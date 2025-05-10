@@ -23,7 +23,7 @@ function App() {
   return (
     <>
       <div>
-        <h1 className='capitalize font-cancun'>Children's Valley English School</h1>
+        <h1 className='capitalize font-cancun'><span className='text-green-500'>Children's</span> <span className='text-blue-900'>Valley</span> <span className='text-red-500'>English</span> <span className='text-pink-500'>School</span></h1>
       </div>
       <h1 className='capitalize font-cancun'>coming soon</h1>
       <div className="card">
