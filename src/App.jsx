@@ -23,9 +23,9 @@ function App() {
   return (
     <>
       <div>
-        <h1 className='capitalize'>Children's Valley English School</h1>
+        <h1 className='capitalize font-cancun'>Children's Valley English School</h1>
       </div>
-      <h1 className='capitalize'>coming soon</h1>
+      <h1 className='capitalize font-cancun'>coming soon</h1>
       <div className="card">
           {formatDate(date)}
       </div>

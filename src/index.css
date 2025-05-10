@@ -1,7 +1,16 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "cancun";
+  display: "swap";
+  src: url("/fonts/cancun.ttf");
+}
+
+@theme {
+  --font-cancun: "cancun", sans-serif;
+}
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: "cancun", sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
@@ -30,6 +39,7 @@ body {
   place-items: center;
   min-width: 320px;
   min-height: 100vh;
+  @apply font-cancun;
 }
 
 h1 {
