@@ -7,7 +7,7 @@ const SideBar = ({ isopen, setIsOpen }) => {
   const [expandFour, setExpandFour] = useState(false);
   return (
     <div
-      className={`h-[100vh] w-96  bg-green-400 fixed z-10 top-0 font-bold ${
+      className={`h-[100vh] w-96  bg-green-600 fixed z-10 top-0 font-bold ${
         isopen ? "left-0 opacity-100" : "-left-[100%] opacity-0"
       } duration-300 transition-all ease-in-out
       `}
@@ -22,15 +22,11 @@ const SideBar = ({ isopen, setIsOpen }) => {
           X
         </button>
       </div>
-      <div className="border-blue-500 border">
+      <div className="">
         <ul className="flex flex-col">
-          <li className="p-2 text-white border-white hover:border-b-2 cursor-pointer">
-            HOME
-          </li>
-
-          <li className="p-2 flex flex-col cursor-pointer hover:border-b-2 border-white ">
+          <li className="p-3 flex flex-col cursor-pointer ">
             <div className="flex justify-between items-center">
-              <p>ABOUT US</p>
+              <p>ABOUT</p>
               <button
                 className=""
                 onClick={() => {
@@ -38,21 +34,22 @@ const SideBar = ({ isopen, setIsOpen }) => {
                 }}
               >
                 {!expand ? (
-                  <BiChevronDown className="min-w-8 min-h-8 " />
+                  <BiChevronDown className="min-w-8 min-h-8 p-1" />
                 ) : (
-                  <BiChevronUp className="min-w-8 min-h-8 " />
+                  <BiChevronUp className="min-w-8 min-h-8 p-1 " />
                 )}
               </button>
             </div>
             <div className={`${expand ? "block" : "hidden"} `}>
               <ul className="px-4 flex flex-col gap-1">
                 <li>VISION MISSION</li>
+
                 <li>COMMITTE</li>
               </ul>
             </div>
           </li>
 
-          <li className="  cursor-pointer p-3 hover:border-b-2 border-white ">
+          <li className="  cursor-pointer p-3  ">
             PROGRAMMERS
             <button
               className="  font-bold float-right "
@@ -60,7 +57,12 @@ const SideBar = ({ isopen, setIsOpen }) => {
                 setExpandTwo((proptwo) => !proptwo);
               }}
             >
-              BUTTON
+              {" "}
+              {!expandTwo ? (
+                <BiChevronDown className="min-w-8 min-h-8 p-1 " />
+              ) : (
+                <BiChevronUp className="min-w-8 min-h-8 p-1" />
+              )}
             </button>
             <div className={`${expandTwo ? "block" : "hidden"} `}>
               <li>
@@ -75,7 +77,7 @@ const SideBar = ({ isopen, setIsOpen }) => {
             </div>
           </li>
 
-          <li className=" 50px] cursor-pointer p-3  hover:border-b-2 border-white ">
+          <li className=" 50px] cursor-pointer p-3  ">
             COUNSELLING
             <button
               className="  font-bold float-right "
@@ -83,7 +85,11 @@ const SideBar = ({ isopen, setIsOpen }) => {
                 setExpandThree((propThree) => !propThree);
               }}
             >
-              BUTTON
+              {!expandThree ? (
+                <BiChevronDown className="min-w-8 min-h-8 p-1" />
+              ) : (
+                <BiChevronUp className="min-w-8 min-h-8 p-1" />
+              )}
             </button>
             <div className={`${expandThree ? "block" : "hidden"} `}>
               <li>
@@ -97,7 +103,7 @@ const SideBar = ({ isopen, setIsOpen }) => {
               <div></div>
             </div>
           </li>
-          <li className=" 50px] cursor-pointer p-3  hover:border-b-2 border-white ">
+          <li className=" 50px] cursor-pointer p-3   ">
             ACCREDITED INSTITUTES
             <button
               className="  font-bold float-right "
@@ -105,7 +111,11 @@ const SideBar = ({ isopen, setIsOpen }) => {
                 setExpandFour((propFour) => !propFour);
               }}
             >
-              BUTTON
+              {!expandFour ? (
+                <BiChevronDown className="min-w-8 min-h-8 p-1 " />
+              ) : (
+                <BiChevronUp className="min-w-8 min-h-8 p-1 " />
+              )}
             </button>
             <div className={`${expandFour ? "block" : "hidden"} `}>
               <li>
@@ -118,13 +128,6 @@ const SideBar = ({ isopen, setIsOpen }) => {
               </li>
               <div></div>
             </div>
-          </li>
-
-          <li className="  cursor-pointer p-3 hover:underline hover:border-b-2 border-white ">
-            ONLINE COURSE MATERIAL
-          </li>
-          <li className="  cursor-pointer p-3 hover:underline hover:border-b-2 border-white ">
-            SKILL & VOCATIONAL
           </li>
         </ul>
       </div>
