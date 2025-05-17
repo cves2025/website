@@ -20,13 +20,17 @@ const Header = () => {
         </div>
         <p className=" h-full w-full font-cancun flex text-3xl sm:text-5xl md:text-6xl md:flex-row flex-wrap gap-0 px-5 my-4 justify-center text-center">
           <div>
-            <span className="text-primaryGreen ">CHILDREN'S </span>
-            <span className="text-primaryBlue">VALLEY</span>
+            <span className="text-primaryGreen p-2">CHILDREN'S</span>
+            <span className="text-primaryBlue p-2">VALLEY </span>
           </div>
           <div>
-            <span className="text-primaryRed">ENGLISH </span>
-            <span className="text-primaryPink">SCHOOL</span>
+            <span className="text-primaryRed p-2">ENGLISH</span>
+            <span className="text-primaryPink p-2">SCHOOL</span>
+            <br />
           </div>
+          <span className="text-2xl font-serif font-semibold">
+            Mahmoorganj, Varanasi
+          </span>
         </p>
       </div>
       <div className="  h-10 bg-primaryGreen text-white ">

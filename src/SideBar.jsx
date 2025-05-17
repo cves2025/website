@@ -14,7 +14,7 @@ const SideBar = ({ isopen, setIsOpen }) => {
     >
       <div className="flex justify-end">
         <button
-          className="py-2 px-4"
+          className="p-5"
           onClick={() => {
             setIsOpen((prev) => !prev);
           }}

@@ -5,11 +5,11 @@ const Syllabus = () => {
   return (
     <div
       className={`${
-        isOpen ? "h-10 duration-500" : "h-[100rem] duration-500"
-      }  `}
+        isOpen ? "h-10 duration-200" : "h-45rem] duration-200 "
+      } overflow-hidden`}
     >
       <div>
-        <div className="h-[100rem] w-full bg-stone-400 ">
+        <div className=" h-full w-full bg-stone-400  ">
           <div
             isopen={isOpen}
             setIsOpen={setIsOpen}
@@ -22,23 +22,99 @@ const Syllabus = () => {
               className="font-medium text-2xl underline font-serif
                 hover:text-blue-800 duration-500"
             >
-              Click Here For Syllabus
+              Click Here For Syllabus Session 2025-26
             </button>
           </div>
-          <div className="flex  flex-col justify-center text-center font-medium gap-10 py-10  ">
-            <div className={isOpen ? "hidden " : "block "}>Play Group</div>
-            <embed></embed>
-            <div className={isOpen ? "hidden " : "block "}> NUS</div>
-            <div className={isOpen ? "hidden " : "block "}> LKG</div>
-            <div className={isOpen ? "hidden " : "block "}>UKG</div>
-            <div className={isOpen ? "hidden " : "block "}>Class I</div>
-            <div className={isOpen ? "hidden " : "block "}>Class II</div>
-            <div className={isOpen ? "hidden " : "block "}>Class III</div>
-            <div className={isOpen ? "hidden " : "block "}>Class IV</div>
-            <div className={isOpen ? "hidden " : "block "}>Class V</div>
-            <div className={isOpen ? "hidden " : "block "}>Class VI</div>
-            <div className={isOpen ? "hidden " : "block "}>Class VII</div>
-            <div className={isOpen ? "hidden " : "block "}>Class VIII</div>
+          <div className="flex  justify-center font-medium gap-5 py-10  flex-wrap">
+            {/* <div className={isOpen ? "hidden " : "block "}>Play Group</div> */}
+            <div className={`${isOpen ? "hidden" : "block"}  `}>
+              <span>Nursery</span>
+              <embed
+                className="h-[32rem] w-[22rem] "
+                src="/Syllabus/Nursery_Syllabus_2025-26.pdf"
+                type="application/pdf"
+              />
+            </div>
+            <div className={`${isOpen ? "hidden" : "block"}  `}>
+              <span>LKG</span>
+              <embed
+                className="h-[32rem] w-[22rem] "
+                src="/Syllabus/LKG_Syllabus_2025-26.pdf"
+                type="application/pdf"
+              />
+            </div>
+            <div className={`${isOpen ? "hidden" : "block"}  `}>
+              <span>UKG</span>
+              <embed
+                className="h-[32rem] w-[22rem] "
+                src="/Syllabus/UKG_Syllabus_2025-26.pdf"
+                type="application/pdf"
+              />
+            </div>
+            <div className={`${isOpen ? "hidden" : "block"}  `}>
+              <span>CLASS I</span>
+              <embed
+                className="h-[32rem] w-[22rem]"
+                src="/Syllabus/Class-1_Syllabus_2025-26.pdf"
+                type="application/pdf"
+              />
+            </div>
+            <div className={`${isOpen ? "hidden" : "block"}  `}>
+              <span>CLASS II</span>
+              <embed
+                className="h-[32rem] w-[22rem]"
+                src="/Syllabus/Class-2-Syllabus_2025-26.pdf"
+                type="application/pdf"
+              />
+            </div>
+            <div className={`${isOpen ? "hidden" : "block"}  `}>
+              <span>CLASS III</span>
+              <embed
+                className="h-[32rem] w-[22rem]"
+                src="/Syllabus/Class-3_Syllabus_2025-26.pdf"
+                type="application/pdf"
+              />
+            </div>
+            <div className={`${isOpen ? "hidden" : "block"}  `}>
+              <span>CLASS IV</span>
+              <embed
+                className="h-[32rem] w-[22rem] "
+                src="/Syllabus/Class-4_Syllabus_2025-26.pdf"
+                type="application/pdf"
+              />
+            </div>
+            <div className={`${isOpen ? "hidden" : "block"}  `}>
+              <span>CLASS V</span>
+              <embed
+                className="h-[32rem] w-[22rem]"
+                src="/Syllabus/Class-5_Syllabus_2025-26.pdf"
+                type="application/pdf"
+              />
+            </div>
+            <div className={`${isOpen ? "hidden" : "block"}  `}>
+              <span>CLASS VI</span>
+              <embed
+                className="h-[32rem] w-[22rem]"
+                src="/Syllabus/Class-6_Syllabus_2025-26.pdf"
+                type="application/pdf"
+              />
+            </div>
+            <div className={`${isOpen ? "hidden" : "block"}  `}>
+              <span>CLASS VII</span>
+              <embed
+                className="h-[32rem] w-[22rem]"
+                src="/Syllabus/Class-7_Syllabus_2025-26.pdf"
+                type="application/pdf"
+              />
+            </div>
+            <div className={`${isOpen ? "hidden" : "block"}  `}>
+              <span>CLASS VIII</span>
+              <embed
+                className="h-[32rem] w-[22rem]"
+                src="/Syllabus/Class-8_Syllabus_2025-26.pdf"
+                type="application/pdf"
+              />
+            </div>
           </div>
         </div>
       </div>
