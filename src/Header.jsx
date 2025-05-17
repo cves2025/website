@@ -43,15 +43,15 @@ const Header = () => {
         </div>
       </div>
       <div className="bg-primaryGreen text-white p-4">
-        <div className="  text-2xl md:flex md:justify-center hidden sm:block">
-          <ul className="flex gap-2 font-semibold">
-            <li className="cursor-pointer hover:text-black duration-500 shadow shadow-white rounded-xl border border-white">
+        <div className="md:flex md:justify-center hidden sm:block ">
+          <ul className="text-lg flex flex-wrap gap-5 justify-center items-center font-semibold">
+            <li className="cursor-pointer hover:text-primaryGreen hover:bg-white  duration-500 shadow shadow-white rounded-xl border border-white">
               <a href="/" className="flex gap-2 items-center px-4 py-1">
                 <FaHome />
                 Home
               </a>
             </li>
-            <li className="cursor-pointer hover:text-black duration-500 shadow shadow-white rounded-xl border border-white">
+            <li className="cursor-pointer hover:text-primaryGreen hover:bg-white duration-500 shadow shadow-white rounded-xl border border-white">
               <a
                 href="/sections=about_us"
                 className="flex gap-2 items-center px-4 py-1"
@@ -60,7 +60,7 @@ const Header = () => {
                 About Us
               </a>
             </li>
-            <li className="cursor-pointer hover:text-black duration-500 shadow shadow-white rounded-xl border border-white">
+            <li className="cursor-pointer hover:text-primaryGreen hover:bg-white duration-500 shadow shadow-white rounded-xl border border-white">
               <a
                 href="/sections=about_us"
                 className="flex gap-2 items-center px-4 py-1"
@@ -68,7 +68,7 @@ const Header = () => {
                 <BsFillMortarboardFill /> Affiliations
               </a>
             </li>
-            <li className="cursor-pointer hover:text-black duration-500 shadow shadow-white rounded-xl border border-white">
+            <li className="cursor-pointer hover:text-primaryGreen hover:bg-white duration-500 shadow shadow-white rounded-xl border border-white">
               <a
                 href="/sections=photo_gallery"
                 className="flex gap-2 items-center px-4 py-1"
@@ -77,7 +77,7 @@ const Header = () => {
                 Photo Gallery
               </a>
             </li>
-            <li className="cursor-pointer hover:text-black duration-500 shadow shadow-white rounded-xl border border-white">
+            <li className="cursor-pointer hover:text-primaryGreen hover:bg-white duration-500 shadow shadow-white rounded-xl border border-white">
               <a
                 href="/sections=downloads"
                 className="flex gap-2 items-center px-4 py-1"
@@ -85,7 +85,7 @@ const Header = () => {
                 <IoCloudDownloadSharp /> Downloads
               </a>
             </li>
-            <li className="cursor-pointer hover:text-black duration-500 shadow shadow-white rounded-xl border border-white">
+            <li className="cursor-pointer hover:text-primaryGreen hover:bg-white duration-500 shadow shadow-white rounded-xl border border-white">
               <a
                 href="/sections=contact_us"
                 className="flex gap-2 items-center px-4 py-1"
@@ -98,12 +98,12 @@ const Header = () => {
         </div>
         <div className="">
           <button
-            className="h-7  md:hidden sm:hidden  bg-green-600  hover:bg-green-500 duration-300  px-5 border border-b-yellow-950 rounded-lg my-1 mx-4 text-white"
+            className="sm:hidden p-2 px-4 flex items-center justify-center gap-2 cursor-pointer hover:text-primaryGreen hover:bg-white duration-500 shadow shadow-white rounded-xl border border-white"
             onClick={() => {
               setIsOpen((prev) => !prev);
             }}
           >
-            <GiHamburgerMenu />
+            <GiHamburgerMenu /> Menu
           </button>
         </div>
       </div>
