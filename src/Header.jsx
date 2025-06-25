@@ -27,7 +27,7 @@ const Header = () => {
         <div className="flex flex-col w-full px-2 my-4 gap-2">
           <div className="h-full w-full font-cancun flex text-2xl sm:text-5xl md:text-6xl md:flex-row flex-wrap gap-x-5 gap-y-2 justify-center items-center text-center">
             <div className="flex gap-2">
-              <span className="text-primaryGreen">CHILDREN'S</span>
+              <span className="text-primaryGreen">CHILDREN'S </span>
               <span className="text-primaryBlue ">VALLEY </span>
             </div>
             <div className="flex gap-2">
