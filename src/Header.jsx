@@ -1,8 +1,5 @@
 import React, { useState } from "react";
 import SideBar from "./SideBar";
-import { FaHamburger, FaHome } from "react-icons/fa";
-import { GiHamburger, GiHamburgerMenu } from "react-icons/gi";
-import { GoMortarBoard } from "react-icons/go";
 import { BsFillMortarboardFill } from "react-icons/bs";
 import { GrGallery } from "react-icons/gr";
 import { IoCloudDownloadSharp, IoMegaphone } from "react-icons/io5";

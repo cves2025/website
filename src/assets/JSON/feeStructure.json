@@ -1,0 +1,14 @@
+[
+    { "title": "Play Group", "fee": "1000" },
+    { "title": "Nursery", "fee": "900" },
+    { "title": "LKG", "fee": "900" },
+    { "title": "UKG", "fee": "900" },
+    { "title": "Class-1", "fee": "950" },
+    { "title": "Class-2", "fee": "950" },
+    { "title": "Class-3", "fee": "950" },
+    { "title": "Class-4", "fee": "950" },
+    { "title": "Class-5", "fee": "950" },
+    { "title": "Class-6", "fee": "1000" },
+    { "title": "Class-7", "fee": "1000" },
+    { "title": "Class-8", "fee": "1000" }
+  ]
