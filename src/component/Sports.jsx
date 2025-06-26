@@ -38,9 +38,9 @@ function Sports() {
         </div>
 
         {/* Text Content */}
-        <div className="flex flex-col items-center justify-center gap-y-4 lg:w-1/2 text-xl md:text-xl text-gray-700 leading-relaxed text-center lg:text-left p-4">
+        <div className="flex flex-col items-center justify-center gap-y-4 text-xl md:text-xl text-gray-700 leading-relaxed text-center lg:text-left p-4">
           <p>
-            At Sun Shine Noble School, we believe in nurturing not only the
+            At Children's Valley English School, we believe in nurturing not only the
             minds but also the bodies and spirits of our students. Our diverse
             range of sports and wellness activities ensures holistic development
             and encourages students to lead active, healthy lives.
@@ -73,7 +73,19 @@ function Sports() {
       <div className="flex flex-col items-center justify-center p-4 gap-4">
         <h1 className="text-2xl font-bold text-gray-800 mb-2">Photos</h1>
         <div className="flex justify-center items-center text-center">
-          Photos Added Soon
+          {Object.values(gamesImages).map((src, index) => (
+            <div
+              key={index}
+              className="w-full md:w-1/2 lg:w-1/3 p-2 m-auto max-w-sm"
+            >
+              <img
+                src={src}
+                alt={`Gallery Image ${index}`}
+                className="w-full h-auto rounded-lg shadow-lg hover:scale-105 transition-transform duration-300 ease-in-out"
+                loading="lazy"
+              />
+            </div>
+          ))}
         </div>
         <div className="flex flex-wrap p-4">
           {Object.values(gamesImages).map((src, index) => (
@@ -97,7 +109,7 @@ function Sports() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
             <iframe
               className="w-full aspect-video rounded-lg shadow-lg"
-              src="https://www.youtube.com/embed/u5C-qtWmWT0"
+              src="https://www.youtube.com/embed/YiQf1ngUJqY?si=qGAbhd8l_8tGsjRU"
               title="Classical Dance Performance"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
@@ -105,7 +117,7 @@ function Sports() {
 
             <iframe
               className="w-full aspect-video rounded-lg shadow-lg"
-              src="https://www.youtube.com/embed/DFIGFL9Otvg"
+              src="https://www.youtube.com/embed/o7nJUNdIiio?si=CW0t0HAUeo9IuadR  "
               title="Karate Training Session"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
@@ -113,7 +125,7 @@ function Sports() {
 
             <iframe
               className="w-full aspect-video rounded-lg shadow-lg"
-              src="https://www.youtube.com/embed/DTT9klp8Pqo"
+              src="https://www.youtube.com/embed/ZMfgDNiTuKs?si=1if1nbWRBpvNA4Lx"
               title="Karate Training Session"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen

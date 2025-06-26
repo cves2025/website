@@ -1,17 +1,13 @@
-import React from "react";
-import Navbar from "./Navbar";
+
 import Router from "./Router";
 import Footer from "./Footer";
-// import Advertise from "./Advertise";
+
 import Banner from "./Banner";
 import Header from "./Header";
 import Navbar2 from "./Navbar2";
 import { useLocation } from "react-router-dom";
 
 function Head() {
-  // const date = new Date();
-  // const currentMonth = date.toLocaleString("default", { month: "long" });
-  // const month = ["August", "September", "October", "November", "December"];
   const location = useLocation();
 
   return (
@@ -19,16 +15,11 @@ function Head() {
       {location.pathname == "/" ? (
         <Banner />
       ) : (
-        <>
+        <div className="sticky top-0 z-50">
           <Header />
-          <Navbar2 dynemicClass="bg-gray-100 top-[144px]"/>
-        </>
+          <Navbar2 dynemicClass="bg-gray-100"/>
+        </div>
       )}
-      {/* <Header /> 
-      <Navbar2 /> */}
-      {/* <Navbar /> */}
-      {/* <Banner /> */}
-      {/* {!month.includes(currentMonth) && <Advertise />} */}
       <Router />
       <Footer />
     </div>

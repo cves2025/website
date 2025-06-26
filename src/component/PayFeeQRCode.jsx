@@ -17,12 +17,12 @@ function PayFeeQRCode({ onClose, titleAndFee }) {
 
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-25"
+      className="absolute top-5 inset-0 flex justify-center items-center bg-black bg-opacity-75"
       onClick={() => onClose()}
     >
-      <div className="relative p-4 transform scale-90 transition-transform duration-300 ease-out animate-zoomIn">
+      <div className="relative top-6 transform scale-90 transition-transform duration-300 ease-out animate-zoomIn">
         <div
-          className="flex flex-col items-center gap-4 bg-white rounded-lg shadow-lg p-6"
+          className="flex flex-col items-center gap-4 max-w-fit bg-white rounded-lg shadow-lg p-10"
           onClick={(e) => e.stopPropagation()} // Prevent closing on inner click
         >
           <QRCodeCanvas value={upiUrl} size={200} />
@@ -37,7 +37,7 @@ function PayFeeQRCode({ onClose, titleAndFee }) {
           <p className="mt-2 text-lg font-semibold">Pay to {titleAndFee.title}</p>
         </div>
         <button
-          className="absolute top-4 right-4 bg-red-600 text-white rounded-full px-3 py-1 text-lg"
+          className="absolute top-6 right-0 bg-red-600 text-white rounded-full px-3 py-1 text-lg"
           onClick={() => onClose()}
         >
           ✖

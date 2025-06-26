@@ -1,8 +1,5 @@
 import React, { useState, useEffect } from "react";
 import Underline from "../design/Underline";
-import Button from "../design/Button";
-// import { firebaseStorageImageData } from "../imageUrls.js"; // Image data source
-import GallerySkeleton from "../design/GallerySkeleton.jsx"; // Skeleton component
 
 function Gallery() {
   // const [allImages, setAllImages] = useState(firebaseStorageImageData);
@@ -33,14 +30,6 @@ function Gallery() {
     setImages(loadedImages);
   }, []);
 
-  // useEffect(() => {
-  //   // Simulating loading delay before displaying images
-  //   setTimeout(() => {
-  //     setFilteredImages(firebaseStorageImageData); // Load images after delay
-  //     setLoading(false);
-  //   }, 1500);
-  // }, []);
-
   const handleCloseModal = () => {
     setIsClosing(true);
     setTimeout(() => {
@@ -48,16 +37,6 @@ function Gallery() {
       setIsClosing(false);
     }, 100);
   };
-
-  // const handleFilter = (category) => {
-  //   if (category === "All") {
-  //     setFilteredImages(allImages);
-  //   } else {
-  //     const filtered = allImages.filter((img) => img.category === category);
-  //     setFilteredImages(filtered);
-  //   }
-  //   setActiveButton(category);
-  // };
 
   return (
     <>

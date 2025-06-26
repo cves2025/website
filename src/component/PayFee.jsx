@@ -16,7 +16,7 @@ function PayFee() {
   }
 
   return (
-    <div>
+    <div className="relative">
       <div className="max-w-xl mx-auto mt-8">
         <div className="flex flex-col justify-center items-center mt-4">
           <p className="text-3xl md:text-5xl font-extrabold text-gray-800 leading-tight">

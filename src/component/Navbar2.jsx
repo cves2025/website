@@ -15,9 +15,8 @@ function Navbar2({ dynemicClass }) {
 
   return (
     <nav
-      className={`sticky top-[95px] z-50 md:top-[6rem] lg:top-[8rem] md:flex md:justify-center md:items-center ${dynemicClass}`}
+      className={`sticky z-50 md:flex md:justify-center md:items-center ${dynemicClass}`}
     >
-      {" "}
       {/* Adjust top position to prevent overlap */}
       <div className="flex md:justify-between md:items-center">
         <div className="hidden text-orange-600 text-2xl gap-10 md:flex z-50 flex-based md:justify-center md:items-center md:p-3">
