@@ -2,8 +2,6 @@ import React, { useState } from "react";
 import Underline from "../design/Underline";
 import PayFeeQRCode from "./PayFeeQRCode";
 import feeStructureData from "../assets/JSON/feeStructure.json"; // Importing fee structure from JSON file
-// import { ref, getDownloadURL } from "firebase/storage";
-// import { storage } from "../firebase"; // adjust path if needed
 
 function PayFee() {
   const [openQRCode, setOpenQRCode] = useState(false);
@@ -18,7 +16,7 @@ function PayFee() {
   }
 
   return (
-    <div className="h-[41vh]">
+    <div>
       <div className="max-w-xl mx-auto mt-8">
         <div className="flex flex-col justify-center items-center mt-4">
           <p className="text-3xl md:text-5xl font-extrabold text-gray-800 leading-tight">

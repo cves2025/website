@@ -78,6 +78,7 @@ function Navbar2({ dynemicClass }) {
             Pay Fee
           </NavLink>
         </div>
+        {/* Mobile view navbar start from here */}
         <div
           className={`flex relative flex-col text-white font-bold text-2xl p-4 w-full md:hidden z-40 bg-amber-400`}
         >

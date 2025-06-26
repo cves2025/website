@@ -14,7 +14,8 @@ const banners = [
   {
     img: banner1,
     title: "Learn. Grow. Lead.",
-    description: "We cultivate a learning environment where every child is encouraged to grow intellectually and lead with confidence.",
+    description:
+      "We cultivate a learning environment where every child is encouraged to grow intellectually and lead with confidence.",
   },
   {
     img: banner2,
@@ -53,8 +54,6 @@ const banners = [
   },
 ];
 
-
-
 // Clone images for infinite scroll illusion
 const extendedBanners = [...banners, ...banners];
 
@@ -63,7 +62,7 @@ function Banner() {
   const [index, setIndex] = useState(0);
   const sliderRef = useRef(null);
   const total = banners.length;
-  const [currentYear, setCurrentYear] = useState(()=>{
+  const [currentYear, setCurrentYear] = useState(() => {
     const date = new Date();
     return date.getFullYear();
   });
@@ -97,26 +96,23 @@ function Banner() {
     }
   }, [index, total]);
 
-  useEffect(()=>{
-    const handleScroll = () =>{
-      if(window.scrollY > 50){
-        setScrollNav(true)
-      }else{
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 50) {
+        setScrollNav(true);
+      } else {
         setScrollNav(false);
       }
-    }
+    };
     window.addEventListener("scroll", handleScroll);
-    return () =>{
-      window.removeEventListener("scroll", handleScroll)
-    }
-  },[])
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
 
   return (
     <>
       <div className="relative overflow-hidden lg:w-full">
-        {/* <div className="sticky">
-        <Header />
-      </div> */}
         <div ref={sliderRef} className="flex w-full">
           {extendedBanners.map((banner, i) => (
             <div key={i} className="relative flex-shrink-0 w-full h-screen">
@@ -134,7 +130,16 @@ function Banner() {
               <div className="absolute inset-0 flex flex-col justify-center items-center text-white text-center px-4 ">
                 <div className="flex flex-col justify-center items-center text-center w-full mt-8 overflow-hidden">
                   <h1 className="text-4xl md:text-6xl font-bold text-yellow-400 mb-4 flex flex-col gap-y-4">
-                    {banner.title !== "ADMISSION OPEN" ? banner.title : <>{banner.title}<span className="block sm:inline">{currentYear}-{(currentYear+1).toString().slice(-2)}</span></>}
+                    {banner.title !== "ADMISSION OPEN" ? (
+                      banner.title
+                    ) : (
+                      <>
+                        {banner.title}
+                        <span className="block sm:inline">
+                          {currentYear}-{(currentYear + 1).toString().slice(-2)}
+                        </span>
+                      </>
+                    )}
                   </h1>
 
                   <p className="text-2xl md:text-4xl">{banner.description}</p>
@@ -144,19 +149,20 @@ function Banner() {
           ))}
         </div>
         <div className="absolute inset-0 flex flex-col text-white text-center">
-  <div className="flex w-full md:justify-center md:items-center">
-    {/* Make Header sticky */}
-    <div className="fixed w-full top-0 z-50">
-      <Header />
-    </div>
-
-    {/* Make Navbar sticky */}
-    <div className={`fixed top-0 right-0 w-full z-40 pt-[9rem] md:flex md:justify-center md:items-center md:pt-[8rem] transition-colors duration-300 ${scrollNav ? "bg-gray-100" : "bg-transparent"}`}>
-      <Navbar2 />
-    </div>
-  </div>
-</div>
-
+          <div className="flex w-full md:justify-center md:items-center">
+            {/* Make Header sticky */}
+            <div className="fixed w-full top-0 z-50">
+              <Header />
+              <div
+                className={`w-full z-50 md:flex md:justify-center md:items-center transition-colors duration-300 ${
+                  scrollNav ? "bg-gray-100" : "bg-transparent"
+                }`}
+              >
+                <Navbar2 />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </>
   );
