@@ -4,12 +4,12 @@ import Underline from '../design/Underline'
 
 function Downloads() {
   const pdfModules = import.meta.glob('/src/assets/syllabus/*.pdf', { eager: true });
-  const summerVacationPdfModules = import.meta.glob('/src/assets/summerVacation/*.pdf', { eager: true });
+  const timeTablesPdfModules = import.meta.glob('/src/assets/timeTable/*.pdf', { eager: true });
   const [openIndex, setOpenIndex] = React.useState(null);
 
   const accordians = [
     { title: 'Syllabus 2025-26', fileModules: pdfModules },
-    { title: 'Summer Vacation Homework 2025-26', fileModules: summerVacationPdfModules },
+    { title: 'Time Table 2025-26', fileModules: timeTablesPdfModules },
   ];
 
   return (
