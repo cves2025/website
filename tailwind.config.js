@@ -27,6 +27,10 @@ export default {
       },
     },
   },
-
+  variants: {
+    extend: {
+      display: ["print"],   // important
+    },
+  },
   plugins: [],
 };

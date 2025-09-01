@@ -1,11 +1,14 @@
 import React from "react";
 import Head from "./component/Head";
+import {MyContextProvider} from "./component/context/MyContextProvider";
 
 function App() {
   return (
-    <div className="m-0.5">
-      <Head />
-    </div>
+    <MyContextProvider>
+      <div className="m-0.5">
+        <Head />
+      </div>
+    </MyContextProvider>
   );
 }
 

@@ -5,7 +5,7 @@ import { BiSolidPhoneCall } from "react-icons/bi";
 const Header = () => {
   return (
     <>
-      <div className="flex w-full bg-gray-100 md:gap-x-10 sticky top-0 z-50 text-center">
+      <div className="flex w-full bg-gray-100 md:gap-x-10 sticky top-0 z-50 text-center print:hidden">
         <div className="flex overflow-hidden md:w-40 justify-center items-center">
           <img
             src={schoolLogo}

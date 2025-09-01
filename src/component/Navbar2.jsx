@@ -4,9 +4,17 @@ import { NavLink } from "react-router-dom";
 
 function Navbar2({ dynemicClass }) {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const [downloadIsOpen, setDownloadIsOpen] = React.useState(false);
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
+  };
+
+  const toggleDownloadMenu = () => {
+    setDownloadIsOpen(() => !downloadIsOpen);
+    setTimeout(() => {
+      setDownloadIsOpen(false);
+    }, 5000);
   };
 
   const linkClasses = ({ isActive }) =>
@@ -15,7 +23,7 @@ function Navbar2({ dynemicClass }) {
 
   return (
     <nav
-      className={`sticky z-50 md:flex md:justify-center md:items-center ${dynemicClass}`}
+      className={`sticky z-50 md:flex md:justify-center md:items-center ${dynemicClass} print:hidden`}
     >
       {/* Adjust top position to prevent overlap */}
       <div className="flex md:justify-between md:items-center">
@@ -36,14 +44,60 @@ function Navbar2({ dynemicClass }) {
           >
             Gallery
           </NavLink>
-          <NavLink
-            className={({ isActive }) =>
-              isActive ? "text-blue-600" : "hover:text-amber-600"
-            }
-            to="/downloads"
+          <h1
+            className={`relative flex flex-row justify-center items-center hover:text-amber-600 hover:cursor-pointer`}
+            onClick={toggleDownloadMenu}
           >
             Downloads
-          </NavLink>
+            <svg
+              className={`w-5 h-5 transform transition-transform duration-200 ${
+                downloadIsOpen ? "rotate-180" : ""
+              }`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+            <div
+              className={`${
+                downloadIsOpen
+                  ? "absolute flex flex-col top-10 left-10 bg-gray-100"
+                  : "hidden"
+              }`}
+            >
+              <ul className="">
+                <li>
+                  <NavLink
+                    className={({ isActive }) =>
+                      isActive
+                        ? "text-blue-600 flex flex-row justify-center items-center"
+                        : "hover:text-amber-600 flex justify-row justify-center items-center"
+                    }
+                    to="/downloads"
+                  >
+                    Downloads
+                  </NavLink>
+                </li>
+                <li><NavLink
+                    className={({ isActive }) =>
+                      isActive
+                        ? "text-blue-600 flex flex-row justify-center items-center"
+                        : "hover:text-amber-600 flex justify-row justify-center items-center"
+                    }
+                    to="/download/result"
+                  >
+                    Result
+                  </NavLink></li>
+              </ul>
+            </div>
+          </h1>
           <NavLink
             className={({ isActive }) =>
               isActive ? "text-blue-600" : "hover:text-amber-600"

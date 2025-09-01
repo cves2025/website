@@ -4,7 +4,7 @@ import { BsFillTelephoneForwardFill, BsFillHouseAddFill } from "react-icons/bs";
 
 const Footer = () => {
   return (
-    <footer className="bg-gray-900 text-white py-8 mt-8">
+    <footer className="bg-gray-900 text-white py-8 mt-8 print:hidden">
       <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="flex flex-col items-start gap-y-2">
           <h2 className="text-3xl font-bold mb-2">

@@ -1,16 +1,18 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import Accordian from '../design/Accordian'
 import Underline from '../design/Underline'
 
 function Downloads() {
   const pdfModules = import.meta.glob('/src/assets/syllabus/*.pdf', { eager: true });
   const timeTablesPdfModules = import.meta.glob('/src/assets/timeTable/*.pdf', { eager: true });
+  // const data = '../assets/result.csv';
   const [openIndex, setOpenIndex] = React.useState(null);
 
   const accordians = [
     { title: 'Syllabus 2025-26', fileModules: pdfModules },
     { title: 'Time Table 2025-26', fileModules: timeTablesPdfModules },
   ];
+
 
   return (
     <div className="max-w-xl mx-auto mt-8">
