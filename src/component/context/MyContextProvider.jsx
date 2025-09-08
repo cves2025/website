@@ -26,6 +26,7 @@ export function MyContextProvider({children}) {
   },[])
 
   const login = async (username, password) => {
+    console.log(import.meta.env.VITE_API_URL);
   try {
     const response = await fetch(`${import.meta.env.VITE_API_URL}login`, {
       method: "POST",
