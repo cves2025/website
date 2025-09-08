@@ -13,7 +13,7 @@ function Student() {
     const formData = new FormData();
     formData.append("file", event.target.files[0]);
 
-    const response = await fetch("http://localhost:3000/excelFileUpload", {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}excelFileUpload`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,

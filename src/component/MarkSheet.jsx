@@ -21,7 +21,7 @@ function MarkSheet() {
 
     try {
       const response = await fetch(
-        `http://localhost:3000/api/result?enrollment=${enrollment}`,
+        `${import.meta.env.VITE_API_URL}api/result?enrollment=${enrollment}`,
         {
           method: "GET",
           headers: { "Content-Type": "application/json" },

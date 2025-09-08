@@ -44,7 +44,7 @@ function UnitTest_1() {
     event.preventDefault();
     console.log(selectedClass, selectSubject.split(" ")[0]);
     const response = await fetch(
-      "http://localhost:3000/api/unit_test_1_marks",
+      `${import.meta.env.VITE_API_URL}api/unit_test_1_marks`,
       {
         method: "POST",
         headers: {

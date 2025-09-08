@@ -86,7 +86,7 @@ const FillUnitTest1Marks = ({ students, selectSubject, selectedClass }) => {
 
     try {
       const response = await fetch(
-        "http://localhost:3000/api/unit-test-1/add-marks",
+        `${import.meta.env.VITE_API_URL}api/unit-test-1/add-marks`,
         {
           method: "POST",
           headers: {

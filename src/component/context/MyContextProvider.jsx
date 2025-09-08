@@ -27,7 +27,7 @@ export function MyContextProvider({children}) {
 
   const login = async (username, password) => {
   try {
-    const response = await fetch("http://localhost:3000/login", {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -61,7 +61,7 @@ export function MyContextProvider({children}) {
 const logout = async () => {
   console.log("logout");
   const token = localStorage.getItem("token");
-  const logoutResponse = await fetch("http://localhost:3000/logout", {
+  const logoutResponse = await fetch(`${import.meta.env.VITE_API_URL}logout`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

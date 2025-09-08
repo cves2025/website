@@ -69,7 +69,7 @@ function ExamSettings() {
       return;
     }
     try {
-      const response = await fetch("http://localhost:3000/exam-setting", {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}exam-setting`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -109,7 +109,7 @@ function ExamSettings() {
   const getDateHandler = async () =>{
     if(resultDateReceived) return;
     try {
-      const response = await fetch("http://localhost:3000/api/get-result-date", {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}api/get-result-date`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
