@@ -1,9 +1,16 @@
 [
   {
     
-    "newsDate": "2025-11-17",
-    "newsHeading": "Unit Test-II Exam Announcement",
-    "newsText": "This is to inform all students that Unit Test II will be conducted first week of December as per the academic schedule. Students are advised to start their preparations and revise all the chapters covered in class. The detailed timetable for the examination will be shared shortly by the school administration.",
+    "newsDate": "2026-01-18",
+    "newsHeading": "Annual Exam Announcement",
+    "newsText": "This is to inform all students that Annual Exam will be conducted from 27 February as per the academic schedule. Students are advised to start their preparations and revise all the chapters covered in class. The detailed timetable for the examination will be shared shortly by the school administration.",
     "newsImageUrl": "https://k8school.com/wp-content/uploads/2023/11/Why-Are-Exams-Important-How-Do-They-Improve-Learning.jpg"
+  },
+  {
+    
+    "newsDate": "2026-01-18",
+    "newsHeading": "Basant Panchami Admission Offer (100% discount)",
+    "newsText": "Dear Students and Parents, On the holy occasion of Basant Panchami, our institute is pleased to offer a 100% waiver on the Admission Fee for new enrollments. This special offer is applicable only on Basant Panchami and is subject to seat availability. We invite parents and students to take advantage of this opportunity and begin their academic journey with us. For further information, kindly contact the administration office.",
+    "newsImageUrl": "../image/otherImages/bsant panchami.jpeg"
   }
 ]
