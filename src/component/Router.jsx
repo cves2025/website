@@ -7,6 +7,7 @@ import About from './About'
 import Contact from './Contact'
 import Downloads from './Downloads'
 import ComputerLab from './ComputerLab'
+import ScienceLab from './ScienceLab'
 import Sports from './Sports'
 import AdmissionOpen from './AdmissionOpen'
 import PayFee from './PayFee'
@@ -32,6 +33,7 @@ function Router() {
         <Route path="/contact" element={<Contact />} />
         <Route path="/payFee" element={<PayFee />} />
         <Route path="/facilities/Computer-Lab" element={<ComputerLab />} />
+        <Route path="/facilities/science-Lab" element={<ScienceLab />} />
         <Route path="/facilities/Sports" element={<Sports />} />
         <Route path="/download/result" element={<Result />} />
         <Route path="/login" element={<Login />} />

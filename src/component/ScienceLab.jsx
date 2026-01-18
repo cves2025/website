@@ -2,20 +2,20 @@ import React from "react";
 import Underline from "../design/Underline";
 
 const sideImages = import.meta.glob(
-  "/src/assets/image/computerLabSideBar/*.{jpeg,png,jpg,webp}",
+  "/src/assets/image/scienceLabSidePic/*.{jpeg,png,jpg,webp}",
   { eager: true, import: "default" }
 );
-const computerLabImages = import.meta.glob(
-  "/src/assets/image/computerLab/*.{jpeg,png,jpg,webp}",
+const scienceLabImages = import.meta.glob(
+  "/src/assets/image/scienceLab/*.{jpeg,png,jpg,webp}",
   { eager: true, import: "default" }
 );
 
-function ComputerLab() {
+function ScienceLab() {
   return (
     <div className="flex flex-col gap-y-4 mt-4 pb-4 bg-gradient-to-b from-blue-200 to-white">
       <div className="flex flex-col justify-center items-center mt-4">
         <p className="text-3xl md:text-5xl font-extrabold text-gray-800 leading-tight">
-          <span className="text-pink-500">Computer Lab</span> Facilities
+          <span className="text-pink-500">Science Lab</span> Facilities
         </p>
         <Underline
           width="w-36"
@@ -40,31 +40,31 @@ function ComputerLab() {
         {/* Text Content */}
         <div className="flex flex-col items-center justify-center gap-y-4 text-xl md:text-xl text-gray-700 leading-relaxed text-center lg:text-left p-4">
           <p>
-            At Children's Valley English School, we believe in empowering
-            students with strong digital skills alongside academic excellence.
-            Our well-equipped Computer Lab provides a modern learning
-            environment where students gain practical knowledge and confidence
-            in technology.
+            At Children's Valley English School, we believe that science is best
+            learned through observation and experimentation. Our well-equipped
+            Science Lab provides students with hands-on learning experiences
+            that spark curiosity and deepen their understanding of scientific
+            concepts.
           </p>
           <ul className="list-disc list-inside">
             <li>
-              <strong>Modern Computer Lab:</strong> Our computer lab is equipped
-              with updated systems, high-speed internet, and the latest
-              educational software to support effective learning and hands-on
-              practice.
+              <strong>Well-Equipped Science Lab:</strong> Our science lab is
+              furnished with modern apparatus, models, and tools for Physics,
+              Chemistry, and Biology, ensuring safe and effective practical
+              learning.
             </li>
             <li>
-              <strong>Practical Learning:</strong> Students learn computer
-              fundamentals, typing skills, MS Office, internet usage, and basic
-              programming concepts through structured and interactive sessions
-              guided by trained faculty.
+              <strong>Experiential Learning:</strong> Students actively
+              participate in experiments and demonstrations that strengthen
+              theoretical knowledge and encourage logical thinking, observation
+              skills, and scientific inquiry.
             </li>
             <li>
-              <strong>Digital Awareness:</strong> Special focus is given to
-              cyber safety, responsible internet use, and developing
-              problem-solving skills. Through regular practice, students build
-              technological confidence and are prepared for a digitally driven
-              future.
+              <strong>Safety & Scientific Temperament:</strong> Emphasis is
+              placed on laboratory safety, proper handling of equipment, and
+              developing a scientific attitude. Guided by experienced teachers,
+              students gain confidence, curiosity, and a lifelong interest in
+              science.
             </li>
           </ul>
         </div>
@@ -72,7 +72,7 @@ function ComputerLab() {
       <div className="flex flex-col items-center justify-center p-4 gap-4">
         <h1 className="text-2xl font-bold text-gray-800 mb-2">Photos</h1>
         {/* <div className="flex justify-center items-center text-center">
-          {Object.values(computerLabImages).map((src, index) => (
+          {Object.values(scienceLabImages).map((src, index) => (
             <div
               key={index}
               className="w-full md:w-1/2 lg:w-1/3 p-2 m-auto max-w-sm"
@@ -87,7 +87,7 @@ function ComputerLab() {
           ))}
         </div> */}
         <div className="flex flex-wrap p-4">
-          {Object.values(computerLabImages).map((src, index) => (
+          {Object.values(scienceLabImages).map((src, index) => (
             <div
               key={index}
               className="w-full md:w-1/2 lg:w-1/3 p-2 m-auto max-w-sm"
@@ -138,4 +138,4 @@ function ComputerLab() {
   );
 }
 
-export default ComputerLab;
+export default ScienceLab;
