@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+
+  <url>
+    <loc>https://cves.in/</loc>
+    <lastmod>2026-04-04</lastmod>
+  </url>
+
+  <url>
+    <loc>https://cves.in/gallery</loc>
+  </url>
+
+  <url>
+    <loc>https://cves.in/admission</loc>
+  </url>
+  
+  <url>
+    <loc>https://cves.in/about</loc>
+  </url>
+
+  <url>
+    <loc>https://cves.in/contact</loc>
+  </url>
+  
+  <url>
+    <loc>https://cves.in/pay-fee</loc>
+  </url>
+  
+  <url>
+    <loc>https://cves.in/facilities/computer-lab</loc>
+  </url>
+  
+  <url>
+    <loc>https://cves.in/facilities/Science-lab</loc>
+  </url>
+  
+  <url>
+    <loc>https://cves.in/facilities/sports</loc>
+  </url>
+
+</urlset>

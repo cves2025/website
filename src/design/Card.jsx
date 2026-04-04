@@ -12,7 +12,7 @@ function Card() {
   const files = Object.entries(facilitiesImage).map(([path, module]) => {
     const fileName = path.split("/").pop();
     return {
-      name: fileName.replace(/\.(jpg|jpeg|png)$/i, ""),
+      name: fileName.replace(/\.(jpg|jpeg|png)$/i, "").toLowerCase(),
       url: module,
     };
   });

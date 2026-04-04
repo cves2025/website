@@ -126,7 +126,7 @@ function Navbar2({ dynemicClass }) {
             className={({ isActive }) =>
               isActive ? "text-blue-600" : "hover:text-amber-600"
             }
-            to="/payFee"
+            to="/pay-fee"
           >
             Pay Fee
           </NavLink>
@@ -187,7 +187,7 @@ function Navbar2({ dynemicClass }) {
                 </NavLink>
                 <NavLink
                   className={linkClasses}
-                  to="/payFee"
+                  to="/pay-fee"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   Pay Fee

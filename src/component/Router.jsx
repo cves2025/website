@@ -31,10 +31,10 @@ function Router() {
         <Route path="/admission" element={<AdmissionOpen />} />
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
-        <Route path="/payFee" element={<PayFee />} />
-        <Route path="/facilities/Computer-Lab" element={<ComputerLab />} />
-        <Route path="/facilities/science-Lab" element={<ScienceLab />} />
-        <Route path="/facilities/Sports" element={<Sports />} />
+        <Route path="/pay-fee" element={<PayFee />} />
+        <Route path="/facilities/computer-lab" element={<ComputerLab />} />
+        <Route path="/facilities/science-lab" element={<ScienceLab />} />
+        <Route path="/facilities/sports" element={<Sports />} />
         <Route path="/download/result" element={<Result />} />
         <Route path="/login" element={<Login />} />
         <Route path='/signup' element={<Signup />}/>
