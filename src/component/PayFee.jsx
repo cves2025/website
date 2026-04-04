@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import Underline from "../design/Underline";
 import PayFeeQRCode from "./PayFeeQRCode";
 import feeStructureData from "../assets/JSON/feeStructure.json"; // Importing fee structure from JSON file
+import SEO from "./SEO";
 
 function PayFee() {
   const [openQRCode, setOpenQRCode] = useState(false);
@@ -17,6 +18,10 @@ function PayFee() {
 
   return (
     <div className="relative">
+      <SEO
+      title="Online Fee Payment | Children's Valley English School Varanasi"
+      description="Pay school fees online for Children's Valley English School in Varanasi easily and securely. Quick and convenient payment options available."
+      />
       <div className="max-w-xl mx-auto mt-8">
         <div className="flex flex-col justify-center items-center mt-4">
           <p className="text-3xl md:text-5xl font-extrabold text-gray-800 leading-tight">

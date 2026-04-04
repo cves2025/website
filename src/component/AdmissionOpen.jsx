@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import SEO from "./SEO";
 
 const AdmissionOpen = () => {
   const [currentYear, setCurrentYear] = useState(() => {
@@ -8,6 +9,10 @@ const AdmissionOpen = () => {
 
   return (
     <div className="h-[44vh]">
+      <SEO
+      title="School Admission in Varanasi | Children's Valley English School"
+      description="Apply for admission at Children's Valley English School in Varanasi. Get details about eligibility, admission process, and required documents."
+      />
       <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-8 shadow-lg mx-auto text-center">
         <h1 className="text-4xl font-bold mb-4">
           Admission Open {currentYear}-{(currentYear + 1).toString().slice(-2)}

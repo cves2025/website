@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import Underline from "../design/Underline";
+import SEO from "./SEO";
 
 function Gallery() {
   // const [allImages, setAllImages] = useState(firebaseStorageImageData);
@@ -40,6 +41,10 @@ function Gallery() {
 
   return (
     <>
+    <SEO
+      title="School Gallery | Children's Valley English School Varanasi"
+      description="Explore the gallery of Children's Valley English School in Varanasi showcasing campus, events, activities, and student life."
+      />
       <div className="px-4">
         {/* Heading */}
         <div className="flex flex-col justify-center items-center mt-4">

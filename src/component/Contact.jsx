@@ -1,11 +1,16 @@
 import React from 'react'
 import SchoolMap from './SchoolMap'
 import QRCodeComponent from './QRCodeComponent'
+import SEO from './SEO'
 
 function Contact() {
 
   return (
     <div className='flex flex-col lg:flex-row gap-4 p-4 bg-gray-100'>
+      <SEO
+      title="Contact Children's Valley English School | Varanasi"
+      description="Contact Children's Valley English School in Varanasi for admission inquiries, location details, and other information. Visit or call us today."
+      />
       <div className='flex overflow-auto rounded-lg shadow-lg lg:w-1/2'>
         <SchoolMap />
       </div>

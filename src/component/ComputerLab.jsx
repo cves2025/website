@@ -1,5 +1,6 @@
 import React from "react";
 import Underline from "../design/Underline";
+import SEO from "./SEO";
 
 const sideImages = import.meta.glob(
   "/src/assets/image/computerLabSideBar/*.{jpeg,png,jpg,webp}",
@@ -12,6 +13,11 @@ const computerLabImages = import.meta.glob(
 
 function ComputerLab() {
   return (
+    <>
+    <SEO
+      title="Computer Lab Facility | Children's Valley English School Varanasi"
+      description="Children's Valley English School in Varanasi provides a modern computer lab with updated systems to enhance digital learning and technical skills."
+      />
     <div className="flex flex-col gap-y-4 mt-4 pb-4 bg-gradient-to-b from-blue-200 to-white">
       <div className="flex flex-col justify-center items-center mt-4">
         <p className="text-3xl md:text-5xl font-extrabold text-gray-800 leading-tight">
@@ -135,6 +141,7 @@ function ComputerLab() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 
