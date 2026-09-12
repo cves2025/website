@@ -12,6 +12,22 @@ import { myContext } from "./context/MyContextProvider";
 function Head() {
   const location = useLocation();
   const {user} = useContext(myContext);
+
+  // Panel & auth pages use their OWN layout (sidebar for /welcome, bare screen for
+  // login/signup). Here the public site header/footer are intentionally NOT shown.
+  const isBarePage =
+    location.pathname.startsWith("/welcome") ||
+    location.pathname === "/login" ||
+    location.pathname === "/signup";
+
+  if (isBarePage) {
+    return (
+      <div className="m-0.5">
+        <Router />
+      </div>
+    );
+  }
+
   return (
     <div className="m-0.5">
       {location.pathname == "/" ? (

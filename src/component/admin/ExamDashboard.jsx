@@ -32,7 +32,7 @@ function ExamDashboard() {
           </NavLink>
         </div>
       </div>
-      {user ? user.role == "admin" ? <div className="border-2 p-2 shadow-md">
+      {user ? (user.role == "admin" || user.admin) ? <div className="border-2 p-2 shadow-md">
         <NavLink to="/examDashboard/examSettings"  className="bg-blue-700 text-white font-bold rounded-md p-1" >Exam Settings</NavLink>
       </div>: "" : ""}
     </div>

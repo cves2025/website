@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext } from "react";
 import Breadcrumb from "./Breadcrumb";
 import { myContext } from "../context/MyContextProvider";
+import { API_BASE_URL } from "../context/api";
 import { useNavigate } from "react-router-dom";
 
 function ExamSettings() {
@@ -69,7 +70,7 @@ function ExamSettings() {
       return;
     }
     try {
-      const response = await fetch("http://localhost:3000/exam-setting", {
+      const response = await fetch(`${API_BASE_URL}/exam-setting`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -109,7 +110,7 @@ function ExamSettings() {
   const getDateHandler = async () =>{
     if(resultDateReceived) return;
     try {
-      const response = await fetch("http://localhost:3000/api/get-result-date", {
+      const response = await fetch(`${API_BASE_URL}/api/get-result-date`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -131,7 +132,7 @@ function ExamSettings() {
 
   useEffect(() => {
     if (user) {
-      user.role !== "admin" ? navigate("/examDashboard") : "";
+      !(user?.admin || user.role === "admin") ? navigate("/examDashboard") : "";
     } else {
       navigate("/login");
     }

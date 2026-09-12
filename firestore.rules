@@ -1,0 +1,54 @@
+rules_version = '2';
+
+// ===========================================================================
+// Cloud Firestore security rules for CVES
+// ---------------------------------------------------------------------------
+// STRONG SECURITY: only two effective access levels -
+//   • users/{uid}   -> only the signed-in owner
+//   • school data   -> ONLY admins (custom claim) can read or write
+// Everything else is denied by default. No anonymous, no unauthenticated.
+// ===========================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isAdmin() {
+      // custom claim set by `node scripts/setAdminRole.js` after login + logout/relogin
+      return signedIn() && (request.auth.token.admin == true || request.auth.token.role == 'admin');
+    }
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    // Profile: ONLY the owner of that document
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // App config data: admins only
+    match /app/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Exam result dates: admins only
+    match /examSettings/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Students list: admins only
+    match /students/{enrollment} {
+      allow read, write: if isAdmin();
+    }
+
+    // Unit test marks: admins only
+    match /unitTest1Results/{studentId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Everything else is denied by default.
+  }
+}

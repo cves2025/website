@@ -14,6 +14,18 @@ import PayFee from './PayFee'
 import Result from './Result'
 import Login from './Login'
 import Signup from './Signup'
+import Welcome from './Welcome'
+import PanelHome from './panel/PanelHome'
+import AddStudent from './panel/AddStudent'
+import StudentList from './panel/StudentList'
+import AddTeacher from './panel/AddTeacher'
+import TeachersList from './panel/TeachersList'
+import AdmitCard from './panel/AdmitCard'
+import ResultPanel from './panel/ResultPanel'
+import IdCardStudents from './panel/IdCardStudents'
+import IdCardTeachers from './panel/IdCardTeachers'
+import IdCardStaff from './panel/IdCardStaff'
+import IdCardAdmin from './panel/IdCardAdmin'
 import Dashboard from './admin/Dashboard'
 import Student from './admin/Student';
 import ExamDashboard from './admin/ExamDashboard';
@@ -38,6 +50,19 @@ function Router() {
         <Route path="/download/result" element={<Result />} />
         <Route path="/login" element={<Login />} />
         <Route path='/signup' element={<Signup />}/>
+        <Route path="/welcome" element={<Welcome />}>
+          <Route index element={<PanelHome />} />
+          <Route path="student/add" element={<AddStudent />} />
+          <Route path="student/list" element={<StudentList />} />
+          <Route path="teacher/add" element={<AddTeacher />} />
+          <Route path="teacher/list" element={<TeachersList />} />
+          <Route path="admit-card" element={<AdmitCard />} />
+          <Route path="result" element={<ResultPanel />} />
+          <Route path="id-card/students" element={<IdCardStudents />} />
+          <Route path="id-card/teachers" element={<IdCardTeachers />} />
+          <Route path="id-card/staff" element={<IdCardStaff />} />
+          <Route path="id-card/admin" element={<IdCardAdmin />} />
+        </Route>
         <Route path='/dashboard' element={<Dashboard />}/>
         <Route path='/student' element={<Student />}/>
         <Route path='/examDashboard' element={<ExamDashboard />} />

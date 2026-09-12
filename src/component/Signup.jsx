@@ -1,8 +1,8 @@
 import React, {useState} from 'react'
+import { API_BASE_URL } from './context/api'
 
 function Signup() {
     const [name, setName] = useState("")
-    const [username, setUsername] = useState("")
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [confirmPassword, setConfirmPassword] = useState("")
@@ -18,13 +18,12 @@ function Signup() {
           setError("Password did not match")
           return;
         }
-        const res = await fetch("http://localhost:3000/signup", {
+        const res = await fetch(`${API_BASE_URL}/signup`, {
             method: 'POST',
-            credentials: "include",
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ name, username, email, password }),
+            body: JSON.stringify({ name, email, password }),
           });
           const data = await res.json();
           if (data.message) setMessage(data.message);
@@ -44,14 +43,6 @@ function Signup() {
               className="rounded-lg h-9 pl-4 border"
             />
             <input
-              type="text"
-              value={username}
-              onChange={(e)=>setUsername(e.target.value)}
-              placeholder="Username"
-              required
-              className="rounded-lg h-9 pl-4 border"
-            />
-            <input
               type="email"
               value={email}
               onChange={(e)=>setEmail(e.target.value)}
@@ -60,7 +51,7 @@ function Signup() {
               className="rounded-lg h-9 pl-4 border"
             />
             <input
-              type="text"
+              type="password"
               value={password}
               onChange={(e)=>setPassword(e.target.value)}
               placeholder="Password"
@@ -68,7 +59,7 @@ function Signup() {
               className="rounded-lg h-9 pl-4 border"
             />
             <input
-              type="text"
+              type="password"
               value={confirmPassword}
               onChange={(e)=>setConfirmPassword(e.target.value)}
               placeholder="Confirm Password"

@@ -4,6 +4,7 @@ import schoolLogo from "../assets/image/schoolLogo1.png";
 import OneToEight from "./OneToEight";
 import ShowNurLKGUnitTestResult from "./ShowNurLKGUnitTestResult";
 import ShowUKGUnitTestResult from "./ShowUKGUnitTestResult";
+import { API_BASE_URL, authHeaders } from "./context/api";
 
 function MarkSheet() {
   const [student, setStudent] = useState([]);
@@ -21,10 +22,10 @@ function MarkSheet() {
 
     try {
       const response = await fetch(
-        `http://localhost:3000/api/result?enrollment=${enrollment}`,
+        `${API_BASE_URL}/api/result?enrollment=${enrollment}`,
         {
           method: "GET",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders(),
           credentials: "include",
         }
       );
