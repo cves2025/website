@@ -105,6 +105,7 @@ function AddStudent() {
       phone: data.phone.trim(),
 
       status: "active",
+      isDeleted: false,
 
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),

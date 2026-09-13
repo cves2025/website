@@ -94,6 +94,11 @@ const Footer = () => {
                   Pay Fee
                 </NavLink>
               </li>
+              <li>
+                <NavLink to="/login" className="hover:underline">
+                  Hemraj Sir Login
+                </NavLink>
+              </li>
             </div>
           </ul>
           {/* <hr /> */}

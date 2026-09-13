@@ -10,6 +10,7 @@ import {
   FaSignOutAlt,
   FaAddressCard,
 } from "react-icons/fa";
+import { AiOutlineDashboard } from "react-icons/ai";
 
 type MenuItem =
   | {
@@ -18,9 +19,16 @@ type MenuItem =
       color: string;
       subLinks: { label: string; path: string }[];
     }
-  | { label: string; icon: ReactElement; color: string; path: string };
+  | { label: string; icon: ReactElement; color: string; path: string; end?: boolean };
 
 const MENU: MenuItem[] = [
+  {
+    label: "Dashboard",
+    icon: <AiOutlineDashboard />,
+    color: "text-pink-400 bg-pink-400/10",
+    path: "/welcome",
+    end: true,
+  },
   {
     label: "Student",
     icon: <FaUserGraduate />,
@@ -199,6 +207,7 @@ function Sidebar({ open, onClose }: SidebarProps) {
               <NavLink
                 key={item.label}
                 to={item.path}
+                end={item.end}
                 onClick={onClose}
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all ${

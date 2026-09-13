@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   collection,
-  deleteDoc,
   doc,
   DocumentData,
   getDocs,
@@ -9,7 +8,9 @@ import {
   orderBy,
   query,
   QueryDocumentSnapshot,
+  serverTimestamp,
   startAfter,
+  updateDoc,
   where,
 } from "firebase/firestore";
 import toast from "react-hot-toast";
@@ -39,11 +40,14 @@ interface EnrollmentRecord {
   fatherName?: string;
   phone?: string;
   status?: string;
+  isDeleted?: boolean;
 }
 
 export default function StudentList() {
   const academicYears = generateAcademicYears();
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [studentToDelete, setStudentToDelete] =
+    useState<EnrollmentRecord | null>(null);
   const [students, setStudents] = useState<EnrollmentRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -88,6 +92,7 @@ export default function StudentList() {
       fatherName: data.fatherName ?? "",
       phone: data.phone ?? "",
       status: data.status ?? "active",
+      isDeleted: data.isDeleted === true,
     };
   };
 
@@ -195,7 +200,9 @@ export default function StudentList() {
 
         const snapshot = await getDocs(studentQuery);
 
-        const result = snapshot.docs.map(convertStudent);
+        const result = snapshot.docs
+          .map(convertStudent)
+          .filter((student) => !student.isDeleted);
 
         setStudents(result);
 
@@ -304,31 +311,35 @@ export default function StudentList() {
 
   /*
    * -----------------------------------------------------------
-   * Delete enrollment
+   * Delete enrollment (soft delete)
    * -----------------------------------------------------------
    *
    * IMPORTANT:
-   * We delete the academic enrollment, not the permanent
-   * student document.
+   * We do NOT delete the permanent student document or the
+   * enrollment document. We only mark the enrollment as
+   * `isDeleted: true` so it is hidden from the list.
    */
 
-  const handleDelete = async (enrollmentId: string) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to remove this student's enrollment?"
-    );
-
-    if (!confirmed) {
+  const handleDelete = async () => {
+    if (!studentToDelete) {
       return;
     }
 
-    setDeletingId(enrollmentId);
+    setDeletingId(studentToDelete.id);
 
     try {
-      await deleteDoc(
-        doc(db, COLLECTION.ENROLLMENTS, enrollmentId)
+      await updateDoc(
+        doc(db, COLLECTION.ENROLLMENTS, studentToDelete.id),
+        {
+          isDeleted: true,
+          updatedAt: serverTimestamp(),
+        }
       );
 
       toast.success("Student enrollment removed.");
+
+      setIsDeleteModalOpen(false);
+      setStudentToDelete(null);
 
       cursorRef.current = undefined;
       previousCursorsRef.current = [];
@@ -439,6 +450,9 @@ export default function StudentList() {
           <thead>
             <tr className="border-b bg-gray-50 text-left">
               <th className="px-4 py-3">
+                Sr. No.
+              </th>
+              <th className="px-4 py-3">
                 Enrollment
               </th>
 
@@ -472,7 +486,7 @@ export default function StudentList() {
             {loading ? (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={8}
                   className="px-4 py-10 text-center"
                 >
                   Loading students...
@@ -481,18 +495,21 @@ export default function StudentList() {
             ) : students.length === 0 ? (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={8}
                   className="px-4 py-10 text-center text-gray-500"
                 >
                   No students found.
                 </td>
               </tr>
             ) : (
-              students.map((student) => (
+              students.map((student, index) => (
                 <tr
                   key={student.id}
                   className="border-b last:border-b-0"
                 >
+                  <td className="px-4 py-3">
+                    {index+1}
+                  </td>
                   <td className="px-4 py-3">
                     {student.enrollment}
                   </td>
@@ -534,9 +551,10 @@ export default function StudentList() {
                       <button
                         type="button"
                         disabled={deletingId === student.id}
-                        onClick={() =>
-                          handleDelete(student.id)
-                        }
+                        onClick={() => {
+                          setStudentToDelete(student);
+                          setIsDeleteModalOpen(true);
+                        }}
                         className="rounded border px-3 py-1 text-sm text-red-600 disabled:opacity-50"
                       >
                         {deletingId === student.id
@@ -580,14 +598,19 @@ export default function StudentList() {
         </div>
       </div>
       <Modal
-  isOpen={isDeleteModalOpen}
-  onClose={() => setIsDeleteModalOpen(false)}
-  title="Delete Student"
-  description="Are you sure you want to delete this student?"
-  cancelText="Cancel"
-  submitText="Delete"
-  onSubmit={handleDelete(student.id)}
-/>
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        title="Delete Student"
+        description={
+          studentToDelete
+            ? `Are you sure you want to delete ${studentToDelete.studentName}?`
+            : "Are you sure you want to delete this student?"
+        }
+        cancelText="Cancel"
+        submitText="Delete"
+        loading={deletingId !== null}
+        onSubmit={handleDelete}
+      />
     </div>
   );
 }
