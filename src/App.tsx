@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import Head from "./component/Head";
 import { MyContextProvider } from "./component/context/MyContextProvider";
 import { useNavigate } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
 
 function App() {
   const navigate = useNavigate();
@@ -18,6 +19,7 @@ function App() {
     <MyContextProvider>
       <div className="m-0.5">
         <Head />
+        <Toaster position="top-right" toastOptions={{ duration: 4000, success: { duration: 3000 }, error: { duration: 5000 }, style: { background: "#1f2937", color: "#fff", fontWeight: 600, }, }} /> 
       </div>
     </MyContextProvider>
   );

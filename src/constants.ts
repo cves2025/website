@@ -1,3 +1,8 @@
+export const COLLECTION = {
+  STUDENTS: "students",
+  ENROLLMENTS: "enrollments",
+};
+
 export const CLASSES: string[] = [
   "PG",
   "Nursery",

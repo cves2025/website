@@ -1,30 +1,34 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useForm, SubmitHandler } from "react-hook-form";
-import BulkStudentImport from "./BulkStudentImport";
-import CustomInput from "../../custom-components/CustomInput";
-import CustomSelect from "../../custom-components/CustomSelect";
-import CustomTextarea from "../../custom-components/CustomTextarea";
-import CustomButton from "../../custom-components/CustomButton";
-import FormMessage from "../../custom-components/FormMessage";
-import { CLASSES, EMAIL_PATTERN, PHONE_PATTERN, SECTIONS } from "../../constants";
+import toast from "react-hot-toast";
+import { StudentFormValues } from "../../../utils/type";
+import BulkStudentImport from "../BulkStudentImport";
+import CustomInput from "../../../custom-components/CustomInput";
+import CustomSelect from "../../../custom-components/CustomSelect";
+import CustomTextarea from "../../../custom-components/CustomTextarea";
+import CustomButton from "../../../custom-components/CustomButton";
+import { CLASSES, COLLECTION, EMAIL_PATTERN, PHONE_PATTERN, SECTIONS } from "../../../constants";
+import { collection, doc, writeBatch, serverTimestamp } from "firebase/firestore";
+import { db } from "../../../firebase/config";
+import { generateAcademicYears } from "../../../utils/generateAcademicYears";
 
-interface StudentFormValues {
-  firstName: string;
-  lastName: string;
-  enrollment: string;
-  className: string;
-  section: string;
-  fatherName: string;
-  motherName: string;
-  dob: string;
-  phone: string;
-  email: string;
-  address: string;
-}
+// Academic sessions from 2023-24 up to the current session (generated once).
+const ACADEMIC_YEARS = generateAcademicYears();
 
-interface StoredStudent extends StudentFormValues {
-  id: number;
+function firestoreErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    const message = error.message;
+    const lower = message.toLowerCase();
+    if (lower.includes("permission")) {
+      return "You do not have permission to save students. Please login with an admin account.";
+    }
+    if (lower.includes("token") || lower.includes("session")) {
+      return "Your session is invalid or expired. Please logout and login again.";
+    }
+    return message;
+  }
+  return "Something went wrong while saving to Firestore.";
 }
 
 const defaultValues: StudentFormValues = {
@@ -39,33 +43,89 @@ const defaultValues: StudentFormValues = {
   phone: "",
   email: "",
   address: "",
+  academicYear: "",
 };
 
 function AddStudent() {
   const [activeTab, setActiveTab] = useState("single");
-  const [message, setMessage] = useState("");
-  const [formError, setFormError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const { control, handleSubmit, reset } = useForm({ defaultValues });
 
-  const onSubmit: SubmitHandler<StudentFormValues> = (data) => {
-    setFormError("");
-    const list: StoredStudent[] = JSON.parse(
-      localStorage.getItem("cves_students") || "[]"
-    );
-    if (list.some((s) => s.enrollment === data.enrollment.trim())) {
-      setFormError("A student with this enrollment number already exists.");
-      return;
-    }
-    list.push({ ...data, id: Date.now() });
-    localStorage.setItem("cves_students", JSON.stringify(list));
+  const onSubmit: SubmitHandler<StudentFormValues> = async (data) => {
+  setSaving(true);
+
+  try {
+    const firstName = data.firstName.trim();
+    const lastName = data.lastName.trim();
+    const enrollment = data.enrollment.trim();
+
+    const studentRef = doc(collection(db, COLLECTION.STUDENTS));
+    const enrollmentRef = doc(collection(db, COLLECTION.ENROLLMENTS));
+
+    const batch = writeBatch(db);
+
+    batch.set(studentRef, {
+      firstName,
+      lastName,
+      enrollment,
+
+      firstNameLower: firstName.toLowerCase(),
+      lastNameLower: lastName.toLowerCase(),
+
+      fatherName: data.fatherName.trim(),
+      motherName: data.motherName.trim(),
+      dob: data.dob,
+      phone: data.phone.trim(),
+      email: data.email.trim(),
+      address: data.address.trim(),
+
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    batch.set(enrollmentRef, {
+      studentId: studentRef.id,
+
+      academicYear: data.academicYear,
+      className: data.className,
+      section: data.section,
+
+      enrollment,
+
+      studentName: `${firstName} ${lastName}`.trim(),
+
+      firstName,
+      lastName,
+
+      firstNameLower: firstName.toLowerCase(),
+      lastNameLower: lastName.toLowerCase(),
+
+      fatherName: data.fatherName.trim(),
+      phone: data.phone.trim(),
+
+      status: "active",
+
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    await batch.commit();
+
     reset(defaultValues);
-    setMessage("Student added successfully!");
-    setTimeout(() => setMessage(""), 4000);
-  };
+
+    toast.success(
+      `Student ${data.firstName} ${data.lastName} added successfully!`
+    );
+  } catch (error) {
+    toast.error(firestoreErrorMessage(error));
+  } finally {
+    setSaving(false);
+  }
+};
 
   return (
-    <div className="mx-auto w-full max-w-4xl">
+    <div className="mx-auto w-full max-w-5xl">
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -114,20 +174,23 @@ function AddStudent() {
         <BulkStudentImport />
       ) : (
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6 md:p-8">
-          <FormMessage type="success">
-            {message && (
-              <>
-                {message}{" "}
-                <NavLink to="/welcome/student/list" className="underline">
-                  View Student List
-                </NavLink>
-              </>
-            )}
-          </FormMessage>
-          <FormMessage type="error">{formError}</FormMessage>
-
           <form onSubmit={handleSubmit(onSubmit)} noValidate>
             <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+              <CustomSelect
+                control={control}
+                name="academicYear"
+                label="Academic Year"
+                placeholder="Select Academic Year"
+                options={ACADEMIC_YEARS}
+                rules={{ required: "Please select a Academic Year" }}
+              />
+                <CustomInput
+                  control={control}
+                  name="enrollment"
+                  label="Enrollment No."
+                  placeholder="e.g. 1001"
+                  rules={{ required: "Enrollment number is required" }}
+                />
               <CustomInput
                 control={control}
                 name="firstName"
@@ -155,13 +218,6 @@ function AddStudent() {
                 label="Section"
                 placeholder={null}
                 options={SECTIONS}
-              />
-              <CustomInput
-                control={control}
-                name="enrollment"
-                label="Enrollment No."
-                placeholder="e.g. 1001"
-                rules={{ required: "Enrollment number is required" }}
               />
               <CustomInput
                 control={control}
@@ -218,8 +274,8 @@ function AddStudent() {
             </div>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <CustomButton type="submit" variant="success">
-                Add Student
+              <CustomButton type="submit" variant="success" loading={saving}>
+                {saving ? "Saving..." : "Add Student"}
               </CustomButton>
               <NavLink
                 to="/welcome/student/list"
