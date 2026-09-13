@@ -5,6 +5,7 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   description?: string;
+  children?: React.ReactNode;
   cancelText?: string;
   submitText?: string;
   onSubmit: () => void;
@@ -17,6 +18,7 @@ const Modal: React.FC<ModalProps> = ({
   onClose,
   title,
   description,
+  children,
   cancelText = "Cancel",
   submitText = "Submit",
   onSubmit,
@@ -51,6 +53,9 @@ const Modal: React.FC<ModalProps> = ({
             {description}
           </p>
         )}
+
+        {/* Body content */}
+        {children}
 
         {/* Actions */}
         <div className="mt-6 flex justify-end gap-3">
