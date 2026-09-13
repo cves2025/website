@@ -1,11 +1,15 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { NavLink } from "react-router-dom";
+import { useForm } from "react-hook-form";
 import BulkStudentImport from "./BulkStudentImport";
+import CustomInput from "../../custom-components/CustomInput";
+import CustomSelect from "../../custom-components/CustomSelect";
+import CustomTextarea from "../../custom-components/CustomTextarea";
+import CustomButton from "../../custom-components/CustomButton";
+import FormMessage from "../../custom-components/FormMessage";
+import { CLASSES, EMAIL_PATTERN, PHONE_PATTERN, SECTIONS } from "../../constants";
 
-const CLASSES = ["PG", "Nursery", "LKG", "UKG", "1", "2", "3", "4", "5", "6", "7", "8"];
-const SECTIONS = ["A", "B", "C"];
-
-const emptyStudent = {
+const defaultValues = {
   firstName: "",
   lastName: "",
   enrollment: "",
@@ -21,44 +25,47 @@ const emptyStudent = {
 
 function AddStudent() {
   const [activeTab, setActiveTab] = useState("single");
-  const [student, setStudent] = useState(emptyStudent);
   const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [formError, setFormError] = useState("");
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setStudent((prev) => ({ ...prev, [name]: value }));
-  };
+  const { control, handleSubmit, reset } = useForm({ defaultValues });
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setError("");
-    if (!student.firstName || !student.enrollment || !student.className) {
-      setError("First name, enrollment number and class are required.");
-      return;
-    }
+  const onSubmit = (data) => {
+    setFormError("");
     const list = JSON.parse(localStorage.getItem("cves_students") || "[]");
-    if (list.some((s) => s.enrollment === student.enrollment.trim())) {
-      setError("A student with this enrollment number already exists.");
+    if (list.some((s) => s.enrollment === data.enrollment.trim())) {
+      setFormError("A student with this enrollment number already exists.");
       return;
     }
-    list.push({ ...student, id: Date.now() });
+    list.push({ ...data, id: Date.now() });
     localStorage.setItem("cves_students", JSON.stringify(list));
-    setStudent(emptyStudent);
+    reset(defaultValues);
     setMessage("Student added successfully!");
     setTimeout(() => setMessage(""), 4000);
   };
 
-  const inputClass =
-    "w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
-
   return (
-    <div className="max-w-3xl">
-      <h2 className="text-2xl md:text-3xl font-bold text-gray-800">Add Student</h2>
-      <p className="text-gray-600 mt-1 mb-6">Add a single student or import in bulk.</p>
+    <div className="mx-auto w-full max-w-4xl">
+      {/* Header */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800 md:text-3xl">
+            Add Student
+          </h2>
+          <p className="mt-1 text-gray-600">
+            Add a single student or import in bulk.
+          </p>
+        </div>
+        <NavLink
+          to="/welcome/student/list"
+          className="rounded-md bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700"
+        >
+          Student List
+        </NavLink>
+      </div>
 
       {/* Tabs */}
-      <div className="mb-6 inline-flex rounded-lg border border-gray-300 bg-white overflow-hidden">
+      <div className="mb-6 inline-flex overflow-hidden rounded-lg border border-gray-300 bg-white">
         <button
           type="button"
           onClick={() => setActiveTab("single")}
@@ -86,99 +93,123 @@ function AddStudent() {
       {activeTab === "bulk" ? (
         <BulkStudentImport />
       ) : (
-      <div>
-      {message && (
-        <p className="mb-4 bg-green-100 text-green-700 border border-green-300 rounded-md px-4 py-2 font-semibold">
-          {message}{" "}
-          <NavLink to="/welcome/student/list" className="underline">
-            View Student List
-          </NavLink>
-        </p>
-      )}
-      {error && (
-        <p className="mb-4 bg-red-100 text-red-700 border border-red-300 rounded-md px-4 py-2 font-semibold">
-          {error}
-        </p>
-      )}
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6 md:p-8">
+          <FormMessage type="success">
+            {message && (
+              <>
+                {message}{" "}
+                <NavLink to="/welcome/student/list" className="underline">
+                  View Student List
+                </NavLink>
+              </>
+            )}
+          </FormMessage>
+          <FormMessage type="error">{formError}</FormMessage>
 
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6"
-      >
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">First Name *</label>
-            <input name="firstName" value={student.firstName} onChange={handleChange} placeholder="First name" className={inputClass} />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Last Name</label>
-            <input name="lastName" value={student.lastName} onChange={handleChange} placeholder="Last name" className={inputClass} />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Enrollment No. *</label>
-            <input name="enrollment" value={student.enrollment} onChange={handleChange} placeholder="e.g. 1001" className={inputClass} />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Class *</label>
-              <select name="className" value={student.className} onChange={handleChange} className={inputClass}>
-                <option value="">Select</option>
-                {CLASSES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
+          <form onSubmit={handleSubmit(onSubmit)} noValidate>
+            <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+              <CustomInput
+                control={control}
+                name="firstName"
+                label="First Name"
+                placeholder="First name"
+                rules={{ required: "First name is required" }}
+              />
+              <CustomInput
+                control={control}
+                name="lastName"
+                label="Last Name"
+                placeholder="Last name"
+              />
+              <CustomSelect
+                control={control}
+                name="className"
+                label="Class"
+                placeholder="Select class"
+                options={CLASSES}
+                rules={{ required: "Please select a class" }}
+              />
+              <CustomSelect
+                control={control}
+                name="section"
+                label="Section"
+                placeholder={null}
+                options={SECTIONS}
+              />
+              <CustomInput
+                control={control}
+                name="enrollment"
+                label="Enrollment No."
+                placeholder="e.g. 1001"
+                rules={{ required: "Enrollment number is required" }}
+              />
+              <CustomInput
+                control={control}
+                name="fatherName"
+                label="Father's Name"
+                placeholder="Father's name"
+              />
+              <CustomInput
+                control={control}
+                name="motherName"
+                label="Mother's Name"
+                placeholder="Mother's name"
+              />
+              <CustomInput
+                control={control}
+                name="dob"
+                label="Date of Birth"
+                type="date"
+              />
+              <CustomInput
+                control={control}
+                name="phone"
+                label="Phone"
+                type="tel"
+                placeholder="Mobile number"
+                rules={{
+                  pattern: {
+                    value: PHONE_PATTERN,
+                    message: "Phone can contain only digits, spaces, + or -",
+                  },
+                }}
+              />
+              <CustomInput
+                control={control}
+                name="email"
+                label="Email"
+                type="email"
+                placeholder="Email"
+                rules={{
+                  pattern: {
+                    value: EMAIL_PATTERN,
+                    message: "Enter a valid email address",
+                  },
+                }}
+              />
+              <CustomTextarea
+                control={control}
+                name="address"
+                label="Address"
+                placeholder="Full address"
+                rows={2}
+                wrapperClassName="sm:col-span-2"
+              />
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Section</label>
-              <select name="section" value={student.section} onChange={handleChange} className={inputClass}>
-                {SECTIONS.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Father's Name</label>
-            <input name="fatherName" value={student.fatherName} onChange={handleChange} placeholder="Father's name" className={inputClass} />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Mother's Name</label>
-            <input name="motherName" value={student.motherName} onChange={handleChange} placeholder="Mother's name" className={inputClass} />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Date of Birth</label>
-            <input type="date" name="dob" value={student.dob} onChange={handleChange} className={inputClass} />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Phone</label>
-            <input name="phone" value={student.phone} onChange={handleChange} placeholder="Mobile number" className={inputClass} />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Email</label>
-            <input type="email" name="email" value={student.email} onChange={handleChange} placeholder="Email" className={inputClass} />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Address</label>
-            <textarea name="address" value={student.address} onChange={handleChange} placeholder="Full address" rows="2" className={inputClass} />
-          </div>
-        </div>
 
-        <div className="mt-6 flex flex-wrap gap-3">
-          <button
-            type="submit"
-            className="bg-green-600 hover:bg-green-700 text-white font-bold rounded-md px-6 py-2.5 transition-colors"
-          >
-            Add Student
-          </button>
-          <NavLink
-            to="/welcome/student/list"
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-md px-6 py-2.5 transition-colors text-center"
-          >
-            Student List
-          </NavLink>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <CustomButton type="submit" variant="success">
+                Add Student
+              </CustomButton>
+              <NavLink
+                to="/welcome/student/list"
+                className="inline-flex items-center justify-center rounded-md bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700"
+              >
+                Student List
+              </NavLink>
+            </div>
+          </form>
         </div>
-      </form>
-      </div>
       )}
     </div>
   );
