@@ -2,12 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body, #root {
-  height: 100%;
-  margin: 0;
-  overflow: hidden;
-}
-
 @font-face {
   font-family: "Cancun";
   src: local("Cancun"), url("/fonts/cancun.ttf") format("truetype");
