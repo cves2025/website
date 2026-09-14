@@ -96,7 +96,7 @@ const Footer = () => {
               </li>
               <li>
                 <NavLink to="/login" className="hover:underline">
-                  Hemraj Sir Login
+                  Admin Login
                 </NavLink>
               </li>
             </div>

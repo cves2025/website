@@ -1,20 +1,118 @@
 import { useState } from "react";
-import { NavLink } from "react-router-dom";
-import { useForm, SubmitHandler } from "react-hook-form";
+import { useForm, SubmitHandler, FieldPath } from "react-hook-form";
 import toast from "react-hot-toast";
-import { StudentFormValues } from "../../../utils/type";
+import { AdmissionStudentFormValues } from "../../../utils/type";
 import BulkStudentImport from "../BulkStudentImport";
-import CustomInput from "../../../custom-components/CustomInput";
-import CustomSelect from "../../../custom-components/CustomSelect";
-import CustomTextarea from "../../../custom-components/CustomTextarea";
 import CustomButton from "../../../custom-components/CustomButton";
-import { CLASSES, COLLECTION, EMAIL_PATTERN, PHONE_PATTERN, SECTIONS } from "../../../constants";
-import { collection, doc, writeBatch, serverTimestamp } from "firebase/firestore";
+import AdmissionBoxedInput from "../../../custom-components/admission/AdmissionBoxedInput";
+import AdmissionCheckboxGroup from "../../../custom-components/admission/AdmissionCheckboxGroup";
+import AdmissionDateOfBirth from "../../../custom-components/admission/AdmissionDateOfBirth";
+import AdmissionLineInput from "../../../custom-components/admission/AdmissionLineInput";
+import AdmissionPinInput from "../../../custom-components/admission/AdmissionPinInput";
+import AdmissionSessionInput from "../../../custom-components/admission/AdmissionSessionInput";
+import {
+  CLASSES,
+  COLLECTION,
+  EMAIL_PATTERN,
+  PHONE_PATTERN,
+} from "../../../constants";
+import {
+  collection,
+  doc,
+  serverTimestamp,
+  writeBatch,
+} from "firebase/firestore";
 import { db } from "../../../firebase/config";
-import { generateAcademicYears } from "../../../utils/generateAcademicYears";
+import schoolLogo from "../../../assets/image/schoolLogo.jpg";
+import QrCodeScanForLocation from "./QrCodeScanForLocation";
+import QrCodeScanForContact from "./QrCodeScanForContact";
+import MobileNumberInputBox from "../../../custom-components/admission/MobileNumberInputBox";
+import AdmissionSelectInput from "../../../custom-components/admission/AdmissionSelectInput";
 
-// Academic sessions from 2023-24 up to the current session (generated once).
-const ACADEMIC_YEARS = generateAcademicYears();
+type StudentTab = "info" | "school" | "bulk";
+
+const defaultValues: AdmissionStudentFormValues = {
+  firstName: "",
+  lastName: "",
+  enrollment: "",
+  className: "",
+  section: "A",
+  fatherName: "",
+  motherName: "",
+  dob: "",
+  phone: "",
+  email: "",
+  address: "",
+  academicYear: "",
+  fullName: "",
+  fatherOccupation: "",
+  gender: "",
+  category: "",
+  nationality: "",
+  phone2: "",
+  correspondenceName: "",
+  city: "",
+  state: "",
+  pin: "",
+  permanentAddress: "",
+  permanentCity: "",
+  permanentState: "",
+  permanentPin: "",
+  sessionStart: "",
+  sessionEnd: "",
+  dobDay: "",
+  dobMonth: "",
+  dobYear: "",
+  penOfStudent: "",
+  lastSchoolName: "",
+  lastSchoolAddress: "",
+  passingYear: "",
+  previousQualifyingExam: {
+    maximumMarks: "",
+    previousClass: "",
+    marksObtained: "",
+    percentage: "",
+  },
+  physicalStatus: {
+    studentName: "",
+    fatherName: "",
+    motherName: "",
+    weight: "",
+    height: "",
+    bloodGroup: "",
+    allergyMedicine: "",
+    allergyOther: "",
+    disease: "",
+    otherInformation: "",
+  },
+  studentPhoto: "",
+  motherPhoto: "",
+  fatherPhoto: "",
+};
+
+const PIN_RULES = {
+  pattern: {
+    value: /^\d{0,6}$/,
+    message: "PIN must be 6 digits",
+  },
+};
+
+/** Fields validated before the user can move from tab 1 to tab 2. */
+const page1RequiredFields: FieldPath<AdmissionStudentFormValues>[] = [
+  "fullName",
+  "motherName",
+  "fatherName",
+  "className",
+  "enrollment",
+  "sessionStart",
+  "sessionEnd",
+  "gender",
+  "category",
+  "nationality",
+  "dobYear",
+  "phone",
+  "email",
+];
 
 function firestoreErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -31,132 +129,177 @@ function firestoreErrorMessage(error: unknown): string {
   return "Something went wrong while saving to Firestore.";
 }
 
-const defaultValues: StudentFormValues = {
-  firstName: "",
-  lastName: "",
-  enrollment: "",
-  className: "",
-  section: "A",
-  fatherName: "",
-  motherName: "",
-  dob: "",
-  phone: "",
-  email: "",
-  address: "",
-  academicYear: "",
-};
-
 function AddStudent() {
-  const [activeTab, setActiveTab] = useState("single");
+  const [activeTab, setActiveTab] = useState<StudentTab>("info");
   const [saving, setSaving] = useState(false);
 
-  const { control, handleSubmit, reset } = useForm({ defaultValues });
-
-  const onSubmit: SubmitHandler<StudentFormValues> = async (data) => {
-  setSaving(true);
-
-  try {
-    const firstName = data.firstName.trim();
-    const lastName = data.lastName.trim();
-    const enrollment = data.enrollment.trim();
-
-    const studentRef = doc(collection(db, COLLECTION.STUDENTS));
-    const enrollmentRef = doc(collection(db, COLLECTION.ENROLLMENTS));
-
-    const batch = writeBatch(db);
-
-    batch.set(studentRef, {
-      firstName,
-      lastName,
-      enrollment,
-
-      firstNameLower: firstName.toLowerCase(),
-      lastNameLower: lastName.toLowerCase(),
-
-      fatherName: data.fatherName.trim(),
-      motherName: data.motherName.trim(),
-      dob: data.dob,
-      phone: data.phone.trim(),
-      email: data.email.trim(),
-      address: data.address.trim(),
-
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+  const { control, getValues, handleSubmit, reset, trigger } =
+    useForm<AdmissionStudentFormValues>({
+      defaultValues,
     });
 
-    batch.set(enrollmentRef, {
-      studentId: studentRef.id,
+  const handleNext = async () => {
+    const valid = await trigger(page1RequiredFields);
+    if (!valid) {
+      return;
+    }
 
-      academicYear: data.academicYear,
-      className: data.className,
-      section: data.section,
+    const { dobDay, dobMonth, dobYear } = getValues();
+    if (!dobDay.trim() || !dobMonth.trim() || !dobYear.trim()) {
+      toast.error(
+        "Please fill the student's date of birth (DATE / MONTH / YEAR).",
+      );
+      return;
+    }
 
-      enrollment,
+    setActiveTab("school");
+  };
 
-      studentName: `${firstName} ${lastName}`.trim(),
+  const onSubmit: SubmitHandler<AdmissionStudentFormValues> = async (data) => {
+    setSaving(true);
 
-      firstName,
-      lastName,
+    try {
+      const fullName = data.fullName.trim();
+      const lastSpaceIndex = fullName.lastIndexOf(" ");
+      const firstName =
+        lastSpaceIndex === -1 ? fullName : fullName.slice(0, lastSpaceIndex);
+      const lastName =
+        lastSpaceIndex === -1 ? "" : fullName.slice(lastSpaceIndex + 1);
 
-      firstNameLower: firstName.toLowerCase(),
-      lastNameLower: lastName.toLowerCase(),
+      const academicYear = `20${data.sessionStart.trim()}-20${data.sessionEnd.trim()}`;
+      const dob = `${data.dobYear
+        .trim()
+        .padStart(
+          4,
+          "0",
+        )}-${data.dobMonth.trim().padStart(2, "0")}-${data.dobDay
+        .trim()
+        .padStart(2, "0")}`;
 
-      fatherName: data.fatherName.trim(),
-      phone: data.phone.trim(),
+      const studentRef = doc(collection(db, COLLECTION.STUDENTS));
+      const enrollmentRef = doc(collection(db, COLLECTION.ENROLLMENTS));
 
-      status: "active",
-      isDeleted: false,
+      const batch = writeBatch(db);
+      batch.set(studentRef, {
+        firstName,
+        lastName,
+        fullName,
+        firstNameLower: firstName.toLowerCase(),
+        lastNameLower: lastName.toLowerCase(),
 
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+        enrollment: data.enrollment.trim(),
+        className: data.className.trim(),
+        section: "A",
+        academicYear,
 
-    await batch.commit();
+        fatherName: data.fatherName.trim(),
+        motherName: data.motherName.trim(),
+        fatherOccupation: data.fatherOccupation.trim(),
+        gender: data.gender,
+        category: data.category,
+        nationality: data.nationality,
+        dob,
+        phone: data.phone.trim(),
+        phone2: data.phone2.trim(),
+        email: data.email.trim(),
+        address: data.address.trim(),
+        correspondenceName: data.correspondenceName.trim(),
+        city: data.city.trim(),
+        state: data.state.trim(),
+        pin: data.pin.trim(),
+        permanentAddress: data.permanentAddress.trim(),
+        permanentCity: data.permanentCity.trim(),
+        permanentState: data.permanentState.trim(),
+        permanentPin: data.permanentPin.trim(),
 
-    reset(defaultValues);
+        penOfStudent: data.penOfStudent.trim(),
+        lastSchoolName: data.lastSchoolName.trim(),
+        lastSchoolAddress: data.lastSchoolAddress.trim(),
+        passingYear: data.passingYear.trim(),
+        previousQualifyingExam: {
+          maximumMarks: data.previousQualifyingExam.maximumMarks.trim(),
+          previousClass: data.previousQualifyingExam.previousClass.trim(),
+          marksObtained: data.previousQualifyingExam.marksObtained.trim(),
+          percentage: data.previousQualifyingExam.percentage.trim(),
+        },
+        physicalStatus: {
+          studentName: data.physicalStatus.studentName.trim(),
+          fatherName: data.physicalStatus.fatherName.trim(),
+          motherName: data.physicalStatus.motherName.trim(),
+          weight: data.physicalStatus.weight.trim(),
+          height: data.physicalStatus.height.trim(),
+          bloodGroup: data.physicalStatus.bloodGroup.trim(),
+          allergyMedicine: data.physicalStatus.allergyMedicine.trim(),
+          allergyOther: data.physicalStatus.allergyOther.trim(),
+          disease: data.physicalStatus.disease.trim(),
+          otherInformation: data.physicalStatus.otherInformation.trim(),
+        },
 
-    toast.success(
-      `Student ${data.firstName} ${data.lastName} added successfully!`
-    );
-  } catch (error) {
-    toast.error(firestoreErrorMessage(error));
-  } finally {
-    setSaving(false);
-  }
-};
+        studentPhoto: data.studentPhoto,
+        motherPhoto: data.motherPhoto,
+        fatherPhoto: data.fatherPhoto,
+
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      batch.set(enrollmentRef, {
+        studentId: studentRef.id,
+        academicYear,
+        className: data.className.trim(),
+        section: "A",
+        enrollment: data.enrollment.trim(),
+        studentName: fullName,
+        firstName,
+        lastName,
+        firstNameLower: firstName.toLowerCase(),
+        lastNameLower: lastName.toLowerCase(),
+        fatherName: data.fatherName.trim(),
+        phone: data.phone.trim(),
+        status: "active",
+        isDeleted: false,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      await batch.commit();
+
+      reset(defaultValues);
+      setActiveTab("info");
+
+      toast.success(`Student ${fullName} added successfully!`);
+    } catch (error) {
+      toast.error(firestoreErrorMessage(error));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="mx-auto w-full max-w-5xl">
-      {/* Header */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800 md:text-3xl">
-            Add Student
-          </h2>
-          <p className="mt-1 text-gray-600">
-            Add a single student or import in bulk.
-          </p>
-        </div>
-        <NavLink
-          to="/welcome/student/list"
-          className="rounded-md bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700"
-        >
-          Student List
-        </NavLink>
-      </div>
-
-      {/* Tabs */}
-      <div className="mb-6 inline-flex overflow-hidden rounded-lg border border-gray-300 bg-white">
+      {/* Form tabs */}
+      <div className="mb-6 inline-flex max-w-full flex-wrap overflow-hidden rounded-lg border border-gray-300 bg-white">
         <button
           type="button"
-          onClick={() => setActiveTab("single")}
+          onClick={() => setActiveTab("info")}
           className={`px-5 py-2 text-sm font-bold transition-colors ${
-            activeTab === "single"
+            activeTab === "info"
               ? "bg-blue-600 text-white"
               : "text-gray-700 hover:bg-gray-100"
           }`}
         >
-          Add Single
+          Student Info
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("school")}
+          className={`px-5 py-2 text-sm font-bold transition-colors ${
+            activeTab === "school"
+              ? "bg-blue-600 text-white"
+              : "text-gray-700 hover:bg-gray-100"
+          }`}
+        >
+          Previous School Info
         </button>
         <button
           type="button"
@@ -173,77 +316,233 @@ function AddStudent() {
 
       {activeTab === "bulk" ? (
         <BulkStudentImport />
-      ) : (
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6 md:p-8">
-          <form onSubmit={handleSubmit(onSubmit)} noValidate>
-            <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
-              <CustomSelect
-                control={control}
-                name="academicYear"
-                label="Academic Year"
-                placeholder="Select Academic Year"
-                options={ACADEMIC_YEARS}
-                rules={{ required: "Please select a Academic Year" }}
+      ) : activeTab === "info" ? (
+        <div className="mx-auto max-w-5xl bg-white p-2 sm:p-2 font-serif text-slate-900">
+          {/* Header */}
+          <div className="flex items-start justify-between mb-2">
+            <div className="text-xs sm:text-sm font-semibold text-slate-800">
+              School Code : 09670911304
+            </div>
+            <div className="text-xs sm:text-sm font-semibold text-slate-800">
+              Affiliation No. : 14203-05
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 mb-2">
+            {/* Logo placeholder */}
+            <div className="h-28 w-28 sm:h-28 sm:w-28 shrink-0 flex items-center justify-center text-center leading-tight text-slate-500 p-1">
+              <img
+                src={schoolLogo}
+                alt="school logo"
+                className="w-28 h-28 lg:w-auto md:h-auto"
+                loading="lazy"
               />
-                <CustomInput
-                  control={control}
-                  name="enrollment"
-                  label="Enrollment No."
-                  placeholder="e.g. 1001"
-                  rules={{ required: "Enrollment number is required" }}
-                />
-              <CustomInput
+            </div>
+
+            <div className="flex-1 text-center">
+              <h1 className="font-cancun text-xl sm:text-2xl font-extrabold tracking-tight">
+                <span className="text-green-700">CHILDREN&apos;S </span>
+                <span className="text-indigo-800">VALLEY </span>
+                <span className="text-red-600">ENGLISH SCHOOL</span>
+              </h1>
+              <p className="italic text-indigo-900 text-xs sm:text-base mt-1">
+                D 59/295 A, Mahmoorganj, Varanasi : 0542-2220107, 9336576690
+              </p>
+              <div className="flex items-center justify-center gap-4 sm:gap-8 mt-2 text-xs sm:text-base">
+                <span className="text-red-600 font-bold underline">
+                  A Gov. Affiliated
+                </span>
+                <span className="text-green-700 font-bold underline">
+                  C.B.S.E. Pattern
+                </span>
+                <span className="text-indigo-900 font-bold underline">
+                  Co - Education
+                </span>
+              </div>
+            </div>
+
+            {/* QR placeholders */}
+            <div className="hidden sm:flex flex-col gap-1 shrink-0">
+              <div className="flex gap-8">
+                <div className="h-16 w-16 border border-slate-400 flex items-center justify-center text-[7px] text-slate-400">
+                  <QrCodeScanForLocation />
+                </div>
+                <div className="h-16 w-16 border border-slate-400 flex items-center justify-center text-[7px] text-slate-400">
+                  <QrCodeScanForContact />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Admission form banner */}
+          <div className="flex justify-center mb-6">
+            <div className="bg-pink-600 text-white text-xl sm:text-xl font-bold italic px-8 py-2 rounded-md shadow">
+              ADMISSION FORM
+            </div>
+          </div>
+
+          {/* Class / Session / Enrollment */}
+          <div className="flex flex-wrap items-end gap-6 mb-6 text-green-800 font-semibold text-sm sm:text-base">
+            <AdmissionSelectInput
+              control={control}
+              name="className"
+              prefix="Class :"
+              placeholder="Select"
+              options={CLASSES.map((cls) => ({ label: cls, value: cls }))}
+            />
+            <AdmissionSessionInput
+              control={control}
+              startName="sessionStart"
+              endName="sessionEnd"
+              rules={{ required: "Please enter session" }}
+            />
+            <AdmissionLineInput
+              control={control}
+              name="enrollment"
+              prefix="Enrollment No. :"
+              className="w-32"
+              rules={{ required: "Enrollment number is required" }}
+            />
+          </div>
+          {/* Student / Mother / Father / Occupation */}
+          <div className="space-y-5 mb-6">
+            <div>
+              <p className="font-bold text-sm sm:text-base mb-1">
+                1. STUDENT&apos;S NAME
+              </p>
+              <AdmissionBoxedInput
                 control={control}
-                name="firstName"
-                label="First Name"
-                placeholder="First name"
-                rules={{ required: "First name is required" }}
+                name="fullName"
+                cells={22}
+                rules={{ required: "Student's name is required" }}
               />
-              <CustomInput
-                control={control}
-                name="lastName"
-                label="Last Name"
-                placeholder="Last name"
-              />
-              <CustomSelect
-                control={control}
-                name="className"
-                label="Class"
-                placeholder="Select class"
-                options={CLASSES}
-                rules={{ required: "Please select a class" }}
-              />
-              <CustomSelect
-                control={control}
-                name="section"
-                label="Section"
-                placeholder={null}
-                options={SECTIONS}
-              />
-              <CustomInput
-                control={control}
-                name="fatherName"
-                label="Father's Name"
-                placeholder="Father's name"
-              />
-              <CustomInput
+            </div>
+            <div>
+              <p className="font-bold text-sm sm:text-base mb-1">
+                2. MOTHER&apos;S NAME
+              </p>
+              <AdmissionBoxedInput
                 control={control}
                 name="motherName"
-                label="Mother's Name"
-                placeholder="Mother's name"
+                cells={22}
+                rules={{ required: "Mother's name is required" }}
               />
-              <CustomInput
+            </div>
+            <div>
+              <p className="font-bold text-sm sm:text-base mb-1">
+                3. FATHER&apos;S NAME
+              </p>
+              <AdmissionBoxedInput
                 control={control}
-                name="dob"
-                label="Date of Birth"
-                type="date"
+                name="fatherName"
+                cells={22}
+                rules={{ required: "Father's name is required" }}
               />
-              <CustomInput
+            </div>
+            <div>
+              <p className="font-bold text-sm sm:text-base mb-1">
+                4. FATHER&apos;S OCCUPATION
+              </p>
+              <AdmissionBoxedInput
+                control={control}
+                name="fatherOccupation"
+                cells={22}
+              />
+            </div>
+          </div>
+
+          {/* Gender / Category / Nationality / DOB */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-6">
+            <div className="border border-sky-500 p-3">
+              <p className="font-bold text-sm mb-2">5. GENDER</p>
+              <AdmissionCheckboxGroup
+                control={control}
+                name="gender"
+                options={[
+                  { value: "MALE", label: "MALE" },
+                  { value: "FEMALE", label: "FEMALE" },
+                ]}
+                rules={{ required: "Please select gender" }}
+                className="space-y-2"
+              />
+            </div>
+
+            <div className="border border-sky-500 p-3">
+              <p className="font-bold text-sm mb-2">6. CATEGORY</p>
+              <AdmissionCheckboxGroup
+                control={control}
+                name="category"
+                options={[
+                  { value: "GEN", label: "GEN" },
+                  { value: "OBC", label: "OBC" },
+                  { value: "SC", label: "SC" },
+                  { value: "ST", label: "ST" },
+                ]}
+                rules={{ required: "Please select category" }}
+                className="grid grid-cols-2 gap-y-2 gap-x-2"
+              />
+            </div>
+
+            <div className="border border-sky-500 p-3">
+              <p className="font-bold text-sm mb-2">7. NATIONALITY</p>
+              <AdmissionCheckboxGroup
+                control={control}
+                name="nationality"
+                options={[
+                  { value: "INDIAN", label: "INDIAN" },
+                  { value: "OTHERS", label: "OTHERS" },
+                ]}
+                rules={{ required: "Please select nationality" }}
+                className="flex gap-4"
+              />
+            </div>
+
+            <div className="sm:col-span-1">
+              <p className="font-bold text-sm mb-2">8. DATE OF BIRTH</p>
+              <AdmissionDateOfBirth
+                control={control}
+                dayName="dobDay"
+                monthName="dobMonth"
+                yearName="dobYear"
+                rules={{
+                  required: "Enter date of birth",
+                  pattern: {
+                    value: /^\d{4}$/,
+                    message: "Enter 4-digit year",
+                  },
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Contact number + Photos */}
+          <div className="flex flex-col sm:flex-row gap-6 mb-6">
+            <div className="flex-1">
+              <p className="font-bold text-sm sm:text-base mb-1">
+                9. CONTACT NUMBER
+              </p>
+              <p className="text-red-700 text-sm font-semibold mb-1">
+                MOBILE NO.
+              </p>
+              <MobileNumberInputBox
                 control={control}
                 name="phone"
-                label="Phone"
                 type="tel"
-                placeholder="Mobile number"
+                rules={{
+                  required: "Mobile number is required",
+                  pattern: {
+                    value: PHONE_PATTERN,
+                    message: "Phone can contain only digits, spaces, + or -",
+                  },
+                }}
+              />
+              <p className="text-red-700 text-sm font-semibold mt-3 mb-1">
+                MOBILE NO.
+              </p>
+              <MobileNumberInputBox
+                control={control}
+                name="phone2"
+                type="tel"
                 rules={{
                   pattern: {
                     value: PHONE_PATTERN,
@@ -251,42 +550,377 @@ function AddStudent() {
                   },
                 }}
               />
-              <CustomInput
-                control={control}
-                name="email"
-                label="Email"
-                type="email"
-                placeholder="Email"
-                rules={{
-                  pattern: {
-                    value: EMAIL_PATTERN,
-                    message: "Enter a valid email address",
-                  },
-                }}
-              />
-              <CustomTextarea
-                control={control}
-                name="address"
-                label="Address"
-                placeholder="Full address"
-                rows={2}
-                wrapperClassName="sm:col-span-2"
-              />
             </div>
 
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <CustomButton type="submit" variant="success" loading={saving}>
-                {saving ? "Saving..." : "Add Student"}
-              </CustomButton>
-              <NavLink
-                to="/welcome/student/list"
-                className="inline-flex items-center justify-center rounded-md bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700"
-              >
-                Student List
-              </NavLink>
+            <div className="flex gap-4 justify-center">
+              {["MOTHER'S\nPHOTO", "FATHER'S\nPHOTO", "STUDENT'S\nPHOTO"].map(
+                (label) => (
+                  <div
+                    key={label}
+                    className="h-28 w-24 border-2 border-pink-600 flex items-center justify-center text-center text-xs font-semibold whitespace-pre-line px-1"
+                  >
+                    {label}
+                  </div>
+                ),
+              )}
             </div>
-          </form>
+          </div>
+          {/* Address section */}
+          <div className="text-indigo-900 font-bold text-sm sm:text-base mb-4">
+            <p>
+              10. WRITE YOUR COMPLETE PERMANENT CORRESPONDENCE ADDRESS INCLUDING
+            </p>
+            <p>
+              YOUR NAME IN ENGLISH IN CAPITAL LETTRES WITH (BLUE / BALL PEN)
+            </p>
+          </div>
+
+          <div className="space-y-4 text-green-800 font-semibold text-sm sm:text-base">
+            <AdmissionLineInput
+              control={control}
+              name="correspondenceName"
+              prefix="NAME :"
+            />
+            <AdmissionLineInput
+              control={control}
+              name="address"
+              prefix="ADDRESS :"
+            />
+            <div className="border-b border-slate-500 h-4" />
+
+            <div className="flex flex-wrap items-end gap-4">
+              <AdmissionLineInput
+                control={control}
+                name="city"
+                prefix="CITY :"
+                wrapperClassName="flex-1 min-w-[160px]"
+              />
+              <AdmissionLineInput
+                control={control}
+                name="state"
+                prefix="STATE :"
+                wrapperClassName="flex-1 min-w-[160px]"
+              />
+              <div className="flex items-end gap-2">
+                <span className="whitespace-nowrap">PIN:</span>
+                <AdmissionPinInput
+                  control={control}
+                  name="pin"
+                  rules={PIN_RULES}
+                />
+              </div>
+            </div>
+
+            <AdmissionLineInput
+              control={control}
+              name="permanentAddress"
+              prefix="PERMANENT ADDRESS :"
+            />
+            <div className="border-b border-slate-500 h-4" />
+
+            <div className="flex flex-wrap items-end gap-4">
+              <AdmissionLineInput
+                control={control}
+                name="permanentCity"
+                prefix="CITY :"
+                wrapperClassName="flex-1 min-w-[160px]"
+              />
+              <AdmissionLineInput
+                control={control}
+                name="permanentState"
+                prefix="STATE :"
+                wrapperClassName="flex-1 min-w-[160px]"
+              />
+              <div className="flex items-end gap-2">
+                <span className="whitespace-nowrap">PIN:</span>
+                <AdmissionPinInput
+                  control={control}
+                  name="permanentPin"
+                  rules={PIN_RULES}
+                />
+              </div>
+            </div>
+
+            <AdmissionLineInput
+              control={control}
+              name="email"
+              prefix="MANDATORY E-MAIL ADDRESS"
+              rules={{
+                required: "E-mail address is required",
+                pattern: {
+                  value: EMAIL_PATTERN,
+                  message: "Enter a valid email address",
+                },
+              }}
+            />
+          </div>
+
+          <div className="mt-8 flex flex-wrap items-center justify-end gap-3">
+            <CustomButton type="button" onClick={handleNext}>
+              Next
+            </CustomButton>
+          </div>
         </div>
+      ) : (
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          noValidate
+          className="mx-auto max-w-5xl bg-white p-6 sm:p-10 font-serif text-slate-900"
+        >
+          {/* LAST SCHOOL DETAILS */}
+          <div className="relative mb-10">
+            <div className="absolute -top-4 left-8 z-10 bg-yellow-300 px-6 py-1.5 shadow">
+              <p className="font-bold text-indigo-900 tracking-wide">
+                LAST SCHOOL DETAILS
+              </p>
+            </div>
+
+            <div className="border-2 border-green-700 pt-8 pb-6 px-6 sm:px-8">
+              <div className="flex items-center gap-2 mb-6">
+                <span className="font-bold text-indigo-900 whitespace-nowrap">
+                  PEN of Student -
+                </span>
+                <AdmissionBoxedInput
+                  control={control}
+                  name="penOfStudent"
+                  cells={10}
+                  borderColor="border-indigo-900"
+                  wrapperClassName="flex-1"
+                />
+              </div>
+
+              <div className="space-y-5 text-pink-800 font-medium">
+                <AdmissionLineInput
+                  control={control}
+                  name="lastSchoolName"
+                  prefix="School Name :"
+                  underlineClassName="border-slate-400"
+                />
+                <AdmissionLineInput
+                  control={control}
+                  name="lastSchoolAddress"
+                  prefix="School Address :"
+                  underlineClassName="border-slate-400"
+                />
+                <AdmissionLineInput
+                  control={control}
+                  name="passingYear"
+                  prefix="Passing Year :"
+                  className="w-40"
+                  underlineClassName="border-slate-400"
+                />
+              </div>
+
+              <p className="font-bold text-red-700 mt-6 mb-3 text-sm sm:text-base">
+                11. PREVIOUS QUALIFYING EXAM DETAIL
+              </p>
+
+              <div className="flex flex-wrap justify-between items-center gap-4 text-green-800 font-medium">
+                <div className="flex justify-between items-center gap-2">
+                  <span>Maximum Marks</span>
+                  <AdmissionBoxedInput
+                    control={control}
+                    name="previousQualifyingExam.maximumMarks"
+                    cells={1}
+                    singleInputBox={true}
+                    borderColor="border-indigo-900"
+                    cellHeightClassName="h-8"
+                    wrapperClassName="w-20"
+                    align="center"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span>Class</span>
+                  <AdmissionBoxedInput
+                    control={control}
+                    name="previousQualifyingExam.previousClass"
+                    cells={1}
+                    singleInputBox={true}
+                    borderColor="border-indigo-900"
+                    cellHeightClassName="h-8"
+                    wrapperClassName="w-16"
+                    align="center"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span>Marks Obtained</span>
+                  <AdmissionBoxedInput
+                    control={control}
+                    name="previousQualifyingExam.marksObtained"
+                    cells={1}
+                    singleInputBox={true}
+                    borderColor="border-indigo-900"
+                    cellHeightClassName="h-8"
+                    wrapperClassName="w-16"
+                    align="center"
+                  />
+                  <span>%</span>
+                  <AdmissionBoxedInput
+                    control={control}
+                    name="previousQualifyingExam.percentage"
+                    cells={1}
+                    singleInputBox={true}
+                    borderColor="border-indigo-900"
+                    cellHeightClassName="h-8"
+                    wrapperClassName="w-16"
+                    align="center"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* PHYSICAL STATUS OF STUDENT */}
+          <div className="relative mb-8">
+            <div className="absolute -top-4 left-8 z-10 bg-yellow-300 px-6 py-1.5 shadow">
+              <p className="font-bold text-indigo-900 tracking-wide">
+                PHYSICAL STATUS OF STUDENT
+              </p>
+            </div>
+
+            <div className="border-2 border-green-700 pt-8 pb-6 px-6 sm:px-8">
+              <div className="flex gap-6">
+                <div className="flex-1 space-y-4 text-pink-800 font-medium">
+                  <AdmissionLineInput
+                    control={control}
+                    name="physicalStatus.studentName"
+                    prefix="Student's Name"
+                    underlineClassName="border-slate-400"
+                  />
+                  <AdmissionLineInput
+                    control={control}
+                    name="physicalStatus.fatherName"
+                    prefix="Father's Name"
+                    underlineClassName="border-slate-400"
+                  />
+                  <AdmissionLineInput
+                    control={control}
+                    name="physicalStatus.motherName"
+                    prefix="Mother's Name"
+                    underlineClassName="border-slate-400"
+                  />
+                </div>
+
+                <div className="flex-1 space-y-4 text-pink-800 font-medium">
+                  <AdmissionLineInput
+                    control={control}
+                    name="physicalStatus.weight"
+                    prefix="Weight in Kg."
+                    underlineClassName="border-slate-400"
+                  />
+                  <AdmissionLineInput
+                    control={control}
+                    name="physicalStatus.height"
+                    prefix="Height in Cm."
+                    underlineClassName="border-slate-400"
+                  />
+                  <AdmissionLineInput
+                    control={control}
+                    name="physicalStatus.bloodGroup"
+                    prefix="Blood Group"
+                    underlineClassName="border-slate-400"
+                  />
+                </div>
+
+                <div className="hidden sm:flex h-28 w-24 border border-slate-500 items-center justify-center text-sm font-semibold shrink-0">
+                  PHOTO
+                </div>
+              </div>
+
+              <div className="space-y-4 text-pink-800 font-medium mt-6">
+                <AdmissionLineInput
+                  control={control}
+                  name="physicalStatus.allergyMedicine"
+                  prefix="Allergy from any Medicine"
+                  underlineClassName="border-slate-400"
+                />
+                <AdmissionLineInput
+                  control={control}
+                  name="physicalStatus.allergyOther"
+                  prefix="Allergy from any other thing"
+                  underlineClassName="border-slate-400"
+                />
+                <AdmissionLineInput
+                  control={control}
+                  name="physicalStatus.disease"
+                  prefix="Any Disease"
+                  underlineClassName="border-slate-400"
+                />
+                <AdmissionLineInput
+                  control={control}
+                  name="physicalStatus.otherInformation"
+                  prefix="Any other information"
+                  underlineClassName="border-slate-400"
+                />
+              </div>
+
+              <p className="text-right italic text-indigo-900 font-semibold mt-6">
+                Parents&apos; Signature
+              </p>
+            </div>
+          </div>
+
+          {/* DECLARATION */}
+          <div className="text-center mb-4">
+            <h2 className="text-2xl italic font-bold text-purple-900 underline underline-offset-4">
+              Declaration
+            </h2>
+          </div>
+
+          <ul className="space-y-3 text-red-700 font-medium list-disc pl-6 mb-10">
+            <li>
+              I hereby declare that the information Submitted is complete and
+              correct to the best of my knowledge.
+            </li>
+            <li>
+              I fully agree to abide by rules and regulations of the School as
+              they are now and may be in the future constituted and I will not
+              claim for any refund of fees.
+            </li>
+            <li>
+              In Case of any Unusual Occurrence on road or out side of the
+              school, The School Management will not be Responsible.
+            </li>
+          </ul>
+
+          {/* Signatures */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-green-800 font-medium mb-6">
+            <div>
+              <p>Signature of Father/Guardian</p>
+              <p className="mt-3">
+                Date:.......................................
+              </p>
+            </div>
+            <div>
+              <p>Signature of Mother</p>
+              <p className="mt-3">
+                Date:.......................................
+              </p>
+            </div>
+            <div>
+              <p>Signature of Student</p>
+              <p className="mt-3">
+                Date:.......................................
+              </p>
+            </div>
+          </div>
+
+          <p className="text-center text-indigo-900 font-semibold">
+            Note: Enclose attested mark sheet &amp; T.C. of privious school.
+          </p>
+
+          <div className="mt-8 flex flex-wrap items-center justify-end gap-3">
+            <CustomButton
+              type="button"
+              variant="outline"
+              onClick={() => setActiveTab("info")}
+            >
+              Previous
+            </CustomButton>
+            <CustomButton type="submit" variant="success" loading={saving}>
+              {saving ? "Saving..." : "Add Student"}
+            </CustomButton>
+          </div>
+        </form>
       )}
     </div>
   );
