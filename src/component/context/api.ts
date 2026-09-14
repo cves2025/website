@@ -1,7 +1,10 @@
 // Central place for the backend URL.
-// Falls back to the local server during development when VITE_API_URL is not set.
+// VITE_API_BASE_URL is injected by Vite from .env.development (npm run dev)
+// or .env.production (npm run build). It falls back to the local server when
+// the env var is not present.
 export const API_BASE_URL: string = (
-  (import.meta.env.VITE_API_URL as string | undefined) || "http://localhost:3000"
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) ||
+    "http://localhost:3000"
 ).replace(/\/+$/, "");
 
 // Helper to attach the Firebase ID token (JWT) to API requests.
