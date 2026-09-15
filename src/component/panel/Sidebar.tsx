@@ -1,7 +1,13 @@
 import { useState, useContext, ReactElement } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { myContext } from "../context/MyContextProvider";
-import { BsX, BsChevronDown, BsChevronUp } from "react-icons/bs";
+import {
+  BsX,
+  BsChevronDown,
+  BsChevronUp,
+  BsChevronLeft,
+  BsChevronRight,
+} from "react-icons/bs";
 import {
   FaUserGraduate,
   FaChalkboardTeacher,
@@ -90,9 +96,23 @@ function Sidebar({ open, onClose }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [expanded, setExpanded] = useState(activeGroup(location.pathname));
+  const [collapsed, setCollapsed] = useState(false);
 
-  const toggleGroup = (label: string) =>
-    setExpanded((prev) => (prev === label ? "" : label));
+  // When collapsed, clicking a group icon navigates straight to its first sub-link
+  // instead of expanding (since there's no room to show sub-links while collapsed).
+  const handleGroupClick = (item: Extract<MenuItem, { subLinks: any }>) => {
+    if (collapsed) {
+      navigate(item.subLinks[0].path);
+      onClose();
+      return;
+    }
+    setExpanded((prev) => (prev === item.label ? "" : item.label));
+  };
+
+  const toggleCollapse = () => {
+    setCollapsed((prev) => !prev);
+    setExpanded("");
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -114,17 +134,32 @@ function Sidebar({ open, onClose }: SidebarProps) {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-72 bg-gradient-to-b from-gray-900 to-gray-950 text-white flex flex-col shadow-2xl transform transition-transform duration-300 ease-in-out border-r border-gray-800
+        className={`fixed inset-y-0 left-0 z-40 w-72 bg-gradient-to-b from-gray-900 to-gray-950 text-white flex flex-col shadow-2xl transform transition-all duration-300 ease-in-out border-r border-gray-800
           ${open ? "translate-x-0" : "-translate-x-full"}
-          md:translate-x-0 md:static md:z-auto md:h-screen md:shrink-0`}
+          md:translate-x-0 md:static md:z-auto md:h-screen md:shrink-0
+          ${collapsed ? "md:w-20" : "md:w-72"}`}
       >
+        {/* Collapse toggle (desktop only) */}
+        <button
+          onClick={toggleCollapse}
+          className="hidden md:flex absolute -right-3 top-8 z-50 w-6 h-6 items-center justify-center rounded-full bg-amber-500 text-gray-900 text-xs shadow-md hover:bg-amber-400 transition-colors"
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {collapsed ? <BsChevronRight /> : <BsChevronLeft />}
+        </button>
+
         {/* Brand */}
-        <div className="flex items-center justify-between px-5 py-5 border-b border-gray-800">
+        <div
+          className={`flex items-center border-b border-gray-800 px-5 py-5 ${
+            collapsed ? "md:justify-center md:px-0" : "justify-between"
+          }`}
+        >
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 shrink-0 rounded-xl bg-amber-500 flex items-center justify-center font-black text-gray-900 text-lg">
               C
             </div>
-            <div className="min-w-0">
+            <div className={`min-w-0 ${collapsed ? "md:hidden" : ""}`}>
               <h2 className="font-bold text-base text-white truncate leading-tight">
                 CVES Panel
               </h2>
@@ -148,8 +183,10 @@ function Sidebar({ open, onClose }: SidebarProps) {
             "subLinks" in item ? (
               <div key={item.label}>
                 <button
-                  onClick={() => toggleGroup(item.label)}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-semibold transition-all
+                  onClick={() => handleGroupClick(item)}
+                  title={collapsed ? item.label : undefined}
+                  className={`w-full flex items-center rounded-lg text-sm font-semibold transition-all
+                    ${collapsed ? "md:justify-center px-0 py-2.5" : "justify-between px-3 py-2.5"}
                     ${
                       expanded === item.label
                         ? "bg-gray-800/80 text-white"
@@ -158,15 +195,15 @@ function Sidebar({ open, onClose }: SidebarProps) {
                 >
                   <span className="flex items-center gap-3">
                     <span
-                      className={`w-8 h-8 flex items-center justify-center rounded-lg text-base ${item.color}`}
+                      className={`w-8 h-8 flex items-center justify-center rounded-lg text-base shrink-0 ${item.color}`}
                     >
                       {item.icon}
                     </span>
-                    {item.label}
+                    <span className={collapsed ? "md:hidden" : ""}>{item.label}</span>
                   </span>
                   <span
                     className={`text-xs transition-transform duration-200 ${
-                      expanded === item.label ? "rotate-0" : ""
+                      collapsed ? "md:hidden" : ""
                     }`}
                   >
                     {expanded === item.label ? (
@@ -179,7 +216,9 @@ function Sidebar({ open, onClose }: SidebarProps) {
 
                 <div
                   className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                    expanded === item.label
+                    collapsed ? "md:hidden" : ""
+                  } ${
+                    expanded === item.label && !collapsed
                       ? "max-h-96 opacity-100 mt-1"
                       : "max-h-0 opacity-0"
                   }`}
@@ -210,8 +249,11 @@ function Sidebar({ open, onClose }: SidebarProps) {
                 to={item.path}
                 end={item.end}
                 onClick={onClose}
+                title={collapsed ? item.label : undefined}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                  `flex items-center gap-3 rounded-lg text-sm font-semibold transition-all ${
+                    collapsed ? "md:justify-center px-0 py-2.5" : "px-3 py-2.5"
+                  } ${
                     isActive
                       ? "bg-amber-500 text-gray-900 shadow-sm"
                       : "text-gray-300 hover:bg-gray-800/50 hover:text-white"
@@ -221,13 +263,13 @@ function Sidebar({ open, onClose }: SidebarProps) {
                 {({ isActive }) => (
                   <>
                     <span
-                      className={`w-8 h-8 flex items-center justify-center rounded-lg text-base ${
+                      className={`w-8 h-8 flex items-center justify-center rounded-lg text-base shrink-0 ${
                         isActive ? "bg-gray-900/10" : item.color
                       }`}
                     >
                       {item.icon}
                     </span>
-                    {item.label}
+                    <span className={collapsed ? "md:hidden" : ""}>{item.label}</span>
                   </>
                 )}
               </NavLink>
@@ -237,11 +279,15 @@ function Sidebar({ open, onClose }: SidebarProps) {
 
         {/* User + logout */}
         <div className="px-3 py-4 border-t border-gray-800 bg-gray-950/60">
-          <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-800/50 transition-colors">
+          <div
+            className={`flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-800/50 transition-colors ${
+              collapsed ? "md:justify-center" : ""
+            }`}
+          >
             <div className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 text-gray-900 flex items-center justify-center font-bold shadow-inner">
               {initials}
             </div>
-            <div className="min-w-0">
+            <div className={`min-w-0 ${collapsed ? "md:hidden" : ""}`}>
               <p className="text-sm font-semibold truncate text-white">
                 {user?.name || "Admin User"}
               </p>
@@ -250,9 +296,10 @@ function Sidebar({ open, onClose }: SidebarProps) {
           </div>
           <button
             onClick={handleLogout}
+            title={collapsed ? "Logout" : undefined}
             className="mt-3 w-full flex items-center justify-center gap-2 bg-red-600/90 hover:bg-red-600 text-white rounded-lg px-4 py-2.5 text-sm font-bold transition-colors shadow-sm"
           >
-            <FaSignOutAlt /> Logout
+            <FaSignOutAlt /> <span className={collapsed ? "md:hidden" : ""}>Logout</span>
           </button>
         </div>
       </aside>
