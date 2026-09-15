@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useForm, SubmitHandler, FieldPath } from "react-hook-form";
+import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { AdmissionStudentFormValues } from "../../../utils/type";
 import BulkStudentImport from "../BulkStudentImport";
@@ -21,6 +22,8 @@ import {
 import {
   collection,
   doc,
+  DocumentData,
+  getDoc,
   serverTimestamp,
   writeBatch,
 } from "firebase/firestore";
@@ -96,6 +99,186 @@ const defaultValues: AdmissionStudentFormValues = {
   fatherPhoto: "",
 };
 
+function buildStudentFields(data: AdmissionStudentFormValues) {
+  const fullName = data.fullName.trim();
+  const lastSpaceIndex = fullName.lastIndexOf(" ");
+  const firstName =
+    lastSpaceIndex === -1 ? fullName : fullName.slice(0, lastSpaceIndex);
+  const lastName =
+    lastSpaceIndex === -1 ? "" : fullName.slice(lastSpaceIndex + 1);
+  const academicYear = `20${data.sessionStart.trim()}-${data.sessionEnd.trim()}`;
+  const dob = `${data.dobYear
+    .trim()
+    .padStart(4, "0")}-${data.dobMonth.trim().padStart(2, "0")}-${data.dobDay
+    .trim()
+    .padStart(2, "0")}`;
+
+  const maximumMarksValue = Number(data.previousQualifyingExam.maximumMarks);
+  const marksObtainedValue = Number(data.previousQualifyingExam.marksObtained);
+  const qualifyingPercentage =
+    data.previousQualifyingExam.maximumMarks.trim() !== "" &&
+    data.previousQualifyingExam.marksObtained.trim() !== "" &&
+    maximumMarksValue > 0 &&
+    !Number.isNaN(marksObtainedValue)
+      ? ((marksObtainedValue / maximumMarksValue) * 100).toFixed(2)
+      : data.previousQualifyingExam.percentage.trim();
+
+  return {
+    firstName,
+    lastName,
+    fullName,
+    firstNameLower: firstName.toLowerCase(),
+    lastNameLower: lastName.toLowerCase(),
+    enrollment: data.enrollment.trim(),
+    className: data.className.trim(),
+    section: data.section.trim(),
+    academicYear,
+    fatherName: data.fatherName.trim(),
+    motherName: data.motherName.trim(),
+    fatherOccupation: data.fatherOccupation.trim(),
+    gender: data.gender,
+    category: data.category,
+    nationality: data.nationality,
+    dob,
+    phone: data.phone.trim(),
+    phone2: data.phone2.trim(),
+    email: data.email.trim(),
+    address: data.address.trim(),
+    correspondenceName: data.correspondenceName.trim(),
+    city: data.city.trim(),
+    state: data.state.trim(),
+    pin: data.pin.trim(),
+    permanentAddress: data.permanentAddress.trim(),
+    permanentCity: data.permanentCity.trim(),
+    permanentState: data.permanentState.trim(),
+    permanentPin: data.permanentPin.trim(),
+    penOfStudent: data.penOfStudent.trim(),
+    lastSchoolName: data.lastSchoolName.trim(),
+    lastSchoolAddress: data.lastSchoolAddress.trim(),
+    passingYear: data.passingYear.trim(),
+    previousQualifyingExam: {
+      maximumMarks: data.previousQualifyingExam.maximumMarks.trim(),
+      previousClass: data.previousQualifyingExam.previousClass.trim(),
+      marksObtained: data.previousQualifyingExam.marksObtained.trim(),
+      percentage: qualifyingPercentage,
+    },
+    physicalStatus: {
+      studentName: data.physicalStatus.studentName.trim(),
+      fatherName: data.physicalStatus.fatherName.trim(),
+      motherName: data.physicalStatus.motherName.trim(),
+      weight: data.physicalStatus.weight.trim(),
+      height: data.physicalStatus.height.trim(),
+      bloodGroup: data.physicalStatus.bloodGroup.trim(),
+      allergyMedicine: data.physicalStatus.allergyMedicine.trim(),
+      allergyOther: data.physicalStatus.allergyOther.trim(),
+      disease: data.physicalStatus.disease.trim(),
+      otherInformation: data.physicalStatus.otherInformation.trim(),
+    },
+    studentPhoto: data.studentPhoto,
+    motherPhoto: data.motherPhoto,
+    fatherPhoto: data.fatherPhoto,
+  };
+}
+
+function buildEnrollmentFields(
+  data: AdmissionStudentFormValues,
+  studentId: string,
+) {
+  const fullName = data.fullName.trim();
+  const lastSpaceIndex = fullName.lastIndexOf(" ");
+  const firstName =
+    lastSpaceIndex === -1 ? fullName : fullName.slice(0, lastSpaceIndex);
+  const lastName =
+    lastSpaceIndex === -1 ? "" : fullName.slice(lastSpaceIndex + 1);
+
+  return {
+    studentId,
+    academicYear: `20${data.sessionStart.trim()}-${data.sessionEnd.trim()}`,
+    className: data.className,
+    section: data.section,
+    enrollment: data.enrollment.trim(),
+    studentName: fullName,
+    firstName,
+    lastName,
+    firstNameLower: firstName.toLowerCase(),
+    lastNameLower: lastName.toLowerCase(),
+    fatherName: data.fatherName.trim(),
+    phone: data.phone.trim(),
+  };
+}
+
+function studentDocToFormValues(
+  doc: DocumentData,
+): AdmissionStudentFormValues {
+  const academicYear =
+    typeof doc.academicYear === "string" ? doc.academicYear : "";
+  const [sessionStart, sessionEnd] = academicYear.split("-");
+  const dob = typeof doc.dob === "string" ? doc.dob : "";
+  const [dobYear, dobMonth, dobDay] = dob.split("-");
+
+  const prevExam = doc.previousQualifyingExam ?? {};
+  const physical = doc.physicalStatus ?? {};
+
+  return {
+    firstName: doc.firstName ?? "",
+    lastName: doc.lastName ?? "",
+    fullName: doc.fullName ?? "",
+    enrollment: doc.enrollment ?? "",
+    className: doc.className ?? "",
+    section: doc.section ?? "A",
+    fatherName: doc.fatherName ?? "",
+    motherName: doc.motherName ?? "",
+    dob,
+    phone: doc.phone ?? "",
+    phone2: doc.phone2 ?? "",
+    email: doc.email ?? "",
+    address: doc.address ?? "",
+    academicYear,
+    fatherOccupation: doc.fatherOccupation ?? "",
+    gender: doc.gender ?? "",
+    category: doc.category ?? "",
+    nationality: doc.nationality ?? "INDIAN",
+    correspondenceName: doc.correspondenceName ?? "",
+    city: doc.city ?? "",
+    state: doc.state ?? "",
+    pin: doc.pin ?? "",
+    permanentAddress: doc.permanentAddress ?? "",
+    permanentCity: doc.permanentCity ?? "",
+    permanentState: doc.permanentState ?? "",
+    permanentPin: doc.permanentPin ?? "",
+    sessionStart: sessionStart ? sessionStart.slice(-2) : "",
+    sessionEnd: sessionEnd ? sessionEnd.slice(-2) : "",
+    dobDay: dobDay ?? "",
+    dobMonth: dobMonth ?? "",
+    dobYear: dobYear ?? "",
+    penOfStudent: doc.penOfStudent ?? "",
+    lastSchoolName: doc.lastSchoolName ?? "",
+    lastSchoolAddress: doc.lastSchoolAddress ?? "",
+    passingYear: doc.passingYear ?? "",
+    previousQualifyingExam: {
+      maximumMarks: prevExam.maximumMarks ?? "",
+      previousClass: prevExam.previousClass ?? "",
+      marksObtained: prevExam.marksObtained ?? "",
+      percentage: prevExam.percentage ?? "",
+    },
+    physicalStatus: {
+      studentName: physical.studentName ?? "",
+      fatherName: physical.fatherName ?? "",
+      motherName: physical.motherName ?? "",
+      weight: physical.weight ?? "",
+      height: physical.height ?? "",
+      bloodGroup: physical.bloodGroup ?? "",
+      allergyMedicine: physical.allergyMedicine ?? "",
+      allergyOther: physical.allergyOther ?? "",
+      disease: physical.disease ?? "",
+      otherInformation: physical.otherInformation ?? "",
+    },
+    studentPhoto: doc.studentPhoto ?? "",
+    motherPhoto: doc.motherPhoto ?? "",
+    fatherPhoto: doc.fatherPhoto ?? "",
+  };
+}
+
 const PIN_RULES = {
   pattern: {
     value: /^\d{0,6}$/,
@@ -136,7 +319,11 @@ function firestoreErrorMessage(error: unknown): string {
 }
 
 function AddStudent() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editEnrollmentId = searchParams.get("edit");
   const [activeTab, setActiveTab] = useState<StudentTab>("info");
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+  const [loadingStudent, setLoadingStudent] = useState(false);
 
   const {
     control,
@@ -192,6 +379,60 @@ function AddStudent() {
     };
   }, [isDirty]);
 
+  useEffect(() => {
+    if (!editEnrollmentId) {
+      setEditingStudentId(null);
+      setLoadingStudent(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadStudentForEdit = async () => {
+      setLoadingStudent(true);
+      try {
+        const enrollmentSnapshot = await getDoc(
+          doc(db, COLLECTION.ENROLLMENTS, editEnrollmentId),
+        );
+        if (!enrollmentSnapshot.exists()) {
+          throw new Error("Enrollment record not found.");
+        }
+        const studentId = enrollmentSnapshot.data().studentId;
+        if (!studentId) {
+          throw new Error("Student record not found.");
+        }
+        const studentSnapshot = await getDoc(
+          doc(db, COLLECTION.STUDENTS, studentId),
+        );
+        if (!studentSnapshot.exists()) {
+          throw new Error("Student record not found.");
+        }
+        if (cancelled) return;
+        reset(studentDocToFormValues(studentSnapshot.data()));
+        setEditingStudentId(studentId);
+        setActiveTab("info");
+      } catch (error) {
+        if (cancelled) return;
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Failed to load the selected student.",
+        );
+        reset(defaultValues);
+        setEditingStudentId(null);
+        setSearchParams({}, { replace: true });
+      } finally {
+        if (!cancelled) setLoadingStudent(false);
+      }
+    };
+
+    void loadStudentForEdit();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [editEnrollmentId, reset, setSearchParams]);
+
   const handleNext = async () => {
     const valid = await trigger(page1RequiredFields);
     if (!valid) {
@@ -211,119 +452,47 @@ function AddStudent() {
 
   const onSubmit: SubmitHandler<AdmissionStudentFormValues> = async (data) => {
     try {
-      const fullName = data.fullName.trim();
-      const lastSpaceIndex = fullName.lastIndexOf(" ");
-      const firstName =
-        lastSpaceIndex === -1 ? fullName : fullName.slice(0, lastSpaceIndex);
-      const lastName =
-        lastSpaceIndex === -1 ? "" : fullName.slice(lastSpaceIndex + 1);
+      const studentFields = buildStudentFields(data);
+      const batch = writeBatch(db);
 
-      const academicYear = `20${data.sessionStart.trim()}-${data.sessionEnd.trim()}`;
-      const dob = `${data.dobYear
-        .trim()
-        .padStart(
-          4,
-          "0",
-        )}-${data.dobMonth.trim().padStart(2, "0")}-${data.dobDay
-        .trim()
-        .padStart(2, "0")}`;
+      if (editingStudentId && editEnrollmentId) {
+        const studentRef = doc(db, COLLECTION.STUDENTS, editingStudentId);
+        const enrollmentRef = doc(
+          db,
+          COLLECTION.ENROLLMENTS,
+          editEnrollmentId,
+        );
 
-      // Final safety check: keep the stored percentage in sync with the marks
-      // even if the auto-calculate effect had not re-run yet.
-      const maximumMarksValue = Number(
-        data.previousQualifyingExam.maximumMarks,
-      );
-      const marksObtainedValue = Number(
-        data.previousQualifyingExam.marksObtained,
-      );
-      const qualifyingPercentage =
-        data.previousQualifyingExam.maximumMarks.trim() !== "" &&
-        data.previousQualifyingExam.marksObtained.trim() !== "" &&
-        maximumMarksValue > 0 &&
-        !Number.isNaN(marksObtainedValue)
-          ? ((marksObtainedValue / maximumMarksValue) * 100).toFixed(2)
-          : data.previousQualifyingExam.percentage.trim();
+        batch.update(studentRef, {
+          ...studentFields,
+          updatedAt: serverTimestamp(),
+        });
+        batch.update(enrollmentRef, {
+          ...buildEnrollmentFields(data, editingStudentId),
+          updatedAt: serverTimestamp(),
+        });
+
+        await batch.commit();
+
+        reset(defaultValues);
+        setActiveTab("info");
+        setEditingStudentId(null);
+        setSearchParams({}, { replace: true });
+
+        toast.success(`Student ${studentFields.fullName} updated successfully!`);
+        return;
+      }
 
       const studentRef = doc(collection(db, COLLECTION.STUDENTS));
       const enrollmentRef = doc(collection(db, COLLECTION.ENROLLMENTS));
 
-      const batch = writeBatch(db);
       batch.set(studentRef, {
-        firstName,
-        lastName,
-        fullName,
-        firstNameLower: firstName.toLowerCase(),
-        lastNameLower: lastName.toLowerCase(),
-
-        enrollment: data.enrollment.trim(),
-        className: data.className.trim(),
-        section: data.section.trim(),
-        academicYear,
-
-        fatherName: data.fatherName.trim(),
-        motherName: data.motherName.trim(),
-        fatherOccupation: data.fatherOccupation.trim(),
-        gender: data.gender,
-        category: data.category,
-        nationality: data.nationality,
-        dob,
-        phone: data.phone.trim(),
-        phone2: data.phone2.trim(),
-        email: data.email.trim(),
-        address: data.address.trim(),
-        correspondenceName: data.correspondenceName.trim(),
-        city: data.city.trim(),
-        state: data.state.trim(),
-        pin: data.pin.trim(),
-        permanentAddress: data.permanentAddress.trim(),
-        permanentCity: data.permanentCity.trim(),
-        permanentState: data.permanentState.trim(),
-        permanentPin: data.permanentPin.trim(),
-
-        penOfStudent: data.penOfStudent.trim(),
-        lastSchoolName: data.lastSchoolName.trim(),
-        lastSchoolAddress: data.lastSchoolAddress.trim(),
-        passingYear: data.passingYear.trim(),
-        previousQualifyingExam: {
-          maximumMarks: data.previousQualifyingExam.maximumMarks.trim(),
-          previousClass: data.previousQualifyingExam.previousClass.trim(),
-          marksObtained: data.previousQualifyingExam.marksObtained.trim(),
-          percentage: qualifyingPercentage,
-        },
-        physicalStatus: {
-          studentName: data.physicalStatus.studentName.trim(),
-          fatherName: data.physicalStatus.fatherName.trim(),
-          motherName: data.physicalStatus.motherName.trim(),
-          weight: data.physicalStatus.weight.trim(),
-          height: data.physicalStatus.height.trim(),
-          bloodGroup: data.physicalStatus.bloodGroup.trim(),
-          allergyMedicine: data.physicalStatus.allergyMedicine.trim(),
-          allergyOther: data.physicalStatus.allergyOther.trim(),
-          disease: data.physicalStatus.disease.trim(),
-          otherInformation: data.physicalStatus.otherInformation.trim(),
-        },
-
-        studentPhoto: data.studentPhoto,
-        motherPhoto: data.motherPhoto,
-        fatherPhoto: data.fatherPhoto,
-
+        ...studentFields,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-
       batch.set(enrollmentRef, {
-        studentId: studentRef.id,
-        academicYear,
-        className: data.className,
-        section: data.section,
-        enrollment: data.enrollment.trim(),
-        studentName: fullName,
-        firstName,
-        lastName,
-        firstNameLower: firstName.toLowerCase(),
-        lastNameLower: lastName.toLowerCase(),
-        fatherName: data.fatherName.trim(),
-        phone: data.phone.trim(),
+        ...buildEnrollmentFields(data, studentRef.id),
         status: "active",
         isDeleted: false,
         createdAt: serverTimestamp(),
@@ -335,14 +504,30 @@ function AddStudent() {
       reset(defaultValues);
       setActiveTab("info");
 
-      toast.success(`Student ${fullName} added successfully!`);
+      toast.success(`Student ${studentFields.fullName} added successfully!`);
     } catch (error) {
       toast.error(firestoreErrorMessage(error));
     }
   };
 
+  if (loadingStudent) {
+    return (
+      <div className="mx-auto w-full">
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-6 text-center text-sm font-semibold text-blue-700">
+          Loading student data...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto w-full">
+      {editingStudentId && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800">
+          Editing mode: updating the selected student record.
+        </div>
+      )}
+
       {/* Form tabs */}
       <div className="mb-6 inline-flex max-w-full flex-wrap overflow-hidden rounded-lg border border-gray-300 bg-white">
         <button
@@ -443,8 +628,8 @@ function AddStudent() {
           {/* Admission form banner */}
           <div className="flex justify-center mb-6">
             <div className="bg-pink-600 text-white text-xl sm:text-xl font-bold italic px-8 py-2 rounded-md shadow">
-              ADMISSION FORM
-            </div>
+                {editingStudentId ? "UPDATE ADMISSION FORM" : "ADMISSION FORM"}
+              </div>
           </div>
 
           {/* Class / Section / Session / Enrollment */}
@@ -1028,7 +1213,11 @@ function AddStudent() {
               variant="success"
               loading={isSubmitting}
             >
-              {isSubmitting ? "Saving..." : "Add Student"}
+              {isSubmitting
+                ? "Saving..."
+                : editingStudentId
+                  ? "Update Student"
+                  : "Add Student"}
             </CustomButton>
           </div>
         </form>

@@ -14,6 +14,8 @@ import {
   where,
 } from "firebase/firestore";
 import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
+import { FaEdit, FaTrash } from "react-icons/fa";
 
 import {
   CLASSES,
@@ -44,6 +46,7 @@ interface EnrollmentRecord {
 }
 
 export default function StudentList() {
+  const navigate = useNavigate();
   const academicYears = generateAcademicYears();
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [studentToDelete, setStudentToDelete] =
@@ -538,28 +541,30 @@ export default function StudentList() {
                     <div className="flex gap-2">
                       <button
                         type="button"
-                        className="rounded border px-3 py-1 text-sm"
+                        title="Edit"
+                        aria-label={`Edit ${student.studentName}`}
                         onClick={() => {
-                          // Navigate to student details/edit page
-                          // Example:
-                          // navigate(`/students/${student.studentId}`)
+                          navigate(
+                            `/welcome/student/add?edit=${student.id}`
+                          );
                         }}
+                        className="rounded border p-2 text-sm text-blue-600 hover:bg-blue-50"
                       >
-                        View
+                        <FaEdit />
                       </button>
 
                       <button
                         type="button"
+                        title="Delete"
+                        aria-label={`Delete ${student.studentName}`}
                         disabled={deletingId === student.id}
                         onClick={() => {
                           setStudentToDelete(student);
                           setIsDeleteModalOpen(true);
                         }}
-                        className="rounded border px-3 py-1 text-sm text-red-600 disabled:opacity-50"
+                        className="rounded border p-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
                       >
-                        {deletingId === student.id
-                          ? "Deleting..."
-                          : "Delete"}
+                        <FaTrash />
                       </button>
                     </div>
                   </td>
