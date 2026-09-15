@@ -32,6 +32,12 @@ function AdmissionSessionInput<T extends FieldValues = FieldValues>({
   const errorMessage =
     start.fieldState.error?.message ?? end.fieldState.error?.message;
 
+  const handleChange = (raw: string) => {
+    const digits = raw.replace(/\D/g, "").slice(0, 2);
+    start.field.onChange(digits);
+    end.field.onChange(digits ? String(Number(digits) + 1).slice(-2) : "");
+  };
+
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-end gap-2">
@@ -45,14 +51,16 @@ function AdmissionSessionInput<T extends FieldValues = FieldValues>({
             start.fieldState.error ? "border-red-500" : "border-slate-500"
           }`}
           {...start.field}
+          onChange={(e) => handleChange(e.target.value)}
         />
         <span>- 20</span>
         <input
           id={endName}
           maxLength={2}
           inputMode="numeric"
+          readOnly
           aria-invalid={Boolean(end.fieldState.error)}
-          className={`w-8 border-0 border-b bg-transparent px-0.5 py-0.5 text-center text-sm font-semibold text-slate-900 focus:outline-none ${
+          className={`w-8 border-0 border-b bg-transparent px-0.5 py-0.5 text-center text-sm font-semibold text-slate-500 focus:outline-none ${
             end.fieldState.error ? "border-red-500" : "border-slate-500"
           }`}
           {...end.field}

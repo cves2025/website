@@ -33,6 +33,10 @@ interface AdmissionBoxedInputProps<T extends FieldValues = FieldValues>
   name: FieldPath<T>;
   /** Minimum / initial number of ruled cells shown. Grows automatically as user types. */
   cells: number;
+  /** Maximum number of characters accepted (caps the boxes / single-box value). */
+  maxLength?: number;
+  /** When true, only digits (0-9) are accepted; everything else is dropped. */
+  numeric?: boolean;
   rules?: RegisterOptions<T, FieldPath<T>>;
   /** Outer box border colour (default page-1 "border-sky-500"). */
   borderColor?: string;
@@ -62,6 +66,8 @@ function AdmissionBoxedInput<T extends FieldValues = FieldValues>({
   inputClassName = "",
   align = "center",
   singleInputBox = false,
+  maxLength,
+  numeric = false,
   ...rest
 }: AdmissionBoxedInputProps<T>) {
   const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
@@ -81,8 +87,15 @@ function AdmissionBoxedInput<T extends FieldValues = FieldValues>({
                   id={name}
                   aria-invalid={Boolean(fieldState.error)}
                   value={field.value ?? ""}
-                  onChange={(e) => field.onChange(e.target.value)}
+                  onChange={(e) => {
+                    let next = e.target.value;
+                    if (numeric) next = next.replace(/\D/g, "");
+                    if (maxLength) next = next.slice(0, maxLength);
+                    field.onChange(next);
+                  }}
                   onBlur={field.onBlur}
+                  maxLength={maxLength}
+                  {...(numeric ? { inputMode: "numeric" } : {})}
                   className={`${cellHeightClassName} w-full flex-1 border-0 bg-transparent text-sm font-semibold text-slate-900 focus:outline-none focus:bg-sky-50 ${
                     align === "center" ? "text-center" : "pl-2 pr-1"
                   } ${inputClassName}`}
@@ -99,16 +112,18 @@ function AdmissionBoxedInput<T extends FieldValues = FieldValues>({
         }
 
         // ---------- MULTI-CELL (OTP-style) MODE — existing code, unchanged ----------
-        const value: string = field.value ?? "";
+        const value: string = String(field.value ?? "");
 
         // cells ab sirf minimum hai — jitna text hai usse ek extra
         // khaali cell hamesha aage available rahega taaki typing continue ho sake.
-        const totalCells = Math.max(cells, value.length + 1);
+        const totalCells = Math.min(
+          Math.max(cells, value.length + 1),
+          maxLength ?? Number.MAX_SAFE_INTEGER
+        );
         const chars = Array.from({ length: totalCells }, (_, i) => value[i] ?? "");
 
         const commitValue = (nextChars: string[]) => {
-          // ab yaha `cells` par slice/cap nahi karna — length dynamic hai.
-          field.onChange(nextChars.join(""));
+          field.onChange(nextChars.join("").slice(0, maxLength));
         };
 
         const focusCell = (index: number) => {
@@ -123,6 +138,7 @@ function AdmissionBoxedInput<T extends FieldValues = FieldValues>({
         const handleChange = (index: number, raw: string) => {
           // Only ever keep the last typed character in this cell.
           const char = raw.slice(-1);
+          if (numeric && !/\d/.test(char)) return;
           const nextChars = [...chars];
           nextChars[index] = char;
           commitValue(nextChars);
@@ -164,10 +180,13 @@ function AdmissionBoxedInput<T extends FieldValues = FieldValues>({
           e: ClipboardEvent<HTMLInputElement>
         ) => {
           e.preventDefault();
-          const pasted = e.clipboardData.getData("text");
+          const pasted = numeric
+            ? e.clipboardData.getData("text").replace(/\D/g, "")
+            : e.clipboardData.getData("text");
           const nextChars = [...chars];
           let cursor = index;
           for (const ch of pasted) {
+            if (cursor >= totalCells) break;
             nextChars[cursor] = ch;
             cursor += 1;
           }

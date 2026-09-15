@@ -10,6 +10,7 @@ import AdmissionDateOfBirth from "../../../custom-components/admission/Admission
 import AdmissionLineInput from "../../../custom-components/admission/AdmissionLineInput";
 import AdmissionPinInput from "../../../custom-components/admission/AdmissionPinInput";
 import AdmissionSessionInput from "../../../custom-components/admission/AdmissionSessionInput";
+import { generateAcademicYears } from "../../../utils/generateAcademicYears";
 import {
   ADMISSION_SECTIONS,
   CLASSES,
@@ -32,6 +33,10 @@ import AdmissionSelectInput from "../../../custom-components/admission/Admission
 
 type StudentTab = "info" | "school" | "bulk";
 
+const [currentSessionStartYear, currentSessionEndYear] = (
+  generateAcademicYears()[0]?.value ?? ""
+).split("-");
+
 const defaultValues: AdmissionStudentFormValues = {
   firstName: "",
   lastName: "",
@@ -49,7 +54,7 @@ const defaultValues: AdmissionStudentFormValues = {
   fatherOccupation: "",
   gender: "",
   category: "",
-  nationality: "",
+  nationality: "INDIAN",
   phone2: "",
   correspondenceName: "",
   city: "",
@@ -59,8 +64,8 @@ const defaultValues: AdmissionStudentFormValues = {
   permanentCity: "",
   permanentState: "",
   permanentPin: "",
-  sessionStart: "",
-  sessionEnd: "",
+  sessionStart: currentSessionStartYear?.slice(-2) ?? "",
+  sessionEnd: currentSessionEndYear ?? "",
   dobDay: "",
   dobMonth: "",
   dobYear: "",
@@ -213,7 +218,7 @@ function AddStudent() {
       const lastName =
         lastSpaceIndex === -1 ? "" : fullName.slice(lastSpaceIndex + 1);
 
-      const academicYear = `20${data.sessionStart.trim()}-20${data.sessionEnd.trim()}`;
+      const academicYear = `20${data.sessionStart.trim()}-${data.sessionEnd.trim()}`;
       const dob = `${data.dobYear
         .trim()
         .padStart(
@@ -309,8 +314,8 @@ function AddStudent() {
       batch.set(enrollmentRef, {
         studentId: studentRef.id,
         academicYear,
-        className: data.className.trim(),
-        section: data.section.trim(),
+        className: data.className,
+        section: data.section,
         enrollment: data.enrollment.trim(),
         studentName: fullName,
         firstName,
@@ -337,7 +342,7 @@ function AddStudent() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-5xl">
+    <div className="mx-auto w-full">
       {/* Form tabs */}
       <div className="mb-6 inline-flex max-w-full flex-wrap overflow-hidden rounded-lg border border-gray-300 bg-white">
         <button
@@ -448,7 +453,6 @@ function AddStudent() {
               control={control}
               name="className"
               prefix="Class :"
-              placeholder="Select"
               options={CLASSES.map((cls) => ({ label: cls, value: cls }))}
             />
             <AdmissionSelectInput
@@ -471,6 +475,8 @@ function AddStudent() {
               control={control}
               name="enrollment"
               prefix="Enrollment No. :"
+              maxLength={5}
+              numeric
               className="w-32"
               rules={{ required: "Enrollment number is required" }}
             />
@@ -485,6 +491,7 @@ function AddStudent() {
                 control={control}
                 name="fullName"
                 cells={22}
+                maxLength={50}
                 rules={{ required: "Student's name is required" }}
               />
             </div>
@@ -496,6 +503,7 @@ function AddStudent() {
                 control={control}
                 name="motherName"
                 cells={22}
+                maxLength={50}
                 rules={{ required: "Mother's name is required" }}
               />
             </div>
@@ -507,6 +515,7 @@ function AddStudent() {
                 control={control}
                 name="fatherName"
                 cells={22}
+                maxLength={50}
                 rules={{ required: "Father's name is required" }}
               />
             </div>
@@ -518,6 +527,7 @@ function AddStudent() {
                 control={control}
                 name="fatherOccupation"
                 cells={22}
+                maxLength={50}
               />
             </div>
           </div>
@@ -651,25 +661,28 @@ function AddStudent() {
               control={control}
               name="correspondenceName"
               prefix="NAME :"
+              maxLength={50}
             />
             <AdmissionLineInput
               control={control}
               name="address"
               prefix="ADDRESS :"
-            />
-            <div className="border-b border-slate-500 h-4" />
+              maxLength={100}
+            />            
 
             <div className="flex flex-wrap items-end gap-4">
               <AdmissionLineInput
                 control={control}
                 name="city"
                 prefix="CITY :"
+                maxLength={50}
                 wrapperClassName="flex-1 min-w-[160px]"
               />
               <AdmissionLineInput
                 control={control}
                 name="state"
                 prefix="STATE :"
+                maxLength={50}
                 wrapperClassName="flex-1 min-w-[160px]"
               />
               <div className="flex items-end gap-2">
@@ -686,20 +699,22 @@ function AddStudent() {
               control={control}
               name="permanentAddress"
               prefix="PERMANENT ADDRESS :"
+              maxLength={100}
             />
-            <div className="border-b border-slate-500 h-4" />
 
             <div className="flex flex-wrap items-end gap-4">
               <AdmissionLineInput
                 control={control}
                 name="permanentCity"
                 prefix="CITY :"
+                maxLength={50}
                 wrapperClassName="flex-1 min-w-[160px]"
               />
               <AdmissionLineInput
                 control={control}
                 name="permanentState"
                 prefix="STATE :"
+                maxLength={50}
                 wrapperClassName="flex-1 min-w-[160px]"
               />
               <div className="flex items-end gap-2">
@@ -716,6 +731,7 @@ function AddStudent() {
               control={control}
               name="email"
               prefix="MANDATORY E-MAIL ADDRESS"
+              maxLength={50}
               rules={{
                 required: "E-mail address is required",
                 pattern: {
@@ -755,6 +771,8 @@ function AddStudent() {
                   control={control}
                   name="penOfStudent"
                   cells={10}
+                  maxLength={15}
+                  numeric
                   borderColor="border-indigo-900"
                   wrapperClassName="flex-1"
                 />
@@ -765,12 +783,14 @@ function AddStudent() {
                   control={control}
                   name="lastSchoolName"
                   prefix="School Name :"
+                  maxLength={50}
                   underlineClassName="border-slate-400"
                 />
                 <AdmissionLineInput
                   control={control}
                   name="lastSchoolAddress"
                   prefix="School Address :"
+                  maxLength={100}
                   underlineClassName="border-slate-400"
                 />
                 <AdmissionLineInput
@@ -778,6 +798,8 @@ function AddStudent() {
                   name="passingYear"
                   prefix="Passing Year :"
                   className="w-40"
+                  maxLength={4}
+                  numeric
                   underlineClassName="border-slate-400"
                 />
               </div>
@@ -793,6 +815,8 @@ function AddStudent() {
                     control={control}
                     name="previousQualifyingExam.maximumMarks"
                     cells={1}
+                    maxLength={4}
+                    numeric
                     singleInputBox={true}
                     borderColor="border-indigo-900"
                     cellHeightClassName="h-8"
@@ -802,15 +826,12 @@ function AddStudent() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span>Class</span>
-                  <AdmissionBoxedInput
+                  <AdmissionSelectInput
                     control={control}
                     name="previousQualifyingExam.previousClass"
-                    cells={1}
-                    singleInputBox={true}
-                    borderColor="border-indigo-900"
-                    cellHeightClassName="h-8"
-                    wrapperClassName="w-16"
-                    align="center"
+                    options={CLASSES.map((cls) => ({ label: cls, value: cls }))}
+                    placeholder="Select"
+                    wrapperClassName="w-24"
                   />
                 </div>
                 <div className="flex items-center gap-2">
@@ -819,6 +840,8 @@ function AddStudent() {
                     control={control}
                     name="previousQualifyingExam.marksObtained"
                     cells={1}
+                    maxLength={4}
+                    numeric
                     singleInputBox={true}
                     borderColor="border-indigo-900"
                     cellHeightClassName="h-8"
@@ -830,6 +853,7 @@ function AddStudent() {
                     control={control}
                     name="previousQualifyingExam.percentage"
                     cells={1}
+                    readOnly
                     singleInputBox={true}
                     borderColor="border-indigo-900"
                     cellHeightClassName="h-8"
@@ -855,18 +879,21 @@ function AddStudent() {
                     control={control}
                     name="physicalStatus.studentName"
                     prefix="Student's Name"
+                    maxLength={50}
                     underlineClassName="border-slate-400"
                   />
                   <AdmissionLineInput
                     control={control}
                     name="physicalStatus.fatherName"
                     prefix="Father's Name"
+                    maxLength={50}
                     underlineClassName="border-slate-400"
                   />
                   <AdmissionLineInput
                     control={control}
                     name="physicalStatus.motherName"
                     prefix="Mother's Name"
+                    maxLength={50}
                     underlineClassName="border-slate-400"
                   />
                 </div>
@@ -876,18 +903,23 @@ function AddStudent() {
                     control={control}
                     name="physicalStatus.weight"
                     prefix="Weight in Kg."
+                    maxLength={3}
+                    numeric
                     underlineClassName="border-slate-400"
                   />
                   <AdmissionLineInput
                     control={control}
                     name="physicalStatus.height"
                     prefix="Height in Cm."
+                    maxLength={3}
+                    numeric
                     underlineClassName="border-slate-400"
                   />
                   <AdmissionLineInput
                     control={control}
                     name="physicalStatus.bloodGroup"
                     prefix="Blood Group"
+                    maxLength={2}
                     underlineClassName="border-slate-400"
                   />
                 </div>
@@ -902,24 +934,28 @@ function AddStudent() {
                   control={control}
                   name="physicalStatus.allergyMedicine"
                   prefix="Allergy from any Medicine"
+                  maxLength={50}
                   underlineClassName="border-slate-400"
                 />
                 <AdmissionLineInput
                   control={control}
                   name="physicalStatus.allergyOther"
                   prefix="Allergy from any other thing"
+                  maxLength={50}
                   underlineClassName="border-slate-400"
                 />
                 <AdmissionLineInput
                   control={control}
                   name="physicalStatus.disease"
                   prefix="Any Disease"
+                  maxLength={50}
                   underlineClassName="border-slate-400"
                 />
                 <AdmissionLineInput
                   control={control}
                   name="physicalStatus.otherInformation"
                   prefix="Any other information"
+                  maxLength={50}
                   underlineClassName="border-slate-400"
                 />
               </div>

@@ -5,7 +5,7 @@ import {
   FieldPath,
   RegisterOptions,
 } from "react-hook-form";
-import { InputHTMLAttributes } from "react";
+import { ChangeEvent, InputHTMLAttributes } from "react";
 
 /**
  * Admission-form style "underline" input.
@@ -20,6 +20,8 @@ interface AdmissionLineInputProps<T extends FieldValues = FieldValues>
   control: Control<T>;
   name: FieldPath<T>;
   rules?: RegisterOptions<T, FieldPath<T>>;
+  /** When true, only digits (0-9) are accepted; everything else is dropped. */
+  numeric?: boolean;
   /** Label shown left of the underline (e.g. "School Name :"). */
   prefix?: string;
   prefixClassName?: string;
@@ -35,6 +37,7 @@ function AdmissionLineInput<T extends FieldValues = FieldValues>({
   control,
   name,
   rules = {},
+  numeric = false,
   prefix,
   prefixClassName = "",
   wrapperClassName = "",
@@ -64,6 +67,13 @@ function AdmissionLineInput<T extends FieldValues = FieldValues>({
                   invalid ? "border-red-500" : underlineClassName
                 } ${className || "flex-1"}`}
                 {...field}
+                onChange={
+                  numeric
+                    ? (e: ChangeEvent<HTMLInputElement>) =>
+                        field.onChange(e.target.value.replace(/\D/g, ""))
+                    : field.onChange
+                }
+                {...(numeric ? { inputMode: "numeric" } : {})}
                 {...rest}
               />
             </div>
