@@ -136,7 +136,7 @@ function Sidebar({ open, onClose }: SidebarProps) {
       <aside
         className={`fixed inset-y-0 left-0 z-40 w-72 bg-gradient-to-b from-gray-900 to-gray-950 text-white flex flex-col shadow-2xl transform transition-all duration-300 ease-in-out border-r border-gray-800
           ${open ? "translate-x-0" : "-translate-x-full"}
-          md:translate-x-0 md:static md:z-auto md:h-screen md:shrink-0
+          md:translate-x-0 md:static md:z-30 md:h-screen md:shrink-0
           ${collapsed ? "md:w-20" : "md:w-72"}`}
       >
         {/* Collapse toggle (desktop only) */}
