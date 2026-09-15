@@ -40,33 +40,35 @@ function AdmissionCheckboxGroup<T extends FieldValues = FieldValues>({
       render={({ field, fieldState }) => {
         const selected = field.value;
         return (
-          <div className={className}>
-            {options.map((option) => {
-              const checked = selected === option.value;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={checked}
-                  onClick={() => field.onChange(option.value)}
-                  className="flex w-full cursor-pointer items-center justify-between gap-2 transition-opacity hover:opacity-80 focus:outline-none"
-                >
-                  <span className="text-red-700 font-semibold text-sm">
-                    {option.label}
-                  </span>
-                  <span
-                    className={`flex h-5 w-5 shrink-0 items-center justify-center border-2 border-green-700 text-green-700 ${
-                      checked ? "bg-green-50" : "bg-transparent"
-                    }`}
+          <div className="flex flex-col gap-1">
+            <div className={className}>
+              {options.map((option) => {
+                const checked = selected === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={checked}
+                    onClick={() => field.onChange(option.value)}
+                    className="flex w-full cursor-pointer items-center justify-between gap-2 transition-opacity hover:opacity-80 focus:outline-none"
                   >
-                    {checked && <span className="text-xs font-bold">✓</span>}
-                  </span>
-                </button>
-              );
-            })}
+                    <span className="text-red-700 font-semibold text-sm">
+                      {option.label}
+                    </span>
+                    <span
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center border-2 border-green-700 text-green-700 ${
+                        checked ? "bg-green-50" : "bg-transparent"
+                      }`}
+                    >
+                      {checked && <span className="text-xs font-bold">✓</span>}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
             {fieldState.error && (
-              <p className="mt-1 text-xs font-medium text-red-600">
+              <p className="text-xs font-medium text-red-600">
                 {fieldState.error.message}
               </p>
             )}

@@ -21,5 +21,8 @@ export const CLASSES: string[] = [
 
 export const SECTIONS: string[] = ["A", "B", "C"];
 
+/** Sections offered in the admission form. */
+export const ADMISSION_SECTIONS: string[] = ["A", "B"];
+
 export const EMAIL_PATTERN: RegExp = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const PHONE_PATTERN: RegExp = /^[0-9+\-\s()]*$/;

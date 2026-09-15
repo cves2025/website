@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm, SubmitHandler, FieldPath } from "react-hook-form";
 import toast from "react-hot-toast";
 import { AdmissionStudentFormValues } from "../../../utils/type";
@@ -11,6 +11,7 @@ import AdmissionLineInput from "../../../custom-components/admission/AdmissionLi
 import AdmissionPinInput from "../../../custom-components/admission/AdmissionPinInput";
 import AdmissionSessionInput from "../../../custom-components/admission/AdmissionSessionInput";
 import {
+  ADMISSION_SECTIONS,
   CLASSES,
   COLLECTION,
   EMAIL_PATTERN,
@@ -131,12 +132,60 @@ function firestoreErrorMessage(error: unknown): string {
 
 function AddStudent() {
   const [activeTab, setActiveTab] = useState<StudentTab>("info");
-  const [saving, setSaving] = useState(false);
 
-  const { control, getValues, handleSubmit, reset, trigger } =
-    useForm<AdmissionStudentFormValues>({
-      defaultValues,
-    });
+  const {
+    control,
+    getValues,
+    handleSubmit,
+    reset,
+    setValue,
+    trigger,
+    watch,
+    formState: { isDirty, isSubmitting },
+  } = useForm<AdmissionStudentFormValues>({
+    defaultValues,
+  });
+
+  // Auto-calculate the "percentage" in the previous qualifying exam section
+  // whenever maximum marks / marks obtained change.
+  const maximumMarks = watch("previousQualifyingExam.maximumMarks");
+  const marksObtained = watch("previousQualifyingExam.marksObtained");
+
+  useEffect(() => {
+    const maximum = Number(maximumMarks);
+    const obtained = Number(marksObtained);
+    if (
+      maximumMarks.trim() !== "" &&
+      marksObtained.trim() !== "" &&
+      maximum > 0 &&
+      !Number.isNaN(obtained)
+    ) {
+      setValue(
+        "previousQualifyingExam.percentage",
+        ((obtained / maximum) * 100).toFixed(2),
+      );
+    } else if (maximumMarks.trim() !== "" || marksObtained.trim() !== "") {
+      // One of the two marks is missing — don't leave a stale percentage.
+      setValue("previousQualifyingExam.percentage", "");
+    }
+  }, [maximumMarks, marksObtained, setValue]);
+
+  // Warn the user before closing / reloading the tab with unsaved changes.
+  useEffect(() => {
+    if (!isDirty) {
+      return;
+    }
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [isDirty]);
 
   const handleNext = async () => {
     const valid = await trigger(page1RequiredFields);
@@ -156,8 +205,6 @@ function AddStudent() {
   };
 
   const onSubmit: SubmitHandler<AdmissionStudentFormValues> = async (data) => {
-    setSaving(true);
-
     try {
       const fullName = data.fullName.trim();
       const lastSpaceIndex = fullName.lastIndexOf(" ");
@@ -176,6 +223,22 @@ function AddStudent() {
         .trim()
         .padStart(2, "0")}`;
 
+      // Final safety check: keep the stored percentage in sync with the marks
+      // even if the auto-calculate effect had not re-run yet.
+      const maximumMarksValue = Number(
+        data.previousQualifyingExam.maximumMarks,
+      );
+      const marksObtainedValue = Number(
+        data.previousQualifyingExam.marksObtained,
+      );
+      const qualifyingPercentage =
+        data.previousQualifyingExam.maximumMarks.trim() !== "" &&
+        data.previousQualifyingExam.marksObtained.trim() !== "" &&
+        maximumMarksValue > 0 &&
+        !Number.isNaN(marksObtainedValue)
+          ? ((marksObtainedValue / maximumMarksValue) * 100).toFixed(2)
+          : data.previousQualifyingExam.percentage.trim();
+
       const studentRef = doc(collection(db, COLLECTION.STUDENTS));
       const enrollmentRef = doc(collection(db, COLLECTION.ENROLLMENTS));
 
@@ -189,7 +252,7 @@ function AddStudent() {
 
         enrollment: data.enrollment.trim(),
         className: data.className.trim(),
-        section: "A",
+        section: data.section.trim(),
         academicYear,
 
         fatherName: data.fatherName.trim(),
@@ -220,7 +283,7 @@ function AddStudent() {
           maximumMarks: data.previousQualifyingExam.maximumMarks.trim(),
           previousClass: data.previousQualifyingExam.previousClass.trim(),
           marksObtained: data.previousQualifyingExam.marksObtained.trim(),
-          percentage: data.previousQualifyingExam.percentage.trim(),
+          percentage: qualifyingPercentage,
         },
         physicalStatus: {
           studentName: data.physicalStatus.studentName.trim(),
@@ -247,7 +310,7 @@ function AddStudent() {
         studentId: studentRef.id,
         academicYear,
         className: data.className.trim(),
-        section: "A",
+        section: data.section.trim(),
         enrollment: data.enrollment.trim(),
         studentName: fullName,
         firstName,
@@ -270,8 +333,6 @@ function AddStudent() {
       toast.success(`Student ${fullName} added successfully!`);
     } catch (error) {
       toast.error(firestoreErrorMessage(error));
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -381,14 +442,24 @@ function AddStudent() {
             </div>
           </div>
 
-          {/* Class / Session / Enrollment */}
-          <div className="flex flex-wrap items-end gap-6 mb-6 text-green-800 font-semibold text-sm sm:text-base">
+          {/* Class / Section / Session / Enrollment */}
+          <div className="flex flex-wrap items-start gap-6 mb-6 text-green-800 font-semibold text-sm sm:text-base">
             <AdmissionSelectInput
               control={control}
               name="className"
               prefix="Class :"
               placeholder="Select"
               options={CLASSES.map((cls) => ({ label: cls, value: cls }))}
+            />
+            <AdmissionSelectInput
+              control={control}
+              name="section"
+              prefix="Section :"
+              placeholder="Select"
+              options={ADMISSION_SECTIONS.map((section) => ({
+                label: section,
+                value: section,
+              }))}
             />
             <AdmissionSessionInput
               control={control}
@@ -916,8 +987,12 @@ function AddStudent() {
             >
               Previous
             </CustomButton>
-            <CustomButton type="submit" variant="success" loading={saving}>
-              {saving ? "Saving..." : "Add Student"}
+            <CustomButton
+              type="submit"
+              variant="success"
+              loading={isSubmitting}
+            >
+              {isSubmitting ? "Saving..." : "Add Student"}
             </CustomButton>
           </div>
         </form>
