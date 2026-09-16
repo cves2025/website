@@ -1,22 +1,90 @@
 import { useState, ChangeEvent } from "react";
 import {
+  collection,
+  doc,
+  serverTimestamp,
+  writeBatch,
+} from "firebase/firestore";
+import {
   parseStudentFile,
   downloadCsvTemplate,
   saveStudentsLocally,
+  toFirestoreStudent,
+  toFirestoreEnrollment,
   StudentRow,
   StudentImportError,
+  StudentImportResult,
 } from "../../utils/studentImport";
-import { API_BASE_URL, authHeaders } from "../context/api";
+import { COLLECTION } from "../../constants";
+import { db } from "../../firebase/config";
 
 const PREVIEW_ROWS = 5;
+
+// Each student = 2 Firestore writes (students + enrollments).
+// 200 x 2 = 400 writes < the 500-write commit limit - optimized batching.
+const STUDENTS_PER_BATCH = 200;
 
 interface BulkStudentImportProps {
   onImported?: (students: StudentRow[]) => void;
 }
 
+/**
+ * Write rows straight to Cloud Firestore using the same documents/timestamps
+ * that AddStudent.tsx creates. Both documents get Firestore auto-generated
+ * doc ids; the enrollment record links to the student via `studentId`.
+ */
+async function importStudentsToFirestore(rows: StudentRow[]): Promise<number> {
+  let batch = writeBatch(db);
+  let queued = 0;
+  let imported = 0;
+  for (const row of rows) {
+    const studentRef = doc(collection(db, COLLECTION.STUDENTS));
+    const enrollmentRef = doc(collection(db, COLLECTION.ENROLLMENTS));
+    batch.set(studentRef, {
+      ...toFirestoreStudent(row),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    batch.set(enrollmentRef, {
+      ...toFirestoreEnrollment(row, studentRef.id),
+      status: "active",
+      isDeleted: false,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    queued += 1;
+    if (queued === STUDENTS_PER_BATCH) {
+      await batch.commit();
+      imported += queued;
+      queued = 0;
+      batch = writeBatch(db);
+    }
+  }
+  if (queued > 0) {
+    await batch.commit();
+    imported += queued;
+  }
+  return imported;
+}
+
+function firestoreErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    const lower = error.message.toLowerCase();
+    if (lower.includes("permission")) {
+      return "You do not have permission to save students. Please login with an admin account.";
+    }
+    if (lower.includes("token") || lower.includes("session")) {
+      return "Your session is invalid or expired. Please logout and login again.";
+    }
+    return error.message;
+  }
+  return "Something went wrong while saving to Firestore.";
+}
+
 function BulkStudentImport({ onImported }: BulkStudentImportProps) {
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [errors, setErrors] = useState<StudentImportError[]>([]);
+  const [missingColumns, setMissingColumns] = useState<string[]>([]);
   const [fileName, setFileName] = useState("");
   const [headers, setHeaders] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -29,68 +97,51 @@ function BulkStudentImport({ onImported }: BulkStudentImportProps) {
     setError("");
     setMessage("");
     try {
-      const result = await parseStudentFile(file);
+      const result: StudentImportResult = await parseStudentFile(file);
       setStudents(result.students);
       setErrors(result.errors);
+      setMissingColumns(result.missingRequiredColumns);
       setHeaders(result.headers);
       setFileName(file.name);
     } catch (parseError) {
       setError(
-        parseError instanceof Error ? parseError.message : "Could not read the file."
+        parseError instanceof Error ? parseError.message : "Could not read the file.",
       );
       setStudents([]);
       setErrors([]);
+      setMissingColumns([]);
+      setHeaders([]);
       setFileName("");
     } finally {
       e.target.value = "";
     }
   };
 
-  const handleImport = async () => {
+const handleImport = async () => {
     if (!students.length) {
-      setError("No valid students to import.");
+      setError("No valid students to import - fix the missing required field(s) shown below first.");
       return;
     }
     setError("");
     setMessage("");
     setLoading(true);
     try {
-      // Try to upload to Cloud Firestore via the backend (batch endpoint).
-      const response = await fetch(`${API_BASE_URL}/api/students/import`, {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify({ students }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || `HTTP error ${response.status}`);
-      }
-      // Mirror locally so the list shows the imported rows immediately.
+      const count = await importStudentsToFirestore(students);
+      // Mirror locally so the Admit Card / ID card panels can use the rows.
       saveStudentsLocally(students);
-      setMessage(`✅ ${data.imported} student(s) uploaded to Cloud Firestore.`);
-    } catch (apiError) {
-      // Backend not reachable yet (not hosted) -> keep it local so the app still works.
-      const merged = saveStudentsLocally(students);
-      console.warn(
-        "Firestore import failed, saved locally:",
-        apiError instanceof Error ? apiError.message : apiError
-      );
-      const apiMessage =
-        apiError instanceof Error ? apiError.message : "unknown error";
-      setMessage(
-        `⚠️ Backend not reachable (${apiMessage}). ${students.length} student(s) saved locally for now. They will need re-importing once the backend is live.`
-      );
-      onImported?.(merged);
+      setMessage(`✅ ${count} student(s) uploaded to Cloud Firestore.`);
+      onImported?.(students);
+    } catch (importError) {
+      setError(firestoreErrorMessage(importError));
+    } finally {
       setLoading(false);
-      return;
     }
-    setLoading(false);
-    onImported?.(students);
   };
 
   const reset = () => {
     setStudents([]);
     setErrors([]);
+    setMissingColumns([]);
     setHeaders([]);
     setFileName("");
     setMessage("");
@@ -108,8 +159,12 @@ function BulkStudentImport({ onImported }: BulkStudentImportProps) {
           Upload Excel (.xlsx / .xls) or CSV file
         </p>
         <p className="text-sm text-gray-500 mb-4">
-          Supports bulk import of 500 - 1000 students at once. Required columns:{" "}
-          <span className="font-semibold">Name, Enrollment, Class</span>.
+          Bulk import up to 2000 students at once. Required columns:{" "}
+          <span className="font-semibold">
+            Name, Enrollment, Class, Session, Mother's Name, Father's Name,
+            Gender, Category, Nationality, DOB, Phone, Email
+          </span>
+          . Use the template for all optional columns.
         </p>
         <div className="flex flex-wrap justify-center gap-3">
           <label className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-md px-5 py-2 text-sm transition-colors">
@@ -140,9 +195,10 @@ function BulkStudentImport({ onImported }: BulkStudentImportProps) {
       </div>
 
       <p className="text-xs text-gray-500 mt-3">
-        Flexible columns are accepted: e.g. <em>Name / Student Name / Full Name</em>,
+        Flexible column names are accepted (e.g. <em>Name / Student Name / Full Name</em>,
         <em> Enrollment / Roll No / Admission No</em>, <em>Class</em>, <em>Section</em>,
-        Father's Name, Mother's Name, DOB, Phone, Email, Address. Extra columns are ignored.
+        Father's Name, Mother's Name, DOB, Phone, Email, Address). A single{" "}
+        <em>DOB</em> column is automatically split into day / month / year. Extra columns are ignored.
       </p>
 
       {error && (
@@ -156,7 +212,15 @@ function BulkStudentImport({ onImported }: BulkStudentImportProps) {
         </p>
       )}
 
-      {/* Preview */}
+      {missingColumns.length > 0 && (
+        <p className="mt-4 bg-orange-50 text-orange-800 border border-orange-300 rounded-md px-4 py-2 text-sm font-semibold">
+          ⚠️ Required column(s) not found in this file:{" "}
+          <span className="font-bold">{missingColumns.join(", ")}</span>. Add these columns -
+          otherwise the affected rows are rejected below.
+        </p>
+      )}
+
+{/* Preview */}
       {students.length > 0 && (
         <div className="mt-4 bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
           <div className="px-4 py-3 border-b border-gray-200 flex flex-wrap items-center justify-between gap-2">
@@ -171,7 +235,7 @@ function BulkStudentImport({ onImported }: BulkStudentImportProps) {
               {loading ? "Uploading..." : "Upload to Firestore"}
             </button>
           </div>
-          <table className="w-full text-sm min-w-[640px]">
+          <table className="w-full text-sm min-w-[720px]">
             <thead>
               <tr className="bg-gray-100 text-gray-700 text-left">
                 <th className="px-4 py-2">Enrollment</th>
@@ -179,6 +243,8 @@ function BulkStudentImport({ onImported }: BulkStudentImportProps) {
                 <th className="px-4 py-2">Class</th>
                 <th className="px-4 py-2">Section</th>
                 <th className="px-4 py-2">Father's Name</th>
+                <th className="px-4 py-2">Mother's Name</th>
+                <th className="px-4 py-2">DOB</th>
                 <th className="px-4 py-2">Phone</th>
               </tr>
             </thead>
@@ -190,6 +256,8 @@ function BulkStudentImport({ onImported }: BulkStudentImportProps) {
                   <td className="px-4 py-2">{s.className}</td>
                   <td className="px-4 py-2">{s.section}</td>
                   <td className="px-4 py-2">{s.fatherName || "-"}</td>
+                  <td className="px-4 py-2">{s.motherName || "-"}</td>
+                  <td className="px-4 py-2">{s.dob || "-"}</td>
                   <td className="px-4 py-2">{s.phone || "-"}</td>
                 </tr>
               ))}
@@ -207,7 +275,7 @@ function BulkStudentImport({ onImported }: BulkStudentImportProps) {
       {errors.length > 0 && (
         <div className="mt-4 bg-yellow-50 border border-yellow-300 rounded-xl p-4">
           <p className="font-bold text-yellow-800 mb-2">
-            ⚠️ {errors.length} row(s) skipped (missing Name / Enrollment / Class):
+            ⚠️ {errors.length} row(s) skipped - missing required field(s) or invalid data:
           </p>
           <div className="max-h-40 overflow-y-auto text-sm">
             {errors.map((err, i) => (
