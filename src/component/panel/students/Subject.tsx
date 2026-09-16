@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useForm, SubmitHandler } from "react-hook-form";
 import {
   addDoc,
   collection,
@@ -11,24 +12,30 @@ import {
   serverTimestamp,
   updateDoc,
   where,
+  orderBy,
 } from "firebase/firestore";
 import toast from "react-hot-toast";
 import Modal from "../../../custom-components/Modal";
+import CustomButton from "../../../custom-components/CustomButton";
+import CustomInput from "../../../custom-components/CustomInput";
+import CustomSelect from "../../../custom-components/CustomSelect";
 import { CLASSES, COLLECTION } from "../../../constants";
 import { db } from "../../../firebase/config";
 
-type SubjectType = "Written + Oral" | "Theory" | "Practical";
+type SubjectType = "Written + Oral" | "Theory" | "Practical" | "Scholastic";
 
 const SUBJECT_TYPES: SubjectType[] = [
   "Written + Oral",
   "Theory",
   "Practical",
+  "Scholastic",
 ];
 
 const SUBJECT_TYPE_BADGE: Record<SubjectType, string> = {
   "Written + Oral": "bg-green-100 text-green-700",
   Theory: "bg-blue-100 text-blue-700",
   Practical: "bg-amber-100 text-amber-700",
+  Scholastic: "bg-amber-300 text-amber-700",
 };
 
 const isSubjectType = (value: unknown): value is SubjectType =>
@@ -38,15 +45,21 @@ interface SubjectDoc {
   id: string;
   name: string;
   type: SubjectType;
+  order: number;
   className: string;
 }
 
-interface SubjectFormState {
+interface SubjectFormValues {
   name: string;
   type: SubjectType;
+  order: string;
 }
 
-const EMPTY_FORM: SubjectFormState = { name: "", type: "Theory" };
+const DEFAULT_FORM: SubjectFormValues = {
+  name: "",
+  type: "Theory",
+  order: "",
+};
 
 const toSubjectDoc = (
   documentSnapshot: QueryDocumentSnapshot<DocumentData>,
@@ -58,6 +71,7 @@ const toSubjectDoc = (
     id: documentSnapshot.id,
     name: typeof data.name === "string" ? data.name : "",
     type: isSubjectType(data.type) ? data.type : "Theory",
+    order: typeof data.order === "number" ? data.order : 1,
     className:
       typeof data.className === "string" ? data.className : fallbackClass,
   };
@@ -69,7 +83,16 @@ function Subject() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<SubjectFormState>(EMPTY_FORM);
+  const {
+    control,
+    handleSubmit,
+    reset,
+    watch,
+  } = useForm<SubjectFormValues>({
+    defaultValues: DEFAULT_FORM,
+  });
+
+  const subjectName = watch("name");
   const [saving, setSaving] = useState(false);
   const [subjectToDelete, setSubjectToDelete] = useState<SubjectDoc | null>(
     null
@@ -82,7 +105,8 @@ function Subject() {
 
     const subjectsQuery = query(
       collection(db, COLLECTION.SUBJECTS),
-      where("className", "==", selectedClass)
+      where("className", "==", selectedClass),
+      orderBy("order", "asc")
     );
 
     const unsubscribe = onSnapshot(
@@ -106,13 +130,21 @@ function Subject() {
 
   const openAddModal = () => {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    const nextOrder =
+      subjects.length > 0
+        ? Math.max(...subjects.map((subject) => subject.order)) + 1
+        : 1;
+    reset({ name: "", type: "Theory", order: String(nextOrder) });
     setModalOpen(true);
   };
 
   const openEditModal = (subject: SubjectDoc) => {
     setEditingId(subject.id);
-    setForm({ name: subject.name, type: subject.type });
+    reset({
+      name: subject.name,
+      type: subject.type,
+      order: String(subject.order),
+    });
     setModalOpen(true);
   };
 
@@ -121,16 +153,20 @@ function Subject() {
     setModalOpen(false);
   };
 
-  const handleSave = async () => {
-    const name = form.name.trim();
+  const onSubmit: SubmitHandler<SubjectFormValues> = async (data) => {
+    const name = data.name.trim();
     if (!name) return;
+
+    // Normalize to a positive integer so the Order column always has a value.
+    const order = Math.max(1, Math.floor(Number(data.order) || 1));
 
     setSaving(true);
     try {
       if (editingId) {
         await updateDoc(doc(db, COLLECTION.SUBJECTS, editingId), {
           name,
-          type: form.type,
+          type: data.type,
+          order,
           className: selectedClass,
           updatedAt: serverTimestamp(),
         });
@@ -138,7 +174,8 @@ function Subject() {
       } else {
         await addDoc(collection(db, COLLECTION.SUBJECTS), {
           name,
-          type: form.type,
+          type: data.type,
+          order,
           className: selectedClass,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -228,13 +265,13 @@ function Subject() {
                 : `${subjects.length} subject${subjects.length === 1 ? "" : "s"}`}
             </p>
           </div>
-          <button
+          <CustomButton
             type="button"
+            variant="success"
             onClick={openAddModal}
-            className="bg-green-600 hover:bg-green-700 text-white font-bold rounded-md px-4 py-2 text-sm transition-colors"
           >
             + Add Subject
-          </button>
+          </CustomButton>
         </div>
         {loading ? (
           <div className="px-4 py-10 text-center">
@@ -257,6 +294,7 @@ function Subject() {
                   <th className="px-4 py-3">#</th>
                   <th className="px-4 py-3">Subject Name</th>
                   <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3">Order</th>
                   <th className="px-4 py-3 text-center">Actions</th>
                 </tr>
               </thead>
@@ -275,6 +313,13 @@ function Subject() {
                         className={`rounded px-2 py-1 text-xs font-bold ${SUBJECT_TYPE_BADGE[subject.type]}`}
                       >
                         {subject.type}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`rounded px-2 py-1 text-xs font-bold ${SUBJECT_TYPE_BADGE[subject.type]}`}
+                      >
+                        {subject.order}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
@@ -311,54 +356,41 @@ function Subject() {
         cancelText="Cancel"
         submitText={editingId ? "Update" : "Add Subject"}
         loading={saving}
-        submitDisabled={!form.name.trim()}
-        onSubmit={handleSave}
+        submitDisabled={!subjectName?.trim()}
+        onSubmit={handleSubmit(onSubmit)}
       >
         <div className="mt-4 space-y-4">
-          <div>
-            <label
-              htmlFor="subject-name"
-              className="block text-sm font-semibold text-gray-700"
-            >
-              Subject Name
-            </label>
-            <input
-              id="subject-name"
-              type="text"
-              value={form.name}
-              onChange={(event) =>
-                setForm({ ...form, name: event.target.value })
-              }
-              placeholder="e.g. English"
-              autoFocus
-              className="w-full mt-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="subject-type"
-              className="block text-sm font-semibold text-gray-700"
-            >
-              Type
-            </label>
-            <select
-              id="subject-type"
-              value={form.type}
-              onChange={(event) =>
-                setForm({
-                  ...form,
-                  type: event.target.value as SubjectType,
-                })
-              }
-              className="w-full mt-1 border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {SUBJECT_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-          </div>
+          <CustomInput
+            control={control}
+            name="name"
+            label="Subject Name"
+            placeholder="e.g. English"
+            autoFocus
+            rules={{ required: "Subject name is required" }}
+          />
+          <CustomSelect
+            control={control}
+            name="type"
+            label="Type"
+            placeholder={null}
+            options={SUBJECT_TYPES}
+            rules={{ required: "Please select a subject type" }}
+          />
+          <CustomInput
+            control={control}
+            name="order"
+            label="Order"
+            type="number"
+            min={1}
+            placeholder="e.g. 1"
+            rules={{
+              required: "Order is required",
+              pattern: {
+                value: /^\d+$/,
+                message: "Order must be a positive whole number",
+              },
+            }}
+          />
         </div>
       </Modal>
 
