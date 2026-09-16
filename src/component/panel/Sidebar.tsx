@@ -12,7 +12,6 @@ import {
   FaUserGraduate,
   FaChalkboardTeacher,
   FaIdCard,
-  FaFileAlt,
   FaSignOutAlt,
   FaAddressCard,
 } from "react-icons/fa";
@@ -66,16 +65,14 @@ const MENU: MenuItem[] = [
     ],
   },
   {
-    label: "Admit Card",
+    label: "Exam",
     icon: <FaIdCard />,
     color: "text-amber-400 bg-amber-400/10",
-    path: "/welcome/admit-card",
-  },
-  {
-    label: "Result",
-    icon: <FaFileAlt />,
-    color: "text-pink-400 bg-pink-400/10",
-    path: "/welcome/result",
+    subLinks: [
+      {label: "Add Exam", path: "/welcome/admit-card"},
+      {label: "Admit Card", path: "/welcome/admit-card"},
+      {label: "Result", path: "/welcome/result"},
+    ],
   },
 ];
 
