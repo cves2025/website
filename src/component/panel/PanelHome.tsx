@@ -3,6 +3,7 @@ import {
   FaUserGraduate,
   FaChalkboardTeacher,
   FaIdCard,
+  FaClipboardList,
   FaFileAlt,
 } from "react-icons/fa";
 
@@ -20,6 +21,13 @@ const CARDS = [
     to: "/welcome/teacher/add",
     icon: <FaChalkboardTeacher className="w-7 h-7" />,
     color: "bg-blue-100 text-blue-700",
+  },
+  {
+    label: "Exam",
+    desc: "Add & manage exam templates",
+    to: "/welcome/exam/list",
+    icon: <FaClipboardList className="w-7 h-7" />,
+    color: "bg-violet-100 text-violet-700",
   },
   {
     label: "Admit Card",

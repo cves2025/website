@@ -11,7 +11,7 @@ import {
 import {
   FaUserGraduate,
   FaChalkboardTeacher,
-  FaIdCard,
+  FaClipboardList,
   FaSignOutAlt,
   FaAddressCard,
 } from "react-icons/fa";
@@ -66,12 +66,13 @@ const MENU: MenuItem[] = [
   },
   {
     label: "Exam",
-    icon: <FaIdCard />,
+    icon: <FaClipboardList />,
     color: "text-amber-400 bg-amber-400/10",
     subLinks: [
-      {label: "Add Exam", path: "/welcome/admit-card"},
-      {label: "Admit Card", path: "/welcome/admit-card"},
-      {label: "Result", path: "/welcome/result"},
+      { label: "Add Exam", path: "/welcome/exam/add" },
+      { label: "Exam List", path: "/welcome/exam/list" },
+      { label: "Admit Card", path: "/welcome/admit-card" },
+      { label: "Result", path: "/welcome/result" },
     ],
   },
 ];
@@ -80,6 +81,7 @@ function activeGroup(pathname: string): string {
   if (pathname.startsWith("/welcome/student")) return "Student";
   if (pathname.startsWith("/welcome/teacher")) return "Teacher";
   if (pathname.startsWith("/welcome/id-card")) return "ID Card";
+  if (pathname.startsWith("/welcome/exam")) return "Exam";
   return "";
 }
 

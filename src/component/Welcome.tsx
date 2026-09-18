@@ -36,7 +36,7 @@ function Welcome() {
             <BsList className="w-7 h-7" />
           </button>
           <h1 className="text-lg md:text-xl font-bold text-gray-800 truncate">
-            Welcome{user?.name ? `, ${user.name}` : ""}! 👋
+            Welcome{user?.name ? `, ${user.name}` : ""}!
           </h1>
         </header>
 

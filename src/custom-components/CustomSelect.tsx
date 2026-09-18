@@ -5,7 +5,7 @@ import {
   FieldPath,
   RegisterOptions,
 } from "react-hook-form";
-import { SelectHTMLAttributes } from "react";
+import { SelectHTMLAttributes, ChangeEvent } from "react";
 
 const SELECT_CLASS =
   "w-full rounded-md border bg-white px-3 py-2 text-sm text-gray-800 shadow-sm transition-colors focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-100";
@@ -31,6 +31,11 @@ interface CustomSelectProps<T extends FieldValues = FieldValues>
   className?: string;
   optionValue?: string;
   optionLabel?: string;
+  /**
+   * Extra change handler invoked AFTER the react-hook-form controller handler,
+   * so the form value is already updated when this runs.
+   */
+  onChange?: (event: ChangeEvent<HTMLSelectElement>) => void;
 }
 
 /**
@@ -51,6 +56,7 @@ function CustomSelect<T extends FieldValues = FieldValues>({
   className = "",
   optionValue = "value",
   optionLabel = "label",
+  onChange,
   ...rest
 }: CustomSelectProps<T>) {
   const isRequired = required || Boolean(rules.required);
@@ -80,6 +86,10 @@ function CustomSelect<T extends FieldValues = FieldValues>({
               className={`${SELECT_CLASS} ${fieldBorder(invalid)} ${className}`}
               {...field}
               {...rest}
+              onChange={(event: ChangeEvent<HTMLSelectElement>) => {
+                field.onChange?.(event);
+                onChange?.(event);
+              }}
             >
               {placeholder !== null && placeholder !== "" && (
                 <option value="">{placeholder}</option>
