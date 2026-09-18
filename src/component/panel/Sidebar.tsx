@@ -15,29 +15,34 @@ import {
   FaSignOutAlt,
   FaAddressCard,
 } from "react-icons/fa";
-import { AiOutlineDashboard } from "react-icons/ai";
+import schoolLogo from "../../assets/image/schoolLogo.jpg";
 
 type MenuItem =
   | {
       label: string;
       icon: ReactElement;
-      color: string;
+      accent: string;
       subLinks: { label: string; path: string }[];
     }
-  | { label: string; icon: ReactElement; color: string; path: string; end?: boolean };
+  | { label: string; icon: ReactElement; accent: string; path: string; end?: boolean };
+
+/** The logo in the brand block always returns to the dashboard. */
+const DASHBOARD_PATH = "/welcome";
+
+// The school's own four brand colors (see the login page wordmark), each
+// permanently assigned to one section so color carries meaning, not decoration.
+const BRAND = {
+  green: "#1E9E5C",
+  blue: "#3763E0",
+  red: "#DC3D42",
+  pink: "#D6408F",
+};
 
 const MENU: MenuItem[] = [
   {
-    label: "Dashboard",
-    icon: <AiOutlineDashboard />,
-    color: "text-pink-400 bg-pink-400/10",
-    path: "/welcome",
-    end: true,
-  },
-  {
     label: "Student",
     icon: <FaUserGraduate />,
-    color: "text-emerald-400 bg-emerald-400/10",
+    accent: BRAND.green,
     subLinks: [
       { label: "Add Student", path: "/welcome/student/add" },
       { label: "Student List", path: "/welcome/student/list" },
@@ -47,7 +52,7 @@ const MENU: MenuItem[] = [
   {
     label: "Teacher",
     icon: <FaChalkboardTeacher />,
-    color: "text-sky-400 bg-sky-400/10",
+    accent: BRAND.blue,
     subLinks: [
       { label: "Add Teacher", path: "/welcome/teacher/add" },
       { label: "Teachers List", path: "/welcome/teacher/list" },
@@ -56,7 +61,7 @@ const MENU: MenuItem[] = [
   {
     label: "ID Card",
     icon: <FaAddressCard />,
-    color: "text-teal-400 bg-teal-400/10",
+    accent: BRAND.pink,
     subLinks: [
       { label: "Students", path: "/welcome/id-card/students" },
       { label: "Teachers", path: "/welcome/id-card/teachers" },
@@ -67,7 +72,7 @@ const MENU: MenuItem[] = [
   {
     label: "Exam",
     icon: <FaClipboardList />,
-    color: "text-amber-400 bg-amber-400/10",
+    accent: BRAND.red,
     subLinks: [
       { label: "Add Exam", path: "/welcome/exam/add" },
       { label: "Exam List", path: "/welcome/exam/list" },
@@ -99,7 +104,7 @@ function Sidebar({ open, onClose }: SidebarProps) {
 
   // When collapsed, clicking a group icon navigates straight to its first sub-link
   // instead of expanding (since there's no room to show sub-links while collapsed).
-  const handleGroupClick = (item: Extract<MenuItem, { subLinks: any }>) => {
+  const handleGroupClick = (item: Extract<MenuItem, { subLinks: unknown[] }>) => {
     if (collapsed) {
       navigate(item.subLinks[0].path);
       onClose();
@@ -133,7 +138,8 @@ function Sidebar({ open, onClose }: SidebarProps) {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-72 bg-gradient-to-b from-gray-900 to-gray-950 text-white flex flex-col shadow-2xl transform transition-all duration-300 ease-in-out border-r border-gray-800
+        className={`fixed inset-y-0 left-0 z-40 w-72 flex flex-col shadow-2xl transform transition-all duration-300 ease-in-out border-r border-white/5
+          bg-gradient-to-b from-[#12141C] to-[#181B26] text-white
           ${open ? "translate-x-0" : "-translate-x-full"}
           md:translate-x-0 md:static md:z-30 md:h-screen md:shrink-0
           ${collapsed ? "md:w-20" : "md:w-72"}`}
@@ -141,7 +147,7 @@ function Sidebar({ open, onClose }: SidebarProps) {
         {/* Collapse toggle (desktop only) */}
         <button
           onClick={toggleCollapse}
-          className="hidden md:flex absolute -right-3 top-8 z-50 w-6 h-6 items-center justify-center rounded-full bg-amber-500 text-gray-900 text-xs shadow-md hover:bg-amber-400 transition-colors"
+          className="hidden md:flex absolute -right-3 top-8 z-50 w-6 h-6 items-center justify-center rounded-full bg-[#20222E] border border-white/10 text-gray-300 text-xs shadow-md hover:text-white hover:border-[#3763E0] transition-colors"
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
@@ -149,31 +155,49 @@ function Sidebar({ open, onClose }: SidebarProps) {
         </button>
 
         {/* Brand */}
-        <div
-          className={`flex items-center border-b border-gray-800 px-5 py-5 ${
-            collapsed ? "md:justify-center md:px-0" : "justify-between"
-          }`}
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 shrink-0 rounded-xl bg-amber-500 flex items-center justify-center font-black text-gray-900 text-lg">
-              C
-            </div>
-            <div className={`min-w-0 ${collapsed ? "md:hidden" : ""}`}>
-              <h2 className="font-bold text-base text-white truncate leading-tight">
-                CVES Panel
-              </h2>
-              <p className="text-[11px] text-gray-400 truncate">
-                Children's Valley English School
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="md:hidden text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg p-1.5 transition-colors text-xl"
-            aria-label="Close menu"
+        <div className={collapsed ? "md:px-0" : ""}>
+          <div
+            className={`flex items-center border-b border-white/5 px-5 py-5 ${
+              collapsed ? "md:justify-center md:px-0" : "justify-between"
+            }`}
           >
-            <BsX />
-          </button>
+            <NavLink
+              to={DASHBOARD_PATH}
+              onClick={onClose}
+              title="Go to dashboard"
+              aria-label="Children's Valley English School logo - go to dashboard"
+              className="group -m-1 flex min-w-0 items-center gap-3 rounded-lg p-1 transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3763E0]"
+            >
+              <img
+                src={schoolLogo}
+                alt="Children's Valley English School logo"
+                className="h-10 w-10 shrink-0 rounded-xl bg-white object-contain p-0.5 shadow-sm transition-transform group-hover:scale-105"
+              />
+              <div className={`min-w-0 ${collapsed ? "md:hidden" : ""}`}>
+                <h2 className="font-bold text-base text-white truncate leading-tight tracking-tight">
+                  CVES Panel
+                </h2>
+                <p className="text-[11px] text-gray-400 truncate">
+                  Children's Valley English School
+                </p>
+              </div>
+            </NavLink>
+            <button
+              onClick={onClose}
+              className="md:hidden text-gray-400 hover:text-white hover:bg-white/10 rounded-lg p-1.5 transition-colors text-xl"
+              aria-label="Close menu"
+            >
+              <BsX />
+            </button>
+          </div>
+
+          {/* Signature stripe - the school's own four brand colors, in one place */}
+          <div className="flex h-[3px] w-full overflow-hidden">
+            <span className="flex-1" style={{ backgroundColor: BRAND.green }} />
+            <span className="flex-1" style={{ backgroundColor: BRAND.blue }} />
+            <span className="flex-1" style={{ backgroundColor: BRAND.red }} />
+            <span className="flex-1" style={{ backgroundColor: BRAND.pink }} />
+          </div>
         </div>
 
         {/* Navigation */}
@@ -184,32 +208,33 @@ function Sidebar({ open, onClose }: SidebarProps) {
                 <button
                   onClick={() => handleGroupClick(item)}
                   title={collapsed ? item.label : undefined}
-                  className={`w-full flex items-center rounded-lg text-sm font-semibold transition-all
-                    ${collapsed ? "md:justify-center px-0 py-2.5" : "justify-between px-3 py-2.5"}
+                  style={
+                    expanded === item.label
+                      ? { borderLeft: `3px solid ${item.accent}` }
+                      : { borderLeft: "3px solid transparent" }
+                  }
+                  className={`w-full flex items-center rounded-r-lg text-sm font-semibold transition-colors
+                    ${collapsed ? "md:justify-center md:rounded-lg px-0 py-2.5" : "justify-between pl-3 pr-3 py-2.5"}
                     ${
                       expanded === item.label
-                        ? "bg-gray-800/80 text-white"
-                        : "text-gray-300 hover:bg-gray-800/50 hover:text-white"
+                        ? "bg-white/[0.06] text-white"
+                        : "text-gray-300 hover:bg-white/[0.04] hover:text-white"
                     }`}
                 >
                   <span className="flex items-center gap-3">
                     <span
-                      className={`w-8 h-8 flex items-center justify-center rounded-lg text-base shrink-0 ${item.color}`}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-base shrink-0"
+                      style={{
+                        backgroundColor: `${item.accent}1A`,
+                        color: item.accent,
+                      }}
                     >
                       {item.icon}
                     </span>
                     <span className={collapsed ? "md:hidden" : ""}>{item.label}</span>
                   </span>
-                  <span
-                    className={`text-xs transition-transform duration-200 ${
-                      collapsed ? "md:hidden" : ""
-                    }`}
-                  >
-                    {expanded === item.label ? (
-                      <BsChevronUp />
-                    ) : (
-                      <BsChevronDown />
-                    )}
+                  <span className={`text-xs ${collapsed ? "md:hidden" : ""}`}>
+                    {expanded === item.label ? <BsChevronUp /> : <BsChevronDown />}
                   </span>
                 </button>
 
@@ -222,7 +247,7 @@ function Sidebar({ open, onClose }: SidebarProps) {
                       : "max-h-0 opacity-0"
                   }`}
                 >
-                  <div className="ml-4 space-y-0.5 border-l-2 border-gray-800 pl-4 py-0.5">
+                  <div className="ml-4 space-y-0.5 border-l-2 border-white/5 pl-4 py-0.5">
                     {item.subLinks.map((link) => (
                       <NavLink
                         key={link.path}
@@ -231,9 +256,12 @@ function Sidebar({ open, onClose }: SidebarProps) {
                         className={({ isActive }) =>
                           `block px-3 py-2 rounded-lg text-sm transition-colors ${
                             isActive
-                              ? "bg-amber-500 text-gray-900 font-bold shadow-sm"
-                              : "text-gray-400 hover:text-white hover:bg-gray-800/60"
+                              ? "font-bold text-white shadow-sm"
+                              : "text-gray-400 hover:text-white hover:bg-white/[0.05]"
                           }`
+                        }
+                        style={({ isActive }) =>
+                          isActive ? { backgroundColor: item.accent } : undefined
                         }
                       >
                         {link.label}
@@ -250,21 +278,27 @@ function Sidebar({ open, onClose }: SidebarProps) {
                 onClick={onClose}
                 title={collapsed ? item.label : undefined}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-lg text-sm font-semibold transition-all ${
+                  `flex items-center gap-3 rounded-lg text-sm font-semibold transition-colors ${
                     collapsed ? "md:justify-center px-0 py-2.5" : "px-3 py-2.5"
                   } ${
                     isActive
-                      ? "bg-amber-500 text-gray-900 shadow-sm"
-                      : "text-gray-300 hover:bg-gray-800/50 hover:text-white"
+                      ? "text-white shadow-sm"
+                      : "text-gray-300 hover:bg-white/[0.04] hover:text-white"
                   }`
+                }
+                style={({ isActive }) =>
+                  isActive ? { backgroundColor: item.accent } : undefined
                 }
               >
                 {({ isActive }) => (
                   <>
                     <span
-                      className={`w-8 h-8 flex items-center justify-center rounded-lg text-base shrink-0 ${
-                        isActive ? "bg-gray-900/10" : item.color
-                      }`}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-base shrink-0"
+                      style={
+                        isActive
+                          ? { backgroundColor: "rgba(255,255,255,0.15)", color: "#fff" }
+                          : { backgroundColor: `${item.accent}1A`, color: item.accent }
+                      }
                     >
                       {item.icon}
                     </span>
@@ -277,13 +311,18 @@ function Sidebar({ open, onClose }: SidebarProps) {
         </nav>
 
         {/* User + logout */}
-        <div className="px-3 py-4 border-t border-gray-800 bg-gray-950/60">
+        <div className="px-3 py-4 border-t border-white/5">
           <div
-            className={`flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-800/50 transition-colors ${
+            className={`flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-white/[0.04] transition-colors ${
               collapsed ? "md:justify-center" : ""
             }`}
           >
-            <div className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 text-gray-900 flex items-center justify-center font-bold shadow-inner">
+            <div
+              className="w-10 h-10 shrink-0 rounded-full text-white flex items-center justify-center font-bold shadow-inner"
+              style={{
+                background: `linear-gradient(135deg, ${BRAND.blue}, ${BRAND.pink})`,
+              }}
+            >
               {initials}
             </div>
             <div className={`min-w-0 ${collapsed ? "md:hidden" : ""}`}>
@@ -296,7 +335,18 @@ function Sidebar({ open, onClose }: SidebarProps) {
           <button
             onClick={handleLogout}
             title={collapsed ? "Logout" : undefined}
-            className="mt-3 w-full flex items-center justify-center gap-2 bg-red-600/90 hover:bg-red-600 text-white rounded-lg px-4 py-2.5 text-sm font-bold transition-colors shadow-sm"
+            className="mt-3 w-full flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold transition-colors border"
+            style={{
+              borderColor: `${BRAND.red}4D`,
+              color: BRAND.red,
+              backgroundColor: "transparent",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = `${BRAND.red}1A`;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+            }}
           >
             <FaSignOutAlt /> <span className={collapsed ? "md:hidden" : ""}>Logout</span>
           </button>
