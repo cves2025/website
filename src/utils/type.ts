@@ -1,3 +1,5 @@
+import { ExamCategory, MarksScheme } from "./examMarksScheme";
+
 export interface StudentFormValues {
   firstName: string;
   lastName: string;
@@ -75,4 +77,53 @@ export interface AdmissionStudentFormValues extends StudentFormValues {
   studentPhoto: string;
   motherPhoto: string;
   fatherPhoto: string;
+}
+
+/** Exams saved on the Add Exam page. */
+export interface ExamDoc {
+  id: string;
+  examName: string;
+  examCategory: ExamCategory;
+  academicYear: string;
+  maxMarks: number;
+  marksScheme: MarksScheme;
+  applicableClasses: string[];
+  examStartDate: string;
+  examEndDate: string;
+  status: "active" | "archived";
+}
+
+/** A subject from the Subjects page, together with the classes offering it. */
+export interface SubjectOption {
+  name: string;
+  classes: string[];
+  order: number;
+  types: string[];
+}
+
+export interface ScheduleRow {
+  id: string;
+  subject: string;
+  date: string;
+  fromTime: string;
+  toTime: string;
+  allClasses: boolean;
+  classes: string[];
+}
+
+/** Student record (from the enrollments page) used to fill an admit card. */
+export interface CardStudent {
+  /** Enrollments document id. */
+  id: string;
+  /** Students document id, used to pull extra details (mother's name). */
+  studentId: string;
+  enrollment: string;
+  studentName: string;
+  firstName: string;
+  lastName: string;
+  className: string;
+  section: string;
+  academicYear: string;
+  fatherName: string;
+  motherName: string;
 }

@@ -29,7 +29,7 @@ function Welcome() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-100 print:hidden">
+    <div className="flex h-screen overflow-hidden bg-gray-100 print:block print:h-auto print:overflow-visible print:bg-white">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Backdrop for mobile */}
@@ -42,7 +42,7 @@ function Welcome() {
 
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         {/* Top bar */}
-        <header className="sticky top-0 z-20 bg-white shadow-sm flex items-center gap-3 px-4 py-3">
+        <header className="sticky top-0 z-20 bg-white shadow-sm flex items-center gap-3 px-4 py-3 print:hidden">
           <button
             onClick={() => setSidebarOpen(true)}
             className="md:hidden text-gray-700 hover:text-gray-900"
@@ -56,7 +56,7 @@ function Welcome() {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 p-4 md:p-6 overflow-y-auto">
+        <main className="flex-1 p-4 md:p-6 overflow-y-auto print:overflow-visible print:p-0">
           <Outlet />
         </main>
       </div>

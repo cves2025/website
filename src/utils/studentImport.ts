@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import type { PhysicalStatus, PreviousQualifyingExam } from "./type";
 import { EMAIL_PATTERN, PHONE_PATTERN } from "../constants";
+import { normalizeClassName } from "./normalizeClassName";
 
 export type FieldKey =
   | "firstName"
@@ -811,6 +812,13 @@ export async function parseStudentFile(
       getValue("academicYear"),
     );
 
+    // ---- Class ---------------------------------------------------------------
+    // Spreadsheets spell the class in many ways ("5th", "Class 5", "V"); the
+    // value is mapped onto the CLASSES spelling used everywhere else so the
+    // uploaded students land in the same class bucket as the manual ones.
+    const classNameRaw = getValue("className");
+    const className = normalizeClassName(classNameRaw) || classNameRaw;
+
     // ---- Enumerated fields ---------------------------------------------------
     const gender = normalizeEnum(getValue("gender"));
     const category = normalizeEnum(getValue("category"));
@@ -906,7 +914,7 @@ export async function parseStudentFile(
       firstNameLower: firstName.toLowerCase(),
       lastNameLower: lastName.toLowerCase(),
       enrollment: enrollmentValue,
-      className: getValue("className"),
+      className,
       section: getValue("section") || "A",
       academicYear: session.academicYear,
       sessionStart: session.sessionStart,

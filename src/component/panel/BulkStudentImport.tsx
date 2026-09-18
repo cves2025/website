@@ -199,6 +199,10 @@ const handleImport = async () => {
         <em> Enrollment / Roll No / Admission No</em>, <em>Class</em>, <em>Section</em>,
         Father's Name, Mother's Name, DOB, Phone, Email, Address). A single{" "}
         <em>DOB</em> column is automatically split into day / month / year. Extra columns are ignored.
+        Class spellings are mapped to the school's class list (<em>5th</em> / <em>Class 5</em> /{" "}
+        <em>V</em> &rarr; <span className="font-semibold">5</span>) and the session is stored in the{" "}
+        <span className="font-semibold">2026-27</span> form, so uploaded students appear together with the
+        manually added ones in the Admit Card, Result and ID card panels.
       </p>
 
       {error && (

@@ -22,7 +22,7 @@ type MenuItem =
       label: string;
       icon: ReactElement;
       accent: string;
-      subLinks: { label: string; path: string }[];
+      subLinks: { label: string; path: string; end?: boolean }[];
     }
   | { label: string; icon: ReactElement; accent: string; path: string; end?: boolean };
 
@@ -76,7 +76,9 @@ const MENU: MenuItem[] = [
     subLinks: [
       { label: "Add Exam", path: "/welcome/exam/add" },
       { label: "Exam List", path: "/welcome/exam/list" },
-      { label: "Admit Card", path: "/welcome/admit-card" },
+      { label: "Exam Schedule", path: "/welcome/admit-card/schedule" },
+      { label: "Admit Card", path: "/welcome/admit-card", end: true },
+      { label: "Generate Admit Card", path: "/welcome/admit-card/generate" },
       { label: "Result", path: "/welcome/result" },
     ],
   },
@@ -86,6 +88,7 @@ function activeGroup(pathname: string): string {
   if (pathname.startsWith("/welcome/student")) return "Student";
   if (pathname.startsWith("/welcome/teacher")) return "Teacher";
   if (pathname.startsWith("/welcome/id-card")) return "ID Card";
+  if (pathname.startsWith("/welcome/admit-card")) return "Exam";
   if (pathname.startsWith("/welcome/exam")) return "Exam";
   return "";
 }
@@ -142,6 +145,7 @@ function Sidebar({ open, onClose }: SidebarProps) {
           bg-gradient-to-b from-[#12141C] to-[#181B26] text-white
           ${open ? "translate-x-0" : "-translate-x-full"}
           md:translate-x-0 md:static md:z-30 md:h-screen md:shrink-0
+          print:hidden
           ${collapsed ? "md:w-20" : "md:w-72"}`}
       >
         {/* Collapse toggle (desktop only) */}
@@ -252,6 +256,7 @@ function Sidebar({ open, onClose }: SidebarProps) {
                       <NavLink
                         key={link.path}
                         to={link.path}
+                        end={link.end}
                         onClick={onClose}
                         className={({ isActive }) =>
                           `block px-3 py-2 rounded-lg text-sm transition-colors ${
