@@ -3,6 +3,7 @@ export const COLLECTION = {
   ENROLLMENTS: "enrollments",
   SUBJECTS: "subjects",
   EXAMS: "exams",
+  EXAM_SCHEDULES: "examSchedules",
 };
 
 export const CLASSES: string[] = [
@@ -22,7 +23,11 @@ export const CLASSES: string[] = [
 
 export const SECTIONS: string[] = ["A", "B", "C"];
 
-/** Classes an exam template can be applied to (Exams module). */
+/**
+ * Legacy list from the first Exams-module draft. The exam templates now use
+ * `CLASSES` (so they match the class names saved on students/subjects) and
+ * render labels through `toOrdinalLabel`. Kept for backwards compatibility.
+ */
 export const EXAM_CLASSES: string[] = [
   "PG",
   "Nursery",

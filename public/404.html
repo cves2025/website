@@ -3,7 +3,12 @@
 <html>
   <head>
     <script>
-      var path = window.location.pathname;
+      // Keep the query string / hash too, so deep links like
+      // /welcome/exam/add?edit=<id> survive a hard refresh on GitHub Pages.
+      var path =
+        window.location.pathname +
+        window.location.search +
+        window.location.hash;
       sessionStorage.setItem("redirectPath", path);
       window.location.replace("/");
     </script>

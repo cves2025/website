@@ -1,17 +1,32 @@
 import { useEffect, useState, useContext } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "./panel/Sidebar";
 import { myContext } from "./context/MyContextProvider";
+import Loader from "../custom-components/Loader";
 import { BsList } from "react-icons/bs";
 
 function Welcome() {
-  const { user } = useContext(myContext);
+  const { user, authReady } = useContext(myContext);
   const navigate = useNavigate();
+  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Only redirect once Firebase has restored the session, and remember where
+  // the user was so they land back on the same page after logging in.
   useEffect(() => {
-    if (!user) navigate("/login");
-  }, [user]);
+    if (authReady && !user) {
+      const from = `${location.pathname}${location.search}`;
+      navigate(`/login?redirect=${encodeURIComponent(from)}`, { replace: true });
+    }
+  }, [authReady, user, location.pathname, location.search, navigate]);
+
+  if (!authReady) {
+    return <Loader label="Checking your session..." />;
+  }
+
+  if (!user) {
+    return <Loader label="Redirecting to login..." />;
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100 print:hidden">

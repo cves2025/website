@@ -13,11 +13,17 @@ import {
 import toast from "react-hot-toast";
 import { NavLink, useNavigate } from "react-router-dom";
 import { FaEdit } from "react-icons/fa";
-import { COLLECTION, EXAM_CLASSES } from "../../../constants";
+import { CLASSES, COLLECTION } from "../../../constants";
 import { db } from "../../../firebase/config";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
+import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
+import {
+  ExamCategory,
+  MarksScheme,
+  marksSchemeBadge,
+  marksSchemeFromDoc,
+} from "../../../utils/examMarksScheme";
 
-type ExamCategory = "UNIT_TEST" | "MAIN_EXAM";
 type ExamStatus = "active" | "archived";
 
 interface ExamDoc {
@@ -25,6 +31,8 @@ interface ExamDoc {
   examName: string;
   examCategory: ExamCategory;
   maxMarks: number;
+  /** Class 1-8 split (notebook/test or theory/practical). */
+  marksScheme: MarksScheme;
   applicableClasses: string[];
   academicYear: string;
   sequence: number;
@@ -54,11 +62,14 @@ function toExamStatus(value: unknown): ExamStatus {
 
 function toExamDoc(snapshot: QueryDocumentSnapshot<DocumentData>): ExamDoc {
   const data = snapshot.data();
+  const maxMarks = typeof data.maxMarks === "number" ? data.maxMarks : 0;
   return {
     id: snapshot.id,
     examName: typeof data.examName === "string" ? data.examName : "",
     examCategory: toExamCategory(data.examCategory),
-    maxMarks: typeof data.maxMarks === "number" ? data.maxMarks : 0,
+    maxMarks,
+    // Falls back to the standard class 1-8 split for older documents.
+    marksScheme: marksSchemeFromDoc(data, maxMarks || undefined),
     applicableClasses: Array.isArray(data.applicableClasses)
       ? data.applicableClasses.filter(
           (cls): cls is string => typeof cls === "string"
@@ -189,9 +200,9 @@ function ExamList() {
             className={inputClass}
           >
             <option value="">All Classes</option>
-            {EXAM_CLASSES.map((className) => (
+            {CLASSES.map((className) => (
               <option key={className} value={className}>
-                {className}
+                {toOrdinalLabel(className)}
               </option>
             ))}
           </select>
@@ -214,12 +225,13 @@ function ExamList() {
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
-          <table className="w-full text-sm min-w-[840px]">
+          <table className="w-full text-sm min-w-[1000px]">
             <thead>
               <tr className="bg-gray-100 text-gray-700 text-left">
                 <th className="px-4 py-3">Exam Name</th>
                 <th className="px-4 py-3">Category</th>
                 <th className="px-4 py-3">Max Marks</th>
+                <th className="px-4 py-3">Marks Breakup</th>
                 <th className="px-4 py-3">Applicable Classes</th>
                 <th className="px-4 py-3">Sequence</th>
                 <th className="px-4 py-3">Status</th>
@@ -242,7 +254,12 @@ function ExamList() {
                   </td>
                   <td className="px-4 py-3">{exam.maxMarks}</td>
                   <td className="px-4 py-3">
-                    {exam.applicableClasses.join(", ")}
+                    <span className="text-xs font-semibold text-gray-700">
+                      {marksSchemeBadge(exam.examCategory, exam.marksScheme)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {exam.applicableClasses.map(toOrdinalLabel).join(", ")}
                   </td>
                   <td className="px-4 py-3">{exam.sequence}</td>
                   <td className="px-4 py-3">

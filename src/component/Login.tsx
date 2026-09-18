@@ -6,7 +6,7 @@ import {
   type FormEvent,
   type MouseEvent,
 } from "react";
-import { useNavigate, NavLink } from "react-router-dom";
+import { useNavigate, NavLink, useSearchParams } from "react-router-dom";
 import { myContext } from "./context/MyContextProvider";
 import loginSideImage from "../assets/image/loginSide.jpg";
 
@@ -15,8 +15,11 @@ function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const submitting = useRef<boolean>(false); // prevents double-submit (onClick + form onSubmit)
-  const { user, login, error } = useContext(myContext);
+  const { user, authReady, login, error } = useContext(myContext);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Page the user originally asked for (set by protected routes on redirect).
+  const redirectTo = searchParams.get("redirect") || "/welcome";
 
   const submitHandler = async (
     event?: FormEvent<HTMLFormElement> | MouseEvent<HTMLButtonElement>
@@ -28,12 +31,14 @@ function Login() {
     const success = await login(email, password);
     submitting.current = false;
     setLoading(false);
-    if (success) navigate("/welcome");
+    if (success) navigate(redirectTo, { replace: true });
   };
 
+  // Already logged in (e.g. arriving here while the session is still valid):
+  // send the user straight to the page they wanted instead of the dashboard.
   useEffect(() => {
-    if (user) navigate("/welcome");
-  }, [user]);
+    if (authReady && user) navigate(redirectTo, { replace: true });
+  }, [authReady, user, redirectTo, navigate]);
 
   return (
     <div className="flex flex-col md:flex-row w-full min-h-screen">

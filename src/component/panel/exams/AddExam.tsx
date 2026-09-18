@@ -9,6 +9,7 @@ import {
   getDocs,
   query,
   serverTimestamp,
+  Timestamp,
   updateDoc,
   where,
 } from "firebase/firestore";
@@ -21,21 +22,44 @@ import CustomRadioGroup from "../../../custom-components/CustomRadioGroup";
 import CustomSelect from "../../../custom-components/CustomSelect";
 import CustomToggle from "../../../custom-components/CustomToggle";
 import FormMessage from "../../../custom-components/FormMessage";
-import { COLLECTION, EXAM_CLASSES } from "../../../constants";
+import Loader from "../../../custom-components/Loader";
+import { COLLECTION, CLASSES } from "../../../constants";
 import { db } from "../../../firebase/config";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
+import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
+import { toDateOrNull } from "../../../utils/toDateOrNull";
+import {
+  ExamCategory,
+  MarksScheme,
+  PRACTICAL_SUBJECTS,
+  SCHEME_CLASSES,
+  defaultMarksScheme,
+  hasSchemeClass,
+  marksSchemeFromDoc,
+  marksSchemeSummary,
+  schemeMaxMarks,
+  toMarksNumber,
+} from "../../../utils/examMarksScheme";
 
-type ExamCategory = "UNIT_TEST" | "MAIN_EXAM";
 type ExamStatus = "active" | "archived";
 
 interface ExamFormValues {
   examName: string;
   customExamName: string;
   examCategory: ExamCategory;
-  maxMarks: string;
+  // Classes 1-8 marks split: Unit Test = notebook + written test,
+  // Half Yearly / Annual = theory (+ practical for Science & Computer).
+  notebookMarks: string;
+  testMarks: string;
+  theoryMarks: string;
+  practicalTheoryMarks: string;
+  practicalMarks: string;
   applicableClasses: string[];
   academicYear: string;
-  examDate: string;
+  // <input type="date"> only understands "yyyy-MM-dd" strings, so the form keeps
+  // dates as strings and converts them to a Timestamp while saving.
+  examStartDate: string;
+  examEndDate: string;
   sequence: string;
   status: ExamStatus;
 }
@@ -48,7 +72,7 @@ const EXAM_NAME_OPTIONS = [
   "Other",
 ];
 
-/** Category inferred for each preset exam name (kept flexible: "Other" is manual). */
+// Which category each preset exam name belongs to. "Other" is picked manually.
 const EXAM_NAME_CATEGORY: Partial<Record<string, ExamCategory>> = {
   "Unit Test 1": "UNIT_TEST",
   "Unit Test 2": "UNIT_TEST",
@@ -61,12 +85,62 @@ const CATEGORY_LABEL: Record<ExamCategory, string> = {
   MAIN_EXAM: "Main Exam",
 };
 
-const CATEGORY_DEFAULT_MARKS: Record<ExamCategory, number> = {
-  UNIT_TEST: 30,
-  MAIN_EXAM: 70,
+/**
+ * Class 1-8 marks split used as the starting point of every exam template:
+ * Unit Test = 5 notebook + 25 test (30), Half Yearly / Annual = 70 theory with
+ * Science & Computer split as 50 theory + 20 practical.
+ */
+const DEFAULT_SCHEME: MarksScheme = defaultMarksScheme();
+
+type SchemeFormFields = Pick<
+  ExamFormValues,
+  | "notebookMarks"
+  | "testMarks"
+  | "theoryMarks"
+  | "practicalTheoryMarks"
+  | "practicalMarks"
+>;
+
+const DEFAULT_SCHEME_FORM: SchemeFormFields = {
+  notebookMarks: String(DEFAULT_SCHEME.notebookMarks),
+  testMarks: String(DEFAULT_SCHEME.testMarks),
+  theoryMarks: String(DEFAULT_SCHEME.theoryMarks),
+  practicalTheoryMarks: String(DEFAULT_SCHEME.practicalTheoryMarks),
+  practicalMarks: String(DEFAULT_SCHEME.practicalMarks),
 };
 
-// Kept local to avoid re-computing on every render; the list only grows over time.
+/** Converts a saved/derived scheme into the string based form fields. */
+function schemeToFormValues(scheme: MarksScheme): SchemeFormFields {
+  return {
+    notebookMarks: String(scheme.notebookMarks),
+    testMarks: String(scheme.testMarks),
+    theoryMarks: String(scheme.theoryMarks),
+    practicalTheoryMarks: String(scheme.practicalTheoryMarks),
+    practicalMarks: String(scheme.practicalMarks),
+  };
+}
+
+/**
+ * Builds a react-hook-form validation rule that only accepts whole numbers
+ * inside [min, max]. Number inputs hand the value over as a string.
+ */
+function wholeNumberRule(label: string, min: number, max: number) {
+  return {
+    validate: (value: string | Date | string[] | null) => {
+      const textValue = typeof value === "string" ? value.trim() : "";
+      const numeric = Number(textValue);
+      if (textValue === "" || !Number.isFinite(numeric)) {
+        return `${label} is required.`;
+      }
+      if (!Number.isInteger(numeric) || numeric < min || numeric > max) {
+        return `${label} must be a whole number between ${min} and ${max}.`;
+      }
+      return undefined;
+    },
+  };
+}
+
+// Computed once, not on every render.
 const academicYears = generateAcademicYears();
 
 function defaultExamValues(): ExamFormValues {
@@ -74,10 +148,11 @@ function defaultExamValues(): ExamFormValues {
     examName: "",
     customExamName: "",
     examCategory: "UNIT_TEST",
-    maxMarks: String(CATEGORY_DEFAULT_MARKS["UNIT_TEST"]),
+    ...DEFAULT_SCHEME_FORM,
     applicableClasses: [],
     academicYear: academicYears[0]?.value ?? "",
-    examDate: "",
+    examStartDate: "",
+    examEndDate: "",
     sequence: "",
     status: "active",
   };
@@ -87,7 +162,44 @@ function isExamCategory(value: unknown): value is ExamCategory {
   return value === "UNIT_TEST" || value === "MAIN_EXAM";
 }
 
-/** Map a Firestore exam document back into editable form values. */
+/** Convert a saved date (Date / Timestamp / string) into "yyyy-MM-dd". */
+function toDateInputValue(value: unknown): string {
+  const date = toDateOrNull(value);
+  if (!date) return "";
+
+  // Use local getters (not toISOString) so the calendar day never shifts.
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/**
+ * Convert a <input type="date"> value ("yyyy-MM-dd") into a Date.
+ * Parsed as a LOCAL date so the stored day matches what the user picked.
+ */
+function dateInputToDate(value: unknown): Date | null {
+  if (typeof value === "string") {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+    if (match) {
+      const date = new Date(
+        Number(match[1]),
+        Number(match[2]) - 1,
+        Number(match[3])
+      );
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+  }
+  // Fallback covers Date/Timestamp values and already-parsed strings.
+  return toDateOrNull(value);
+}
+
+/** Convert a form value into a Firestore Timestamp (or null). */
+function toTimestampOrNull(value: unknown): Timestamp | null {
+  const date = dateInputToDate(value);
+  return date ? Timestamp.fromDate(date) : null;
+}
+
+/** Turn a saved Firestore exam document back into editable form values. */
 function examDocToForm(data: DocumentData): ExamFormValues {
   const examName = typeof data.examName === "string" ? data.examName : "";
   const customExamName =
@@ -101,38 +213,43 @@ function examDocToForm(data: DocumentData): ExamFormValues {
     examName: usesPreset ? examName : "Other",
     customExamName: usesPreset ? "" : examName || customExamName,
     examCategory,
-    maxMarks: String(
-      typeof data.maxMarks === "number"
-        ? data.maxMarks
-        : CATEGORY_DEFAULT_MARKS[examCategory]
+    // Old documents only stored maxMarks; marksSchemeFromDoc keeps that total
+    // and fills the class 1-8 split with the standard defaults.
+    ...schemeToFormValues(
+      marksSchemeFromDoc(
+        data,
+        typeof data.maxMarks === "number" ? data.maxMarks : undefined
+      )
     ),
     applicableClasses: Array.isArray(data.applicableClasses)
       ? data.applicableClasses.filter(
           (cls): cls is string =>
-            typeof cls === "string" && EXAM_CLASSES.includes(cls)
+            typeof cls === "string" && CLASSES.includes(cls)
         )
       : [],
     academicYear:
       typeof data.academicYear === "string" ? data.academicYear : "",
-    examDate: typeof data.examDate === "string" ? data.examDate : "",
+    // toDateOrNull handles Date, Timestamp and string values; the result is
+    // formatted as "yyyy-MM-dd" because the field is a native date input.
+    examStartDate: toDateInputValue(data.examStartDate),
+    examEndDate: toDateInputValue(data.examEndDate),
     sequence: String(typeof data.sequence === "number" ? data.sequence : ""),
     status: data.status === "archived" ? "archived" : "active",
   };
 }
 
 function firestoreErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    const message = error.message;
-    const lower = message.toLowerCase();
-    if (lower.includes("permission")) {
-      return "You do not have permission to save exams. Please login with an admin account.";
-    }
-    if (lower.includes("token") || lower.includes("session")) {
-      return "Your session is invalid or expired. Please logout and login again.";
-    }
-    return message;
+  if (!(error instanceof Error)) {
+    return "Something went wrong while saving to Firestore.";
   }
-  return "Something went wrong while saving to Firestore.";
+  const lower = error.message.toLowerCase();
+  if (lower.includes("permission")) {
+    return "You do not have permission to save exams. Please login with an admin account.";
+  }
+  if (lower.includes("token") || lower.includes("session")) {
+    return "Your session is invalid or expired. Please logout and login again.";
+  }
+  return error.message;
 }
 
 interface SequenceConflict {
@@ -140,13 +257,16 @@ interface SequenceConflict {
   examName: string;
 }
 
-// Firestore's array-contains-any accepts at most 10 values per query.
-const MAX_ARRAY_CONTAIN_ANY_VALUES = 10;
-
 /**
- * Returns the first class + exam that would collide when saving this exam,
- * i.e. an existing exam for the same academic year whose applicableClasses
- * overlap the selected classes and that already uses the same sequence.
+ * Finds an already-saved exam (same academic year + overlapping class +
+ * same sequence number) that would clash with what's about to be saved.
+ *
+ * Only the academic year is filtered in Firestore (a single-field query needs
+ * no custom composite index); classes and sequence are matched in memory,
+ * which is plenty fast for the small number of exams per year.
+ *
+ * Any query failure is treated as "no conflict" so a Firestore hiccup can
+ * never stop the user from saving. Errors are logged for debugging.
  */
 async function findSequenceConflicts(
   academicYear: string,
@@ -155,48 +275,45 @@ async function findSequenceConflicts(
   excludeId: string | null
 ): Promise<SequenceConflict | null> {
   const sequenceNumber = Number(sequence);
-  if (
-    !academicYear ||
-    classes.length === 0 ||
-    !Number.isInteger(sequenceNumber) ||
-    sequenceNumber < 1
-  ) {
-    return null;
-  }
+  const isValidInput =
+    academicYear.trim() !== "" &&
+    classes.length > 0 &&
+    Number.isInteger(sequenceNumber) &&
+    sequenceNumber >= 1;
 
-  for (
-    let start = 0;
-    start < classes.length;
-    start += MAX_ARRAY_CONTAIN_ANY_VALUES
-  ) {
-    const chunk = classes.slice(start, start + MAX_ARRAY_CONTAIN_ANY_VALUES);
+  if (!isValidInput) return null;
+
+  try {
     const snapshot = await getDocs(
       query(
         collection(db, COLLECTION.EXAMS),
-        where("academicYear", "==", academicYear),
-        where("applicableClasses", "array-contains-any", chunk)
+        where("academicYear", "==", academicYear.trim())
       )
     );
 
-    for (const documentSnapshot of snapshot.docs) {
-      if (documentSnapshot.id === excludeId) continue;
-      const data = documentSnapshot.data();
+    for (const examDoc of snapshot.docs) {
+      if (examDoc.id === excludeId) continue;
+
+      const data = examDoc.data();
       if (data.sequence !== sequenceNumber) continue;
-      const overlappingClass = chunk.find(
-        (cls) =>
-          Array.isArray(data.applicableClasses) &&
-          data.applicableClasses.includes(cls)
+      if (!Array.isArray(data.applicableClasses)) continue;
+
+      const overlappingClass = classes.find((cls) =>
+        data.applicableClasses.includes(cls)
       );
-      if (overlappingClass) {
-        return {
-          className: overlappingClass,
-          examName:
-            typeof data.examName === "string" && data.examName
-              ? data.examName
-              : "another exam",
-        };
-      }
+      if (!overlappingClass) continue;
+
+      return {
+        className: overlappingClass,
+        examName:
+          typeof data.examName === "string" && data.examName
+            ? data.examName
+            : "another exam",
+      };
     }
+  } catch (error) {
+    // Network/permission/index problems must not block saving.
+    console.warn("Sequence conflict check failed:", error);
   }
 
   return null;
@@ -219,13 +336,14 @@ function AddExam() {
     setValue,
     setError,
     clearErrors,
+    getValues,
     watch,
     formState: { isSubmitting },
   } = useForm<ExamFormValues>({
     defaultValues: defaultExamValues(),
   });
 
-  // Load the exam document when opened in edit mode (/welcome/exam/add?edit=<id>).
+  // Load the exam when the page opens in edit mode: /welcome/exam/add?edit=<id>
   useEffect(() => {
     if (!editExamIdFromUrl) {
       setEditingId(null);
@@ -245,6 +363,7 @@ function AddExam() {
           throw new Error("Exam document not found.");
         }
         if (cancelled) return;
+
         reset(examDocToForm(snapshot.data()));
         setEditingId(editExamIdFromUrl);
         setMessage("");
@@ -272,7 +391,7 @@ function AddExam() {
     };
   }, [editExamIdFromUrl, reset, clearErrors, setSearchParams]);
 
-  // Watched values used by conditional rendering + the live sequence check.
+  // Watched values, used for conditional fields and the live sequence check.
   const watchExamName = watch("examName");
   const watchExamCategoryValue = watch("examCategory");
   const watchExamCategory: ExamCategory =
@@ -280,24 +399,54 @@ function AddExam() {
   const watchApplicableClasses = (watch("applicableClasses") ?? []) as string[];
   const watchAcademicYear = watch("academicYear") ?? "";
   const watchSequence = watch("sequence") ?? "";
-
   const classesKey = watchApplicableClasses.join(",");
 
-  // Debounced live check for sequence clashes (inline RHF error naming class + sequence).
+  // Live marks-scheme preview (classes 1-8 split).
+  const watchNotebookMarks = watch("notebookMarks") ?? "";
+  const watchTestMarks = watch("testMarks") ?? "";
+  const watchTheoryMarks = watch("theoryMarks") ?? "";
+  const watchPracticalTheoryMarks = watch("practicalTheoryMarks") ?? "";
+  const watchPracticalMarks = watch("practicalMarks") ?? "";
+
+  const watchScheme: MarksScheme = {
+    notebookMarks: toMarksNumber(
+      watchNotebookMarks,
+      DEFAULT_SCHEME.notebookMarks
+    ),
+    testMarks: toMarksNumber(watchTestMarks, DEFAULT_SCHEME.testMarks),
+    theoryMarks: toMarksNumber(watchTheoryMarks, DEFAULT_SCHEME.theoryMarks),
+    practicalTheoryMarks: toMarksNumber(
+      watchPracticalTheoryMarks,
+      DEFAULT_SCHEME.practicalTheoryMarks
+    ),
+    practicalMarks: toMarksNumber(
+      watchPracticalMarks,
+      DEFAULT_SCHEME.practicalMarks
+    ),
+  };
+
+  const isUnitTestExam = watchExamCategory === "UNIT_TEST";
+  // Science & Computer carry a practical paper only in Half Yearly / Annual
+  // and only for classes 1 to 8.
+  const showPracticalFields =
+    !isUnitTestExam && hasSchemeClass(watchApplicableClasses);
+  const watchMaxMarks = schemeMaxMarks(watchExamCategory, watchScheme);
+
+  // Debounced check: warns the user if this sequence number is already
+  // used for one of the selected classes in the same academic year.
   useEffect(() => {
     let cancelled = false;
     clearErrors("sequence");
     setCheckingSequence(false);
 
     const sequenceNumber = Number(watchSequence);
-    if (
-      !watchAcademicYear ||
-      watchApplicableClasses.length === 0 ||
-      !Number.isInteger(sequenceNumber) ||
-      sequenceNumber < 1
-    ) {
-      return;
-    }
+    const isValidInput =
+      watchAcademicYear &&
+      watchApplicableClasses.length > 0 &&
+      Number.isInteger(sequenceNumber) &&
+      sequenceNumber >= 1;
+
+    if (!isValidInput) return;
 
     setCheckingSequence(true);
     const timer = setTimeout(async () => {
@@ -336,13 +485,23 @@ function AddExam() {
     }
   };
 
+  /**
+   * Restores the standard class 1-8 split (5 notebook + 25 test for Unit Tests,
+   * 70 theory / 50 + 20 practical for Half Yearly & Annual) whenever the exam
+   * name or category changes, so the form never starts from stale numbers.
+   */
+  const applySchemeDefaults = () => {
+    const fields = schemeToFormValues(DEFAULT_SCHEME);
+    (Object.keys(fields) as (keyof SchemeFormFields)[]).forEach((key) => {
+      setValue(key, fields[key], { shouldDirty: false });
+    });
+  };
+
   const handleExamSelectChange = (value: string) => {
     const category = EXAM_NAME_CATEGORY[value];
     if (category) {
       setValue("examCategory", category, { shouldDirty: false });
-      setValue("maxMarks", String(CATEGORY_DEFAULT_MARKS[category]), {
-        shouldDirty: false,
-      });
+      applySchemeDefaults();
     }
     if (value !== "Other") {
       setValue("customExamName", "", { shouldDirty: false });
@@ -350,15 +509,58 @@ function AddExam() {
   };
 
   const handleCategoryChange = (value: string) => {
-    const category: ExamCategory = value === "MAIN_EXAM" ? "MAIN_EXAM" : "UNIT_TEST";
+    const category: ExamCategory =
+      value === "MAIN_EXAM" ? "MAIN_EXAM" : "UNIT_TEST";
     setValue("examCategory", category);
-    setValue("maxMarks", String(CATEGORY_DEFAULT_MARKS[category]), {
+    applySchemeDefaults();
+  };
+
+  /** Notebook + Test must add up to the unit test total (30 by default). */
+  const handleResetNotebookMarks = () => {
+    setValue("notebookMarks", String(DEFAULT_SCHEME.notebookMarks), {
+      shouldDirty: false,
+    });
+    setValue("testMarks", String(DEFAULT_SCHEME.testMarks), {
+      shouldDirty: false,
+    });
+  };
+
+  /** Science & Computer: theory + practical must add up to the theory total. */
+  const handleResetPracticalMarks = () => {
+    setValue("theoryMarks", String(DEFAULT_SCHEME.theoryMarks), {
+      shouldDirty: false,
+    });
+    setValue(
+      "practicalTheoryMarks",
+      String(DEFAULT_SCHEME.practicalTheoryMarks),
+      { shouldDirty: false }
+    );
+    setValue("practicalMarks", String(DEFAULT_SCHEME.practicalMarks), {
       shouldDirty: false,
     });
   };
 
   const handleClassesChange = (next: string[]) => {
     setValue("applicableClasses", next);
+    // Ticking a class from 1 to 8 turns on the Science & Computer practical
+    // papers, so fill in the standard split when none is configured yet
+    // (50 theory + 20 practical for the usual 70 mark paper).
+    if (
+      hasSchemeClass(next) &&
+      toMarksNumber(getValues("practicalMarks"), 0) < 1
+    ) {
+      const theory = toMarksNumber(
+        getValues("theoryMarks"),
+        DEFAULT_SCHEME.theoryMarks
+      );
+      const practical = DEFAULT_SCHEME.practicalMarks;
+      setValue("practicalMarks", String(practical), { shouldDirty: false });
+      setValue(
+        "practicalTheoryMarks",
+        String(Math.max(theory - practical, 0)),
+        { shouldDirty: false }
+      );
+    }
   };
 
   const handleStatusChange = (value: string) => {
@@ -366,48 +568,90 @@ function AddExam() {
   };
 
   const onSubmit: SubmitHandler<ExamFormValues> = async (data) => {
-    clearErrors("sequence");
-
-    // Authoritative check before saving (also covers the pre-submit debounce).
-    setCheckingSequence(true);
-    const conflict = await findSequenceConflicts(
-      data.academicYear,
-      data.applicableClasses,
-      data.sequence,
-      editingId
-    );
-    setCheckingSequence(false);
-    if (conflict) {
-      setError("sequence", {
-        type: "server",
-        message: `Sequence ${data.sequence} is already used for class ${conflict.className} in ${data.academicYear} (${conflict.examName}).`,
-      });
-      return;
-    }
-
-    const examName = (
-      data.examName === "Other" ? data.customExamName : data.examName
-    ).trim();
-
-    // Store classes in the canonical EXAM_CLASSES order.
-    const applicableClasses = EXAM_CLASSES.filter((cls) =>
-      data.applicableClasses.includes(cls)
-    );
-
-    const examFields = {
-      examName,
-      examCategory: data.examCategory,
-      maxMarks: Number(data.maxMarks),
-      applicableClasses,
-      academicYear: data.academicYear.trim(),
-      examDate: data.examDate.trim(),
-      sequence: Number(data.sequence),
-      status: data.status,
-    };
-
     setMessage("");
     setSubmitError("");
+    clearErrors("sequence");
+
+    // Everything (including the pre-save sequence check) runs inside
+    // try/catch/finally so a failure can never leave the button stuck on
+    // "Saving..." and always surfaces an error message to the user.
+    setCheckingSequence(true);
     try {
+      // Final check right before saving (covers any race with the debounce above).
+      const conflict = await findSequenceConflicts(
+        data.academicYear,
+        data.applicableClasses,
+        data.sequence,
+        editingId
+      );
+
+      if (conflict) {
+        setError("sequence", {
+          type: "server",
+          message: `Sequence ${data.sequence} is already used for class ${conflict.className} in ${data.academicYear} (${conflict.examName}).`,
+        });
+        return;
+      }
+
+      const examName = (
+        data.examName === "Other" ? data.customExamName : data.examName
+      ).trim();
+
+      // Keep classes sorted in the same order as the CLASSES list.
+      const applicableClasses = CLASSES.filter((cls) =>
+        data.applicableClasses.includes(cls)
+      );
+
+      const scheme: MarksScheme = {
+        notebookMarks: toMarksNumber(
+          data.notebookMarks,
+          DEFAULT_SCHEME.notebookMarks
+        ),
+        testMarks: toMarksNumber(data.testMarks, DEFAULT_SCHEME.testMarks),
+        theoryMarks: toMarksNumber(data.theoryMarks, DEFAULT_SCHEME.theoryMarks),
+        practicalTheoryMarks: toMarksNumber(
+          data.practicalTheoryMarks,
+          DEFAULT_SCHEME.practicalTheoryMarks
+        ),
+        practicalMarks: toMarksNumber(
+          data.practicalMarks,
+          DEFAULT_SCHEME.practicalMarks
+        ),
+      };
+
+      // The Science & Computer practical paper exists only in Half Yearly /
+      // Annual and only for classes 1 to 8. Everything else keeps plain theory.
+      const hasPracticalPaper =
+        data.examCategory === "MAIN_EXAM" &&
+        hasSchemeClass(applicableClasses) &&
+        scheme.practicalMarks > 0;
+
+      const examFields = {
+        examName,
+        examCategory: data.examCategory,
+        // Total marks stay 30 (notebook + test) or 70 (theory / 50 + 20).
+        maxMarks: schemeMaxMarks(data.examCategory, scheme),
+        notebookMarks: scheme.notebookMarks,
+        testMarks: scheme.testMarks,
+        theoryMarks: scheme.theoryMarks,
+        practicalTheoryMarks: hasPracticalPaper
+          ? scheme.practicalTheoryMarks
+          : 0,
+        practicalMarks: hasPracticalPaper ? scheme.practicalMarks : 0,
+        practicalSubjects: hasPracticalPaper ? PRACTICAL_SUBJECTS : [],
+        practicalClasses: hasPracticalPaper ? SCHEME_CLASSES : [],
+        applicableClasses,
+        academicYear: data.academicYear.trim(),
+        examStartDate: toTimestampOrNull(data.examStartDate),
+        examEndDate: toTimestampOrNull(data.examEndDate),
+        sequence: Number(data.sequence),
+        status: data.status,
+      };
+
+      const successMessage = editingId
+        ? `Exam "${examName}" updated successfully.`
+        : `Exam "${examName}" added successfully.`;
+
       if (editingId) {
         await updateDoc(doc(db, COLLECTION.EXAMS, editingId), {
           ...examFields,
@@ -415,21 +659,24 @@ function AddExam() {
         });
         setEditingId(null);
         setSearchParams({}, { replace: true });
-        setMessage(`Exam "${examName}" updated successfully.`);
       } else {
         await addDoc(collection(db, COLLECTION.EXAMS), {
           ...examFields,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
-        setMessage(`Exam "${examName}" added successfully.`);
       }
+
       reset(defaultExamValues());
       clearErrors();
+      setMessage(successMessage);
+      toast.success(successMessage);
       setTimeout(() => setMessage(""), 6000);
     } catch (error) {
       console.error("Failed to save exam:", error);
       setSubmitError(firestoreErrorMessage(error));
+    } finally {
+      setCheckingSequence(false);
     }
   };
 
@@ -443,6 +690,9 @@ function AddExam() {
           <p className="text-gray-600 mt-1">
             Define exam templates for classes and academic years. Student marks
             are entered later on the Marks Entry page.
+          </p>
+          <p className="text-xs font-semibold text-amber-700 mt-1">
+            Classes 1 to 8: {marksSchemeSummary(watchExamCategory, watchScheme)}
           </p>
         </div>
         <NavLink
@@ -470,8 +720,8 @@ function AddExam() {
       {submitError && <FormMessage type="error">{submitError}</FormMessage>}
 
       {loadingExam ? (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-6 text-center text-sm font-semibold text-blue-700">
-          Loading exam data...
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-10">
+          <Loader label="Loading exam data..." fullScreen={false} />
         </div>
       ) : (
         <form
@@ -513,7 +763,7 @@ function AddExam() {
             )}
           </div>
 
-          {/* Category, marks, year, date, sequence, status */}
+          {/* Category, year, dates, sequence, status */}
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               {watchExamName === "Other" ? (
@@ -525,12 +775,12 @@ function AddExam() {
                     {
                       value: "UNIT_TEST",
                       label: "Unit Test",
-                      hint: `default ${CATEGORY_DEFAULT_MARKS["UNIT_TEST"]} marks`,
+                      hint: `notebook ${DEFAULT_SCHEME.notebookMarks} + test ${DEFAULT_SCHEME.testMarks}`,
                     },
                     {
                       value: "MAIN_EXAM",
                       label: "Main Exam",
-                      hint: `default ${CATEGORY_DEFAULT_MARKS["MAIN_EXAM"]} marks`,
+                      hint: `theory ${DEFAULT_SCHEME.theoryMarks} (Science & Computer ${DEFAULT_SCHEME.practicalTheoryMarks} + ${DEFAULT_SCHEME.practicalMarks} practical)`,
                     },
                   ]}
                   onChange={handleCategoryChange}
@@ -545,35 +795,12 @@ function AddExam() {
                       {CATEGORY_LABEL[watchExamCategory]}
                     </span>
                     <span className="text-gray-500">
-                      {" "}— default max marks{" "}
-                      {CATEGORY_DEFAULT_MARKS[watchExamCategory]} (editable below)
+                      {" "}— marks split is set in the Marks Scheme section below
                     </span>
                   </div>
                 </>
               )}
             </div>
-
-            <CustomInput
-              control={control}
-              name="maxMarks"
-              label="Maximum Marks"
-              type="number"
-              min={1}
-              required
-              placeholder="e.g. 30"
-              rules={{
-                required: "Maximum marks is required.",
-                validate: (value: string | string[]) => {
-                  const textValue = typeof value === "string" ? value : "" ;
-                  const numeric = Number(textValue);
-                  return textValue.trim() !== "" &&
-                    Number.isFinite(numeric) &&
-                    numeric >= 1
-                    ? undefined
-                    : "Maximum marks must be a positive number of at least 1.";
-                },
-              }}
-            />
 
             <CustomSelect
               control={control}
@@ -590,9 +817,30 @@ function AddExam() {
 
             <CustomInput
               control={control}
-              name="examDate"
-              label="Exam Date (optional)"
+              name="examStartDate"
+              label="Exam Start Date"
               type="date"
+              required
+              rules={{ required: "Exam start date is required." }}
+            />
+
+            <CustomInput
+              control={control}
+              name="examEndDate"
+              label="Exam End Date"
+              type="date"
+              required
+              rules={{
+                required: "Exam end date is required.",
+                validate: (value: string | Date | string[] | null) => {
+                  const start = dateInputToDate(getValues("examStartDate"));
+                  const end = dateInputToDate(value);
+                  if (!start || !end) return undefined;
+                  return end < start
+                    ? "Exam end date cannot be before the start date."
+                    : undefined;
+                },
+              }}
             />
 
             <div>
@@ -636,12 +884,170 @@ function AddExam() {
             control={control}
             name="applicableClasses"
             label="Applicable Classes"
-            options={EXAM_CLASSES}
+            options={CLASSES.map((cls) => ({
+              label: toOrdinalLabel(cls),
+              value: cls,
+            }))}
             required
             rules={{ required: "Select at least one applicable class." }}
             onChange={handleClassesChange}
             className="mt-4"
           />
+
+          {/* Marks scheme - classes 1 to 8 */}
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-gray-800">
+                  Marks Scheme (Classes 1 to 8)
+                </h3>
+                <p className="text-xs text-gray-600 mt-0.5">
+                  {isUnitTestExam
+                    ? "Notebook marks and written test marks are added together to make the unit test total."
+                    : `All subjects carry theory marks; ${PRACTICAL_SUBJECTS.join(
+                        " & "
+                      )} also carry a practical paper.`}
+                </p>
+              </div>
+              <span className="rounded-md border border-amber-300 bg-white px-3 py-1 text-xs font-bold text-amber-800">
+                Maximum Marks: {watchMaxMarks}
+              </span>
+            </div>
+
+            {isUnitTestExam ? (
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <CustomInput
+                  control={control}
+                  name="notebookMarks"
+                  label="Notebook Marks"
+                  type="number"
+                  min={0}
+                  required
+                  placeholder={`e.g. ${DEFAULT_SCHEME.notebookMarks}`}
+                  rules={wholeNumberRule("Notebook marks", 0, 30)}
+                />
+                <CustomInput
+                  control={control}
+                  name="testMarks"
+                  label="Written Test Marks"
+                  type="number"
+                  min={1}
+                  required
+                  placeholder={`e.g. ${DEFAULT_SCHEME.testMarks}`}
+                  rules={wholeNumberRule("Written test marks", 1, 100)}
+                />
+                <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-white px-3 py-2 text-xs text-gray-700">
+                  <span>
+                    Notebook <b>{watchScheme.notebookMarks}</b> + Written Test{" "}
+                    <b>{watchScheme.testMarks}</b> = <b>{watchMaxMarks}</b> marks
+                    per subject (Unit Test 1 &amp; 2, classes 1 to 8).
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleResetNotebookMarks}
+                    className="rounded border border-amber-300 px-2 py-1 font-semibold text-amber-800 hover:bg-amber-100"
+                  >
+                    Reset to {DEFAULT_SCHEME.notebookMarks} +{" "}
+                    {DEFAULT_SCHEME.testMarks}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <CustomInput
+                  control={control}
+                  name="theoryMarks"
+                  label="Theory Marks (all other subjects)"
+                  type="number"
+                  min={1}
+                  required
+                  placeholder={`e.g. ${DEFAULT_SCHEME.theoryMarks}`}
+                  rules={wholeNumberRule("Theory marks", 1, 200)}
+                />
+                {showPracticalFields ? (
+                  <>
+                    <CustomInput
+                      control={control}
+                      name="practicalTheoryMarks"
+                      label={`Theory Marks (${PRACTICAL_SUBJECTS.join(" & ")})`}
+                      type="number"
+                      min={0}
+                      required
+                      placeholder={`e.g. ${DEFAULT_SCHEME.practicalTheoryMarks}`}
+                      rules={wholeNumberRule(
+                        `Theory marks (${PRACTICAL_SUBJECTS.join(" & ")})`,
+                        0,
+                        200
+                      )}
+                    />
+                    <CustomInput
+                      control={control}
+                      name="practicalMarks"
+                      label={`Practical Marks (${PRACTICAL_SUBJECTS.join(" & ")})`}
+                      type="number"
+                      min={1}
+                      required
+                      placeholder={`e.g. ${DEFAULT_SCHEME.practicalMarks}`}
+                      rules={{
+                        ...wholeNumberRule("Practical marks", 1, 100),
+                        validate: (
+                          value: string | Date | string[] | null
+                        ) => {
+                          const numeric = toMarksNumber(value, 0);
+                          if (!Number.isInteger(numeric) || numeric < 1) {
+                            return "Practical marks must be a whole number of at least 1.";
+                          }
+                          const theory = toMarksNumber(
+                            getValues("theoryMarks"),
+                            0
+                          );
+                          const practicalTheory = toMarksNumber(
+                            getValues("practicalTheoryMarks"),
+                            0
+                          );
+                          return practicalTheory + numeric === theory
+                            ? undefined
+                            : `For ${PRACTICAL_SUBJECTS.join(
+                                " & "
+                              )} theory + practical must add up to ${theory} (currently ${practicalTheory} + ${numeric}).`;
+                        },
+                      }}
+                    />
+                    <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-white px-3 py-2 text-xs text-gray-700">
+                      <span>
+                        {PRACTICAL_SUBJECTS.join(" & ")}:{" "}
+                        <b>{watchScheme.practicalTheoryMarks}</b> theory +{" "}
+                        <b>{watchScheme.practicalMarks}</b> practical ={" "}
+                        <b>
+                          {watchScheme.practicalTheoryMarks +
+                            watchScheme.practicalMarks}
+                        </b>{" "}
+                        | all other subjects: <b>{watchScheme.theoryMarks}</b>{" "}
+                        theory. A Practical column (NA for other subjects) is
+                        added to the result and admit card.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleResetPracticalMarks}
+                        className="rounded border border-amber-300 px-2 py-1 font-semibold text-amber-800 hover:bg-amber-100"
+                      >
+                        Reset to {DEFAULT_SCHEME.theoryMarks} /{" "}
+                        {DEFAULT_SCHEME.practicalTheoryMarks} +{" "}
+                        {DEFAULT_SCHEME.practicalMarks}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="sm:col-span-2 rounded-md border border-amber-200 bg-white px-3 py-2 text-xs text-gray-600">
+                    The practical paper applies to{" "}
+                    {PRACTICAL_SUBJECTS.join(" & ")} only, and only for classes
+                    1 to 8. Tick any class from 1st to 8th above to configure the
+                    theory + practical split.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           <div className="mt-6 flex flex-wrap gap-3">
             <CustomButton

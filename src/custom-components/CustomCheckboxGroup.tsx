@@ -7,11 +7,16 @@ import {
   RegisterOptions,
 } from "react-hook-form";
 
+export interface CheckboxOption {
+  label: string;
+  value: string;
+}
+
 interface CustomCheckboxGroupProps<T extends FieldValues = FieldValues> {
   control: Control<T>;
   name: FieldPath<T>;
   label?: string;
-  options: string[];
+  options: CheckboxOption[];
   required?: boolean;
   rules?: RegisterOptions<T, FieldPath<T>>;
   wrapperClassName?: string;
@@ -53,19 +58,20 @@ function CustomCheckboxGroup<T extends FieldValues = FieldValues>({
     : ([] as string[]);
   const isRequired = required || Boolean(rules.required);
   const allSelected =
-    options.length > 0 && options.every((option) => selected.includes(option));
+    options.length > 0 &&
+    options.every((option) => selected.includes(option.value));
 
   const commit = (next: string[]) => onChange?.(next);
 
-  const toggleOption = (option: string, checked: boolean) => {
+  const toggleOption = (value: string, checked: boolean) => {
     const next = checked
-      ? Array.from(new Set([...selected, option]))
-      : selected.filter((item) => item !== option);
+      ? Array.from(new Set([...selected, value]))
+      : selected.filter((item) => item !== value);
     commit(next);
   };
 
   const toggleAll = (checked: boolean) => {
-    commit(checked ? [...options] : []);
+    commit(checked ? options.map((option) => option.value) : []);
   };
 
   return (
@@ -100,18 +106,18 @@ function CustomCheckboxGroup<T extends FieldValues = FieldValues>({
         >
           {options.map((option) => (
             <label
-              key={option}
+              key={option.value}
               className={`flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 cursor-pointer hover:border-blue-300 ${optionClassName}`}
             >
               <input
                 type="checkbox"
-                checked={selected.includes(option)}
+                checked={selected.includes(option.value)}
                 onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                  toggleOption(option, event.target.checked)
+                  toggleOption(option.value, event.target.checked)
                 }
                 className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
-              {option}
+              {option.label}
             </label>
           ))}
         </div>
