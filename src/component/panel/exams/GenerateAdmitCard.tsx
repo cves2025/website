@@ -158,8 +158,6 @@ function GenerateAdmitCard() {
     let cancelled = false;
     setLoadingStudents(true);
 
-    // Only one equality filter is used so no composite index is required; the
-    // session filter runs in memory afterwards.
     const studentsQuery = query(
       collection(db, COLLECTION.ENROLLMENTS),
       where("className", "==", selectedClass),
@@ -359,7 +357,12 @@ function GenerateAdmitCard() {
     // Extra details (mother's / father's name) live on the students document.
     const details = await Promise.all(
       selectedStudents.map(async (student) => {
-        const empty = { id: student.id, motherName: "", fatherName: "" };
+        const empty = {
+          id: student.id,
+          motherName: "",
+          fatherName: "",
+          studentPhoto: "",
+        };
         if (!student.studentId) return empty;
         try {
           const snapshot = await getDoc(
@@ -373,6 +376,8 @@ function GenerateAdmitCard() {
               typeof data.motherName === "string" ? data.motherName : "",
             fatherName:
               typeof data.fatherName === "string" ? data.fatherName : "",
+            studentPhoto:
+              typeof data.studentPhoto === "string" ? data.studentPhoto : "",
           };
         } catch (error) {
           console.warn("Could not load extra student details:", error);
@@ -389,6 +394,7 @@ function GenerateAdmitCard() {
           ...student,
           motherName: detail.motherName || student.motherName,
           fatherName: detail.fatherName || student.fatherName,
+          studentPhoto: detail.studentPhoto || student.studentPhoto,
         };
       }),
     );
@@ -763,14 +769,13 @@ function GenerateAdmitCard() {
                     <span className="text-green-700">C.B.S.E. Pattern</span>
                     <span className="text-indigo-800">Co - Education</span>
                   </div>
-              <div className="mt-2 flex justify-center">
-                <div className="inline-block rounded bg-pink-500 px-8 py-1 text-sm font-bold tracking-wide text-white md:text-base">
-                  ADMIT CARD
+                  <div className="mt-2 flex justify-center">
+                    <div className="inline-block rounded bg-pink-500 px-8 py-1 text-sm font-bold tracking-wide text-white md:text-base">
+                      ADMIT CARD
+                    </div>
+                  </div>
                 </div>
               </div>
-                </div>
-              </div>
-
             </div>
 
             {/* Exam strip */}
@@ -823,8 +828,16 @@ function GenerateAdmitCard() {
                   <span>: {card.motherName || "-"}</span>
                 </p>
               </div>
-              <div className="flex h-28 w-28 items-center justify-center rounded border-2 border-dashed border-gray-400 p-2 text-center text-xs text-gray-400">
-                Affix recent photograph
+              <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded border-2 border-dashed border-gray-400 text-center text-xs text-gray-400">
+                {card.studentPhoto ? (
+                  <img
+                    src={card.studentPhoto}
+                    alt="Student"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="px-2">Affix recent photograph</span>
+                )}
               </div>
             </div>
 

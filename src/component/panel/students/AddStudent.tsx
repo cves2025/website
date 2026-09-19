@@ -33,6 +33,12 @@ import QrCodeScanForLocation from "./QrCodeScanForLocation";
 import QrCodeScanForContact from "./QrCodeScanForContact";
 import MobileNumberInputBox from "../../../custom-components/admission/MobileNumberInputBox";
 import AdmissionSelectInput from "../../../custom-components/admission/AdmissionSelectInput";
+import PhotoUploadBox from "../../../custom-components/admission/PhotoUploadBox";
+import {
+  uploadStudentPhoto,
+  deleteStudentPhoto,
+  PhotoKind,
+} from "../../../firebase/studentPhotos";
 
 type StudentTab = "info" | "school" | "bulk";
 
@@ -207,9 +213,7 @@ function buildEnrollmentFields(
   };
 }
 
-function studentDocToFormValues(
-  doc: DocumentData,
-): AdmissionStudentFormValues {
+function studentDocToFormValues(doc: DocumentData): AdmissionStudentFormValues {
   const academicYear =
     typeof doc.academicYear === "string" ? doc.academicYear : "";
   const [sessionStart, sessionEnd] = academicYear.split("-");
@@ -324,6 +328,15 @@ function AddStudent() {
   const [activeTab, setActiveTab] = useState<StudentTab>("info");
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [loadingStudent, setLoadingStudent] = useState(false);
+  const [pendingStudentPhoto, setPendingStudentPhoto] = useState<File | null>(
+    null,
+  );
+  const [pendingFatherPhoto, setPendingFatherPhoto] = useState<File | null>(
+    null,
+  );
+  const [pendingMotherPhoto, setPendingMotherPhoto] = useState<File | null>(
+    null,
+  );
 
   const {
     control,
@@ -342,6 +355,9 @@ function AddStudent() {
   // whenever maximum marks / marks obtained change.
   const maximumMarks = watch("previousQualifyingExam.maximumMarks");
   const marksObtained = watch("previousQualifyingExam.marksObtained");
+  const studentPhotoUrl = watch("studentPhoto");
+  const fatherPhotoUrl = watch("fatherPhoto");
+  const motherPhotoUrl = watch("motherPhoto");
 
   useEffect(() => {
     const maximum = Number(maximumMarks);
@@ -409,6 +425,9 @@ function AddStudent() {
         }
         if (cancelled) return;
         reset(studentDocToFormValues(studentSnapshot.data()));
+        setPendingStudentPhoto(null);
+        setPendingFatherPhoto(null);
+        setPendingMotherPhoto(null);
         setEditingStudentId(studentId);
         setActiveTab("info");
       } catch (error) {
@@ -452,10 +471,6 @@ function AddStudent() {
 
   const onSubmit: SubmitHandler<AdmissionStudentFormValues> = async (data) => {
     try {
-      // The "Previous School Info" tab can be opened without passing the
-      // Student Info validation (the tab buttons switch freely). Re-check
-      // the required Student Info fields here so a student can never be
-      // saved while that section is incomplete.
       const formValues = getValues();
       const missingPage1Field = page1RequiredFields.find((name) => {
         const value = get(formValues, name);
@@ -472,24 +487,52 @@ function AddStudent() {
           "Please fill all the required fields on the Student Info page.",
         );
         setActiveTab("info");
-        // Once the Student Info tab has mounted, re-run validation so the
-        // missing fields are highlighted with their error messages.
         setTimeout(() => {
           void trigger(page1RequiredFields);
         }, 0);
         return;
       }
 
-      const studentFields = buildStudentFields(data);
+      // A new student's Firestore id is generated up-front (doc() assigns the
+      // id locally without a write) so photos can be uploaded to their final
+      // students/{studentId}/... path before the Firestore batch is committed.
+      const newStudentRef = editingStudentId
+        ? null
+        : doc(collection(db, COLLECTION.STUDENTS));
+      const studentId = editingStudentId ?? newStudentRef!.id;
+
+      const resolvePhoto = async (
+        kind: PhotoKind,
+        pendingFile: File | null,
+        currentUrl: string,
+      ): Promise<string> => {
+        if (pendingFile) {
+          return uploadStudentPhoto(studentId, kind, pendingFile);
+        }
+        if (!currentUrl && editingStudentId) {
+          // The admin removed a previously-saved photo.
+          await deleteStudentPhoto(studentId, kind);
+        }
+        return currentUrl;
+      };
+
+      const [studentPhoto, fatherPhoto, motherPhoto] = await Promise.all([
+        resolvePhoto("student", pendingStudentPhoto, data.studentPhoto),
+        resolvePhoto("father", pendingFatherPhoto, data.fatherPhoto),
+        resolvePhoto("mother", pendingMotherPhoto, data.motherPhoto),
+      ]);
+
+      const studentFields = buildStudentFields({
+        ...data,
+        studentPhoto,
+        fatherPhoto,
+        motherPhoto,
+      });
       const batch = writeBatch(db);
 
       if (editingStudentId && editEnrollmentId) {
         const studentRef = doc(db, COLLECTION.STUDENTS, editingStudentId);
-        const enrollmentRef = doc(
-          db,
-          COLLECTION.ENROLLMENTS,
-          editEnrollmentId,
-        );
+        const enrollmentRef = doc(db, COLLECTION.ENROLLMENTS, editEnrollmentId);
 
         batch.update(studentRef, {
           ...studentFields,
@@ -503,15 +546,20 @@ function AddStudent() {
         await batch.commit();
 
         reset(defaultValues);
+        setPendingStudentPhoto(null);
+        setPendingFatherPhoto(null);
+        setPendingMotherPhoto(null);
         setActiveTab("info");
         setEditingStudentId(null);
         setSearchParams({}, { replace: true });
 
-        toast.success(`Student ${studentFields.fullName} updated successfully!`);
+        toast.success(
+          `Student ${studentFields.fullName} updated successfully!`,
+        );
         return;
       }
 
-      const studentRef = doc(collection(db, COLLECTION.STUDENTS));
+      const studentRef = newStudentRef!;
       const enrollmentRef = doc(collection(db, COLLECTION.ENROLLMENTS));
 
       batch.set(studentRef, {
@@ -530,6 +578,9 @@ function AddStudent() {
       await batch.commit();
 
       reset(defaultValues);
+      setPendingStudentPhoto(null);
+      setPendingFatherPhoto(null);
+      setPendingMotherPhoto(null);
       setActiveTab("info");
 
       toast.success(`Student ${studentFields.fullName} added successfully!`);
@@ -656,8 +707,8 @@ function AddStudent() {
           {/* Admission form banner */}
           <div className="flex justify-center mb-6">
             <div className="bg-pink-600 text-white text-xl sm:text-xl font-bold italic px-8 py-2 rounded-md shadow">
-                {editingStudentId ? "UPDATE ADMISSION FORM" : "ADMISSION FORM"}
-              </div>
+              {editingStudentId ? "UPDATE ADMISSION FORM" : "ADMISSION FORM"}
+            </div>
           </div>
 
           {/* Class / Section / Session / Enrollment */}
@@ -847,16 +898,31 @@ function AddStudent() {
             </div>
 
             <div className="flex gap-4 justify-center">
-              {["MOTHER'S\nPHOTO", "FATHER'S\nPHOTO", "STUDENT'S\nPHOTO"].map(
-                (label) => (
-                  <div
-                    key={label}
-                    className="h-28 w-24 border-2 border-pink-600 flex items-center justify-center text-center text-xs font-semibold whitespace-pre-line px-1"
-                  >
-                    {label}
-                  </div>
-                ),
-              )}
+              <PhotoUploadBox
+                label={"MOTHER'S\nPHOTO"}
+                photoUrl={motherPhotoUrl}
+                onFileSelected={(file) => {
+                  setPendingMotherPhoto(file);
+                  if (!file) setValue("motherPhoto", "", { shouldDirty: true });
+                }}
+              />
+              <PhotoUploadBox
+                label={"FATHER'S\nPHOTO"}
+                photoUrl={fatherPhotoUrl}
+                onFileSelected={(file) => {
+                  setPendingFatherPhoto(file);
+                  if (!file) setValue("fatherPhoto", "", { shouldDirty: true });
+                }}
+              />
+              <PhotoUploadBox
+                label={"STUDENT'S\nPHOTO"}
+                photoUrl={studentPhotoUrl}
+                onFileSelected={(file) => {
+                  setPendingStudentPhoto(file);
+                  if (!file)
+                    setValue("studentPhoto", "", { shouldDirty: true });
+                }}
+              />
             </div>
           </div>
           {/* Address section */}
@@ -881,7 +947,7 @@ function AddStudent() {
               name="address"
               prefix="ADDRESS :"
               maxLength={100}
-            />            
+            />
 
             <div className="flex flex-wrap items-end gap-4">
               <AdmissionLineInput

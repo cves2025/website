@@ -126,4 +126,5 @@ export interface CardStudent {
   academicYear: string;
   fatherName: string;
   motherName: string;
+  studentPhoto?: string;
 }
