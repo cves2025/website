@@ -56,7 +56,7 @@ function Welcome() {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 p-4 md:p-6 overflow-y-auto print:overflow-visible print:p-0">
+        <main className="flex-1 p-4 md:p-2 overflow-y-auto print:overflow-visible print:p-0">
           <Outlet />
         </main>
       </div>

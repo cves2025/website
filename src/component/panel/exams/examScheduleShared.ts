@@ -38,6 +38,8 @@ export const ADMIT_CARD_PATH = "/welcome/admit-card";
 export const EXAM_SCHEDULE_PATH = "/welcome/admit-card/schedule";
 /** Route of the admit card generator. */
 export const GENERATE_ADMIT_CARD_PATH = "/welcome/admit-card/generate";
+/** Route of the page that shows the generated admit cards. */
+export const GENERATED_ADMIT_CARDS_PATH = "/welcome/admit-card/generated";
 /** Route of the Exam templates page. */
 export const ADD_EXAM_PATH = "/welcome/exam/add";
 

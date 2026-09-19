@@ -1,11 +1,14 @@
-import { ReactElement } from "react";
-import { NavLink } from "react-router-dom";
+import { ReactElement, useState } from "react";
+import { NavLink, useNavigate } from "react-router-dom";
 import { FaAddressCard, FaClipboardList, FaPlus } from "react-icons/fa";
 import {
   ADD_EXAM_PATH,
   EXAM_SCHEDULE_PATH,
   GENERATE_ADMIT_CARD_PATH,
 } from "./examScheduleShared";
+import PageHeader from "../../../custom-components/PageHeader";
+import Button from "../../../custom-components/Button";
+import AdmitCardGenerateModal from "./AdmitCardGenerateModal";
 
 /**
  * Admit Card hub.
@@ -39,7 +42,7 @@ const ACTIONS: AdmitCardAction[] = [
     buttonLabel: "Admit Card",
     buttonClass: "bg-amber-600 hover:bg-amber-700",
     icon: <FaAddressCard />,
-    title: "Generate Admit Card",    
+    title: "Generate Admit Card",
   },
   {
     to: EXAM_SCHEDULE_PATH,
@@ -51,8 +54,35 @@ const ACTIONS: AdmitCardAction[] = [
 ];
 
 function AdmitCard() {
+  const [modalOpen, setModalOpen] = useState(false);
+  const navigate = useNavigate();
+
   return (
-    <div className="max-w-5xl">
+    <div>
+      <PageHeader
+        title="Admit Card"
+        titleStyle="text-primaryBlue"
+        description="Prepare the exam schedule (subject, date, time and applicable classes) and then generate the admit card of any student."
+        descriptionStyle="text-gray-500"
+        button={
+          <div className="flex gap-4">
+          <Button
+            buttonName="+ Admit Card"
+            variant="success"
+            size="md"
+            buttonStyle="rounded-full"
+            onClick={() => setModalOpen(true)}
+          />
+          <Button
+            buttonName="+ Exam Schedule"
+            variant="success"
+            size="md"
+            buttonStyle="rounded-full bg-blue-600 hover:bg-blue-700"
+            onClick={() => navigate(EXAM_SCHEDULE_PATH)}
+          />
+          </div>
+        }
+      />
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
@@ -74,7 +104,11 @@ function AdmitCard() {
             </NavLink>
           ))}
         </div>
-      </div>            
+      </div>
+
+      {modalOpen && (
+        <AdmitCardGenerateModal onClose={() => setModalOpen(false)} />
+      )}
     </div>
   );
 }

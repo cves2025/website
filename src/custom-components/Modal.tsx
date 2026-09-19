@@ -1,4 +1,5 @@
 import React from "react";
+import { FaTimes } from "react-icons/fa";
 
 interface ModalProps {
   isOpen: boolean;
@@ -11,6 +12,12 @@ interface ModalProps {
   onSubmit: () => void;
   loading?: boolean;
   submitDisabled?: boolean;
+  /** When true only the Cancel button (and the cross) are shown. */
+  hideSubmit?: boolean;
+  /** Extra Tailwind classes merged onto the Submit button. */
+  submitClassName?: string;
+  /** Extra Tailwind classes for the dialog box (default "max-w-md"). */
+  modalClassName?: string;
 }
 
 const Modal: React.FC<ModalProps> = ({
@@ -24,26 +31,36 @@ const Modal: React.FC<ModalProps> = ({
   onSubmit,
   loading = false,
   submitDisabled = false,
+  hideSubmit = false,
+  submitClassName = "",
+  modalClassName = "max-w-md",
 }) => {
   if (!isOpen) {
     return null;
   }
 
-  const handleSubmit = () => {
-    onSubmit();
-  };
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
     >
       <div
-        className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl"
-        onClick={(event) => event.stopPropagation()}
+        className={`relative w-full ${modalClassName} rounded-lg bg-white p-6 shadow-xl`}
       >
+        {/* Close (cross) button — right top corner */}
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={loading}
+          aria-label="Close"
+          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <FaTimes className="h-5 w-5" />
+        </button>
+
         {/* Title */}
-        <h2 className="text-lg font-semibold text-gray-900">
+        <h2 className="pr-8 text-lg font-semibold text-gray-900">
           {title}
         </h2>
 
@@ -57,7 +74,8 @@ const Modal: React.FC<ModalProps> = ({
         {/* Body content */}
         {children}
 
-        {/* Actions */}
+        {/* Actions — the modal closes ONLY through the cross or Cancel button
+            so a half-filled form is never lost by an accidental outside click. */}
         <div className="mt-6 flex justify-end gap-3">
           <button
             type="button"
@@ -68,14 +86,16 @@ const Modal: React.FC<ModalProps> = ({
             {cancelText}
           </button>
 
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={loading || submitDisabled}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loading ? "Please wait..." : submitText}
-          </button>
+          {!hideSubmit && (
+            <button
+              type="button"
+              onClick={() => onSubmit()}
+              disabled={loading || submitDisabled}
+              className={`rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 ${submitClassName}`}
+            >
+              {loading ? "Please wait..." : submitText}
+            </button>
+          )}
         </div>
       </div>
     </div>
