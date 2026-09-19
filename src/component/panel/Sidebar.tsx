@@ -76,9 +76,9 @@ const MENU: MenuItem[] = [
     subLinks: [
       { label: "Add Exam", path: "/welcome/exam/add" },
       { label: "Exam List", path: "/welcome/exam/list" },
-      { label: "Exam Schedule", path: "/welcome/admit-card/schedule" },
+      // { label: "Exam Schedule", path: "/welcome/admit-card/schedule" },
       { label: "Admit Card", path: "/welcome/admit-card", end: true },
-      { label: "Generate Admit Card", path: "/welcome/admit-card/generate" },
+      // { label: "Generate Admit Card", path: "/welcome/admit-card/generate" },
       { label: "Result", path: "/welcome/result" },
     ],
   },

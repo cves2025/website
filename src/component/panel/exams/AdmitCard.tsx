@@ -24,7 +24,6 @@ interface AdmitCardAction {
   buttonClass: string;
   icon: ReactElement;
   title: string;
-  description: string;
 }
 
 const ACTIONS: AdmitCardAction[] = [
@@ -34,17 +33,13 @@ const ACTIONS: AdmitCardAction[] = [
     buttonClass: "bg-blue-600 hover:bg-blue-700",
     icon: <FaPlus />,
     title: "Add Exam",
-    description:
-      "Create or edit an exam template with its academic year, applicable classes, exam window and marks scheme.",
   },
   {
     to: GENERATE_ADMIT_CARD_PATH,
     buttonLabel: "Admit Card",
     buttonClass: "bg-amber-600 hover:bg-amber-700",
     icon: <FaAddressCard />,
-    title: "Generate Admit Card",
-    description:
-      "Pick the exam, the class and the student and print the admit card with only the papers applicable to that class.",
+    title: "Generate Admit Card",    
   },
   {
     to: EXAM_SCHEDULE_PATH,
@@ -52,8 +47,6 @@ const ACTIONS: AdmitCardAction[] = [
     buttonClass: "bg-green-600 hover:bg-green-700",
     icon: <FaClipboardList />,
     title: "Exam Schedule",
-    description:
-      "Add every subject paper of an exam with its date, reporting time, end time and the classes it applies to.",
   },
 ];
 
@@ -87,41 +80,7 @@ function AdmitCard() {
             </NavLink>
           ))}
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {ACTIONS.map((action) => (
-          <div
-            key={action.to}
-            className="flex flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
-          >
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 text-lg text-gray-700">
-              {action.icon}
-            </span>
-            <h3 className="mt-3 text-base font-bold text-gray-800">
-              {action.title}
-            </h3>
-            <p className="mt-1 flex-1 text-sm text-gray-600">
-              {action.description}
-            </p>
-            <NavLink
-              to={action.to}
-              className="mt-4 inline-flex w-fit items-center gap-1 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-bold text-gray-700 transition-colors hover:bg-gray-50"
-            >
-              Open →
-            </NavLink>
-          </div>
-        ))}
-      </div>
-
-      <section className="mt-6 rounded-xl border border-gray-200 bg-white p-4 md:p-6 shadow-sm">
-        <h3 className="text-lg font-bold text-gray-800">How it works</h3>
-        <ol className="mt-3 list-inside list-decimal space-y-2 text-sm text-gray-700">
-          {STEPS.map((step) => (
-            <li key={step}>{step}</li>
-          ))}
-        </ol>
-      </section>
+      </div>            
     </div>
   );
 }
