@@ -46,7 +46,7 @@ const Modal: React.FC<ModalProps> = ({
       aria-modal="true"
     >
       <div
-        className={`relative w-full ${modalClassName} rounded-lg bg-white p-6 shadow-xl`}
+        className={`relative w-full ${modalClassName} max-h-[calc(100vh-2rem)] overflow-y-auto rounded-lg bg-white p-6 shadow-xl`}
       >
         {/* Close (cross) button — right top corner */}
         <button

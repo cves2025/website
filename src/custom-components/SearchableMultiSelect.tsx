@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { FaCheck, FaChevronDown, FaSearch, FaTimes } from "react-icons/fa";
 
 export interface SearchableOption {
@@ -92,47 +93,87 @@ function SearchableMultiSelect({
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
 
-  /* Opens below the trigger by default, but flips above it when the drop-down
-     no longer fits below (e.g. a select near the bottom edge of the screen
-     or inside a modal). The panel is measured right after it mounts, before
-     paint, so it never visibly jumps. */
-  const [openUp, setOpenUp] = useState(false);
+  /* The dropdown is rendered at the document root (portal) and positioned with a
+     fixed frame computed from the trigger's bounding rect, so it can never be
+     clipped by a scrollable/overflowing parent (e.g. a modal) and always stays
+     inside the viewport - no matter the screen size. Its height is clamped to
+     the space actually available below/above the trigger. */
+  const [panelRect, setPanelRect] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+  } | null>(null);
 
-  const measureDirection = useCallback(() => {
+  const positionPanel = useCallback(() => {
     const button = buttonRef.current;
     const panel = panelRef.current;
     if (!button || !panel) return;
 
     const buttonRect = button.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - buttonRect.bottom;
-    const spaceAbove = buttonRect.top;
     const panelHeight = panel.offsetHeight;
+    const gap = 6;
 
+    /* `visualViewport` is more accurate than `window.innerHeight` on mobile
+       (dynamic URL bar / pinch-zoom), and falls back to the window size. */
+    const vv = window.visualViewport;
+    const viewportWidth = vv ? vv.width : window.innerWidth;
+    const viewportTop = vv ? vv.offsetTop : 0;
+    const viewportBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+
+    const spaceBelow = viewportBottom - buttonRect.bottom - gap;
+    const spaceAbove = buttonRect.top - viewportTop - gap;
+
+    // Open below by default; flip above when the panel does not fit below.
+    let openAbove = false;
     if (panelHeight <= spaceBelow) {
-      setOpenUp(false);
+      openAbove = false;
     } else if (panelHeight <= spaceAbove) {
-      setOpenUp(true);
+      openAbove = true;
     } else {
-      setOpenUp(spaceAbove > spaceBelow);
+      openAbove = spaceAbove > spaceBelow;
     }
+
+    /* Keep the panel fully on-screen on the chosen side (with a small margin)
+       by shrinking it to the available space when it would overflow. */
+    const available = Math.max(16, openAbove ? spaceAbove : spaceBelow);
+    const maxHeight = Math.min(panelHeight, available);
+    /* Open below: top edge sits below the trigger. Open above: the panel's
+       bottom edge sits at the trigger's top, so its top starts above that. */
+    const targetTop = openAbove
+      ? buttonRect.top - gap - maxHeight
+      : buttonRect.bottom + gap;
+
+    setPanelRect({
+      top: Math.max(viewportTop + 4, targetTop),
+      // Clamp horizontally too, so a trigger near the right edge stays visible.
+      left: Math.min(
+        Math.max(4, buttonRect.left),
+        Math.max(4, viewportWidth - buttonRect.width - 4)
+      ),
+      width: buttonRect.width,
+      maxHeight,
+    });
   }, []);
 
+  /* Measure and position the panel right after it mounts, before paint, so it
+     never visibly jumps while settling into its final spot. */
   useLayoutEffect(() => {
     if (!open) return;
-    measureDirection();
-  }, [open, measureDirection]);
+    positionPanel();
+  }, [open, positionPanel]);
 
-  /* Re-measure while open so the panel stays on the right side if the window
-     is resized or the page scrolls under it. */
+  /* Re-position while open so the panel follows the trigger when the window is
+     resized or the page/modal is scrolled under it. */
   useEffect(() => {
     if (!open) return;
-    window.addEventListener("resize", measureDirection);
-    window.addEventListener("scroll", measureDirection, true);
+    window.addEventListener("resize", positionPanel);
+    window.addEventListener("scroll", positionPanel, true);
     return () => {
-      window.removeEventListener("resize", measureDirection);
-      window.removeEventListener("scroll", measureDirection, true);
+      window.removeEventListener("resize", positionPanel);
+      window.removeEventListener("scroll", positionPanel, true);
     };
-  }, [open, measureDirection]);
+  }, [open, positionPanel]);
 
   const selectedSet = useMemo(() => new Set(values), [values]);
 
@@ -145,11 +186,15 @@ function SearchableMultiSelect({
     [values, options]
   );
 
-  /* Close the dropdown when the user clicks / taps outside of it. */
+  /* Close the dropdown when the user clicks / taps outside of it. The panel is
+     portaled into <body>, so check both the wrapper and the panel itself. */
   useEffect(() => {
     if (!open) return;
     const handlePointerDown = (event: MouseEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
+      if (
+        !containerRef.current?.contains(event.target as Node) &&
+        !panelRef.current?.contains(event.target as Node)
+      ) {
         setOpen(false);
         setQuery("");
       }
@@ -303,106 +348,116 @@ function SearchableMultiSelect({
           </span>
         </button>
 
-        {open && (
-          <div
-            ref={panelRef}
-            className={`absolute left-0 right-0 z-30 overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg ${
-              openUp ? "bottom-full mb-1" : "mt-1"
-            }`}
-          >
-            {/* Search box */}
-            <div className="flex items-center gap-2 border-b border-gray-200 px-3 py-2">
-              <FaSearch className="text-xs text-gray-400" />
-              <input
-                ref={searchRef}
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={searchPlaceholder}
-                className="w-full border-0 bg-transparent p-0 text-sm text-gray-800 focus:outline-none focus:ring-0"
-              />
-              {query && (
-                <button
-                  type="button"
-                  title="Clear search"
-                  onClick={() => setQuery("")}
-                  className="text-gray-400 hover:text-gray-700"
-                >
-                  <FaTimes className="text-xs" />
-                </button>
-              )}
-            </div>
+        {open &&
+          createPortal(
+            <div
+              ref={panelRef}
+              style={{
+                position: "fixed",
+                top: panelRect?.top ?? 0,
+                left: panelRect?.left ?? 0,
+                width: panelRect?.width ?? 0,
+                maxHeight: panelRect?.maxHeight ?? "none",
+                zIndex: 9990,
+                /* Hidden only until the first layout pass positions it. */
+                visibility: panelRect ? "visible" : "hidden",
+              }}
+              className="flex flex-col overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg"
+            >
+              {/* Search box */}
+              <div className="flex shrink-0 items-center gap-2 border-b border-gray-200 px-3 py-2">
+                <FaSearch className="text-xs text-gray-400" />
+                <input
+                  ref={searchRef}
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={searchPlaceholder}
+                  className="w-full border-0 bg-transparent p-0 text-sm text-gray-800 focus:outline-none focus:ring-0"
+                />
+                {query && (
+                  <button
+                    type="button"
+                    title="Clear search"
+                    onClick={() => setQuery("")}
+                    className="text-gray-400 hover:text-gray-700"
+                  >
+                    <FaTimes className="text-xs" />
+                  </button>
+                )}
+              </div>
 
-            {/* Options */}
-            <div className="max-h-64 overflow-y-auto py-1">
-              {filteredOptions.length === 0 ? (
-                <p className="px-3 py-4 text-center text-sm text-gray-500">
-                  {emptyMessage || defaultEmptyMessage(query)}
-                </p>
-              ) : (
-                filteredOptions.map((option) => {
-                  const checked = selectedSet.has(option.value);
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => toggleOption(option)}
-                      className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors ${
-                        option.disabled
-                          ? "cursor-not-allowed opacity-50"
-                          : "hover:bg-blue-50"
-                      }`}
-                    >
-                      <span
-                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                          checked
-                            ? "border-blue-600 bg-blue-600 text-white"
-                            : "border-gray-300 bg-white"
+              {/* Options */}
+              <div className="min-h-0 flex-1 overflow-y-auto py-1">
+                {filteredOptions.length === 0 ? (
+                  <p className="px-3 py-4 text-center text-sm text-gray-500">
+                    {emptyMessage || defaultEmptyMessage(query)}
+                  </p>
+                ) : (
+                  filteredOptions.map((option) => {
+                    const checked = selectedSet.has(option.value);
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => toggleOption(option)}
+                        className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors ${
+                          option.disabled
+                            ? "cursor-not-allowed opacity-50"
+                            : "hover:bg-blue-50"
                         }`}
                       >
-                        {checked && <FaCheck className="text-[9px]" />}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium text-gray-800">
-                          {option.label}
+                        <span
+                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                            checked
+                              ? "border-blue-600 bg-blue-600 text-white"
+                              : "border-gray-300 bg-white"
+                          }`}
+                        >
+                          {checked && <FaCheck className="text-[9px]" />}
                         </span>
-                        {option.hint && (
-                          <span className="block truncate text-xs text-gray-500">
-                            {option.hint}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium text-gray-800">
+                            {option.label}
                           </span>
-                        )}
-                      </span>
-                    </button>
-                  );
-                })
-              )}
-            </div>
+                          {option.hint && (
+                            <span className="block truncate text-xs text-gray-500">
+                              {option.hint}
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
 
-            {/* Footer actions */}
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-600">
-              <span>
-                {values.length} of {options.length} selected
-                {normalizedQuery ? ` · ${filteredOptions.length} match` : ""}
-              </span>
-              <span className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={toggleAllFiltered}
-                  className="rounded border border-gray-300 bg-white px-2 py-1 font-bold text-gray-700 hover:bg-gray-100"
-                >
-                  {allFilteredSelected ? "Unselect shown" : "Select shown"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onChange([])}
-                  disabled={values.length === 0}
-                  className="rounded border border-gray-300 bg-white px-2 py-1 font-bold text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Clear
-                </button>
-              </span>
-            </div>
-          </div>
-        )}
+              {/* Footer actions */}
+              <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-600">
+                <span>
+                  {values.length} of {options.length} selected
+                  {normalizedQuery ? ` · ${filteredOptions.length} match` : ""}
+                </span>
+                <span className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={toggleAllFiltered}
+                    className="rounded border border-gray-300 bg-white px-2 py-1 font-bold text-gray-700 hover:bg-gray-100"
+                  >
+                    {allFilteredSelected ? "Unselect shown" : "Select shown"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onChange([])}
+                    disabled={values.length === 0}
+                    className="rounded border border-gray-300 bg-white px-2 py-1 font-bold text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Clear
+                  </button>
+                </span>
+              </div>
+            </div>,
+            document.body
+          )}
       </div>
 
       {helpText && <p className="text-xs text-gray-500">{helpText}</p>}
