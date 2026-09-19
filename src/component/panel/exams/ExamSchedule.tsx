@@ -11,9 +11,7 @@ import { ScheduleRow } from "../../../utils/type";
 import {
   ADD_EXAM_PATH,
   ADMIT_CARD_PATH,
-  GENERATE_ADMIT_CARD_PATH,
   academicYears,
-  examPageLink,
   formatScheduleDate,
   inputClass,
   newRowId,
@@ -28,7 +26,7 @@ import {
  * Exam Schedule page (step 1 of the Admit Card module).
  *
  * The schedule of one exam is edited here and saved against the exam id, so the
- * Admit Card page (`GenerateAdmitCard.tsx`) can print the same papers later.
+ * admit card flow can print the same papers later.
  */
 function ExamSchedule() {
   /* ---------------------------------------------------------------- exams */
@@ -234,16 +232,6 @@ function ExamSchedule() {
             className="bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-md px-4 py-2 text-sm transition-colors"
           >
             ← Admit Card
-          </NavLink>
-          <NavLink
-            to={examPageLink(
-              GENERATE_ADMIT_CARD_PATH,
-              selectedExamId,
-              selectedExam?.academicYear || selectedYear
-            )}
-            className="bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-md px-4 py-2 text-sm transition-colors"
-          >
-            Generate Admit Card
           </NavLink>
           <NavLink
             to={ADD_EXAM_PATH}
@@ -582,22 +570,7 @@ function ExamSchedule() {
               </ul>
             )}
 
-            {selectedExamId && (
-              <p className="mt-3 text-xs font-semibold text-gray-600">
-                These papers are printed on the admit card.{" "}
-                <NavLink
-                  to={examPageLink(
-                    GENERATE_ADMIT_CARD_PATH,
-                    selectedExamId,
-                    selectedExam?.academicYear || selectedYear
-                  )}
-                  className="text-blue-700 underline"
-                >
-                  Go to Admit Card →
-                </NavLink>
-              </p>
-            )}
-          </div>
+            </div>
         )}
       </section>
     </div>

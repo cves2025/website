@@ -24,7 +24,6 @@ import AddTeacher from './panel/AddTeacher'
 import TeachersList from './panel/TeachersList'
 import AdmitCard from './panel/exams/AdmitCard'
 import ExamSchedule from './panel/exams/ExamSchedule'
-import GenerateAdmitCard from './panel/exams/GenerateAdmitCard'
 import GeneratedAdmitCards from './panel/exams/GeneratedAdmitCards'
 import ResultPanel from './panel/ResultPanel'
 import IdCardStudents from './panel/IdCardStudents'
@@ -66,7 +65,6 @@ function Router() {
           <Route path="teacher/list" element={<TeachersList />} />
           <Route path="admit-card" element={<AdmitCard />} />
           <Route path="admit-card/schedule" element={<ExamSchedule />} />
-          <Route path="admit-card/generate" element={<GenerateAdmitCard />} />
           <Route path="admit-card/generated" element={<GeneratedAdmitCards />} />
           <Route path="result" element={<ResultPanel />} />
           <Route path="id-card/students" element={<IdCardStudents />} />

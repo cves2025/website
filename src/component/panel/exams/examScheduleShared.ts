@@ -1,9 +1,9 @@
 /**
  * Helpers shared by the Admit Card module.
  *
- * The module is split into three pages: the hub (`AdmitCard.tsx`), the schedule
- * editor (`ExamSchedule.tsx`) and the card generator
- * (`GenerateAdmitCard.tsx`). All three read the same Firestore documents, so
+ * The module is split into: the hub (`AdmitCard.tsx`), the schedule editor
+ * (`ExamSchedule.tsx`) and the generated-admit-cards page
+ * (`GeneratedAdmitCards.tsx`). All read the same Firestore documents, so
  * the converters and the live listeners live here once instead of being copied
  * into every page.
  */
@@ -36,8 +36,6 @@ import {
 export const ADMIT_CARD_PATH = "/welcome/admit-card";
 /** Route of the exam schedule editor. */
 export const EXAM_SCHEDULE_PATH = "/welcome/admit-card/schedule";
-/** Route of the admit card generator. */
-export const GENERATE_ADMIT_CARD_PATH = "/welcome/admit-card/generate";
 /** Route of the page that shows the generated admit cards. */
 export const GENERATED_ADMIT_CARDS_PATH = "/welcome/admit-card/generated";
 /** Route of the Exam templates page. */
