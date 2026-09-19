@@ -345,13 +345,17 @@ export function useExamTemplates(): {
   return { exams, loadingExams };
 }
 
-/** Subjects added on the Subjects page (all classes) + class lookup helper. */
+/** Subjects added on the Subjects page (all classes) + class lookup helpers. */
 export function useSubjectOptions(): {
   subjectOptions: SubjectOption[];
   loadingSubjects: boolean;
   classesOfSubject: (subjectName: string) => string[];
+  typeOfSubjectInClass: (subjectName: string, className: string) => string[];
 } {
   const [subjectOptions, setSubjectOptions] = useState<SubjectOption[]>([]);
+  const [subjectTypesByClass, setSubjectTypesByClass] = useState<
+    Map<string, string[]>
+  >(new Map());
   const [loadingSubjects, setLoadingSubjects] = useState(true);
 
   useEffect(() => {
@@ -359,6 +363,27 @@ export function useSubjectOptions(): {
       collection(db, COLLECTION.SUBJECTS),
       (snapshot) => {
         setSubjectOptions(toSubjectOptions(snapshot.docs));
+
+        /* Type of every <class, subject> pair. The admit card "Type" column
+           reads this so the type of the printed class is never mixed with the
+           type another class gave to the same subject (e.g. English is
+           "Written + Oral" in Nursery but "Theory" in Class 1). */
+        const typesByClass = new Map<string, string[]>();
+        snapshot.docs.forEach((documentSnapshot) => {
+          const data = documentSnapshot.data();
+          const name =
+            typeof data.name === "string" ? data.name.trim() : "";
+          const className =
+            typeof data.className === "string" ? data.className.trim() : "";
+          const type = typeof data.type === "string" ? data.type : "";
+          if (!name || !className || !type) return;
+          const key = `${className.toLowerCase()}::${name.toLowerCase()}`;
+          const list = typesByClass.get(key) ?? [];
+          if (!list.includes(type)) list.push(type);
+          typesByClass.set(key, list);
+        });
+        setSubjectTypesByClass(typesByClass);
+
         setLoadingSubjects(false);
       },
       (error) => {
@@ -382,7 +407,21 @@ export function useSubjectOptions(): {
   const classesOfSubject = (subjectName: string): string[] =>
     subjectByName.get(subjectName.trim().toLowerCase())?.classes ?? [];
 
-  return { subjectOptions, loadingSubjects, classesOfSubject };
+  /* Types of one subject in one class (case-insensitive subject & class). */
+  const typeOfSubjectInClass = (
+    subjectName: string,
+    className: string
+  ): string[] =>
+    subjectTypesByClass.get(
+      `${className.trim().toLowerCase()}::${subjectName.trim().toLowerCase()}`
+    ) ?? [];
+
+  return {
+    subjectOptions,
+    loadingSubjects,
+    classesOfSubject,
+    typeOfSubjectInClass,
+  };
 }
 
 export interface ExamScheduleDraft {

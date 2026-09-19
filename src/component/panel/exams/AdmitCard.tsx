@@ -50,12 +50,6 @@ const ACTIONS: AdmitCardAction[] = [
   },
 ];
 
-const STEPS: string[] = [
-  "Create the exam on the Add Exam page (once per exam / session).",
-  "Open Exam Schedule, select the exam and save every subject paper.",
-  "Open Admit Card, select the exam and class, then generate and print the card of any student.",
-];
-
 function AdmitCard() {
   return (
     <div className="max-w-5xl">

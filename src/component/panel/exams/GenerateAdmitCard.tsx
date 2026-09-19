@@ -16,16 +16,8 @@ import SearchableMultiSelect, {
   SearchableOption,
 } from "../../../custom-components/SearchableMultiSelect";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
-import {
-  ExamCategory,
-  MarksScheme,
-  defaultMarksScheme,
-  isSchemeClass,
-  marksCellLabel,
-  marksSchemeBadge,
-  subjectMarksBreakdown,
-} from "../../../utils/examMarksScheme";
-import { CardStudent, SubjectOption } from "../../../utils/type";
+import { marksSchemeBadge } from "../../../utils/examMarksScheme";
+import { CardStudent } from "../../../utils/type";
 import {
   ADD_EXAM_PATH,
   ADMIT_CARD_PATH,
@@ -65,7 +57,7 @@ function GenerateAdmitCard() {
   const [selectedExamId, setSelectedExamId] = useState(requestedExamId);
 
   /* ------------------------------------------------------------- subjects */
-  const { classesOfSubject, subjectOptions } = useSubjectOptions();
+  const { classesOfSubject, typeOfSubjectInClass } = useSubjectOptions();
 
   /* ------------------------------------------------------------- schedule */
   /* Saved schedule of the selected exam, read only on this page. */
@@ -174,19 +166,6 @@ function GenerateAdmitCard() {
   const selectedExam =
     yearExams.find((exam) => exam.id === selectedExamId) ?? null;
 
-  /* Subject name -> subject types (reads the "Type" saved on the Subjects
-     page, used for the "Type" column of the admit card table). */
-  const subjectByName = useMemo(() => {
-    const map = new Map<string, SubjectOption>();
-    subjectOptions.forEach((option) =>
-      map.set(option.name.toLowerCase(), option),
-    );
-    return map;
-  }, [subjectOptions]);
-
-  const typesOfSubject = (subjectName: string): string[] =>
-    subjectByName.get(subjectName.trim().toLowerCase())?.types ?? [];
-
   /* Classes that have at least one applicable paper in the schedule. */
   const scheduledClasses = CLASSES.filter((className) =>
     rows.some(
@@ -204,15 +183,6 @@ function GenerateAdmitCard() {
           rowAppliesToClass(row, selectedClass, classesOfSubject(row.subject)),
       )
     : [];
-
-  const examCategory: ExamCategory = selectedExam?.examCategory ?? "UNIT_TEST";
-  const examScheme: MarksScheme =
-    selectedExam?.marksScheme ?? defaultMarksScheme();
-  const isUnitTest = examCategory === "UNIT_TEST";
-  // Classes 1 to 8 keep the notebook / Science-Computer practical columns.
-  const cardUsesMarksScheme = cards[0]
-    ? isSchemeClass(cards[0].className)
-    : false;
 
   /* Students of the class that fit the selected session. A student whose
      session was never saved (many bulk uploaded rows) is always kept, so the
@@ -769,22 +739,6 @@ function GenerateAdmitCard() {
                         Subject
                       </th>
                       <th className="border border-gray-300 px-3 py-2">Type</th>
-                      {cardUsesMarksScheme && (
-                        <>
-                          <th className="border border-gray-300 px-3 py-2">
-                            {isUnitTest ? "Test" : "Theory"}
-                          </th>
-                          <th className="border border-gray-300 px-3 py-2">
-                            Notebook
-                          </th>
-                          <th className="border border-gray-300 px-3 py-2">
-                            Practical
-                          </th>
-                          <th className="border border-gray-300 px-3 py-2">
-                            Total
-                          </th>
-                        </>
-                      )}
                       <th className="border border-gray-300 px-3 py-2">Date</th>
                       <th className="border border-gray-300 px-3 py-2">
                         Reporting Time
@@ -799,51 +753,16 @@ function GenerateAdmitCard() {
                   </thead>
                   <tbody>
                     {cardRows.map((row) => {
-                      const breakdown = subjectMarksBreakdown(
-                        row.subject,
-                        examCategory,
-                        examScheme,
-                      );
                       return (
                         <tr key={row.id}>
                           <td className="border border-gray-300 px-3 py-2 font-semibold">
                             {row.subject}
                           </td>
                           <td className="border border-gray-300 px-3 py-2 text-center">
-                            {typesOfSubject(row.subject).join(", ") || "-"}
+                            {typeOfSubjectInClass(row.subject, selectedClass).join(
+                              ", ",
+                            ) || "-"}
                           </td>
-                          {cardUsesMarksScheme && (
-                            <>
-                              <td className="border border-gray-300 px-3 py-2 text-center">
-                                {breakdown.theory}
-                              </td>
-                              <td
-                                className={`border border-gray-300 px-3 py-2 text-center ${
-                                  breakdown.notebook > 0 ? "" : "text-gray-400"
-                                }`}
-                              >
-                                {marksCellLabel(
-                                  breakdown.notebook,
-                                  breakdown.notebook > 0,
-                                )}
-                              </td>
-                              <td
-                                className={`border border-gray-300 px-3 py-2 text-center ${
-                                  breakdown.hasPractical
-                                    ? "font-bold text-amber-700"
-                                    : "text-gray-400"
-                                }`}
-                              >
-                                {marksCellLabel(
-                                  breakdown.practical,
-                                  breakdown.hasPractical,
-                                )}
-                              </td>
-                              <td className="border border-gray-300 px-3 py-2 text-center font-bold">
-                                {breakdown.total}
-                              </td>
-                            </>
-                          )}
                           <td className="border border-gray-300 px-3 py-2 text-center">
                             {formatScheduleDate(row.date)}
                           </td>
@@ -862,19 +781,6 @@ function GenerateAdmitCard() {
                   </tbody>
                 </table>
               </div>
-
-              {cardUsesMarksScheme && (
-                <p className="mt-3 text-xs leading-relaxed text-gray-600">
-                  <span className="font-semibold">
-                    Marks scheme (classes 1 to 8):
-                  </span>{" "}
-                  {isUnitTest
-                    ? `Notebook ${examScheme.notebookMarks} + written test ${examScheme.testMarks} = ${
-                        examScheme.notebookMarks + examScheme.testMarks
-                      } marks per subject.`
-                    : `Theory ${examScheme.theoryMarks} for all subjects; Science & Computer ${examScheme.practicalTheoryMarks} theory + ${examScheme.practicalMarks} practical. Practical is shown as "NA" for other subjects.`}
-                </p>
-              )}
 
               {/* Instructions */}
               <div className="mt-4 rounded-md border border-blue-200 bg-blue-50/60 p-3">
