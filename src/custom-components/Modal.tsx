@@ -1,10 +1,12 @@
 import React from "react";
 import { FaTimes } from "react-icons/fa";
+import Button from "./Button";
 
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
+  titleStyle?: string;
   description?: string;
   children?: React.ReactNode;
   cancelText?: string;
@@ -18,12 +20,15 @@ interface ModalProps {
   submitClassName?: string;
   /** Extra Tailwind classes for the dialog box (default "max-w-md"). */
   modalClassName?: string;
+  /** When set, a "Change Exam" action button is shown in the footer. */
+  onChangeExam?: () => void;
 }
 
 const Modal: React.FC<ModalProps> = ({
   isOpen,
   onClose,
   title,
+  titleStyle,
   description,
   children,
   cancelText = "Cancel",
@@ -34,6 +39,7 @@ const Modal: React.FC<ModalProps> = ({
   hideSubmit = false,
   submitClassName = "",
   modalClassName = "max-w-md",
+  onChangeExam,
 }) => {
   if (!isOpen) {
     return null;
@@ -60,9 +66,11 @@ const Modal: React.FC<ModalProps> = ({
         </button>
 
         {/* Title */}
-        <h2 className="pr-8 text-lg font-semibold text-gray-900">
+        <div className={`${titleStyle}`}>
+        <h2 className={`pr-8 text-lg font-semibold text-gray-900`}>
           {title}
         </h2>
+        </div>
 
         {/* Description */}
         {description && (
@@ -95,6 +103,16 @@ const Modal: React.FC<ModalProps> = ({
             >
               {loading ? "Please wait..." : submitText}
             </button>
+          )}
+
+          {onChangeExam && (
+            <Button
+              type="button"
+              buttonName="Change Exam"
+              onClick={onChangeExam}
+              variant="success"
+              size="md"
+            />
           )}
         </div>
       </div>

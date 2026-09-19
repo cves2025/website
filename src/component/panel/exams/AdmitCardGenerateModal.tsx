@@ -52,7 +52,7 @@ function AdmitCardGenerateModal({ onClose }: AdmitCardGenerateModalProps) {
       isOpen
       onClose={onClose}
       title="Generate Admit Card"
-      description="Pick the exam, the class and the student(s). The admit cards open on a new page that can be printed and refreshed later."
+      titleStyle="text-center"
       cancelText="Cancel"
       onSubmit={() => void handleSubmit()}
       submitText={
@@ -64,15 +64,14 @@ function AdmitCardGenerateModal({ onClose }: AdmitCardGenerateModalProps) {
       hideSubmit={!gen.selectedExamId}
       submitClassName="bg-amber-600 hover:bg-amber-700"
       modalClassName="max-w-2xl"
+      onChangeExam={
+        gen.selectedExamId ? () => gen.handleExamChange("") : undefined
+      }
     >
       {!gen.selectedExamId ? (
         <SelectExamStep generator={gen} />
       ) : (
-        <GenerateAdmitCardStep
-          generator={gen}
-          showGenerateButton={false}
-          onChangeExam={() => gen.handleExamChange("")}
-        />
+        <GenerateAdmitCardStep generator={gen} />
       )}
     </Modal>
   );

@@ -52,7 +52,9 @@ export interface SearchableMultiSelectProps {
 
 /** Fallback text shown in the dropdown when nothing matches the search. */
 function defaultEmptyMessage(query: string): string {
-  return query.trim() ? `No match for "${query.trim()}"` : "No option available";
+  return query.trim()
+    ? `No match for "${query.trim()}"`
+    : "No option available";
 }
 
 /**
@@ -78,7 +80,7 @@ function SearchableMultiSelect({
   disabled = false,
   loading = false,
   loadingLabel = "Loading...",
-  maxChips = 4,
+  maxChips = 2,
   helpText,
   footer,
   id,
@@ -149,7 +151,7 @@ function SearchableMultiSelect({
       // Clamp horizontally too, so a trigger near the right edge stays visible.
       left: Math.min(
         Math.max(4, buttonRect.left),
-        Math.max(4, viewportWidth - buttonRect.width - 4)
+        Math.max(4, viewportWidth - buttonRect.width - 4),
       ),
       width: buttonRect.width,
       maxHeight,
@@ -183,7 +185,7 @@ function SearchableMultiSelect({
       values
         .map((value) => options.find((option) => option.value === value))
         .filter((option): option is SearchableOption => Boolean(option)),
-    [values, options]
+    [values, options],
   );
 
   /* Close the dropdown when the user clicks / taps outside of it. The panel is
@@ -227,14 +229,14 @@ function SearchableMultiSelect({
     return options.filter((option) =>
       `${option.label} ${option.hint ?? ""} ${option.keywords ?? ""}`
         .toLowerCase()
-        .includes(normalizedQuery)
+        .includes(normalizedQuery),
     );
   }, [options, normalizedQuery]);
 
   const allFilteredSelected =
     filteredOptions.length > 0 &&
     filteredOptions.every(
-      (option) => option.disabled || selectedSet.has(option.value)
+      (option) => option.disabled || selectedSet.has(option.value),
     );
 
   const toggleOption = (option: SearchableOption) => {
@@ -262,8 +264,8 @@ function SearchableMultiSelect({
         new Set([
           ...values,
           ...filteredOptions.filter((o) => !o.disabled).map((o) => o.value),
-        ])
-      )
+        ]),
+      ),
     );
   };
 
@@ -276,7 +278,7 @@ function SearchableMultiSelect({
   return (
     <div
       ref={containerRef}
-      className={`flex w-full flex-col gap-1.5 ${wrapperClassName}`}
+      className={`flex w-full flex-col gap-1 ${wrapperClassName}`}
     >
       {label && (
         <span className="block text-sm font-semibold text-gray-700">
@@ -295,15 +297,15 @@ function SearchableMultiSelect({
           onClick={() => setOpen((prev) => !prev)}
           aria-haspopup="listbox"
           aria-expanded={open}
-          className={`flex min-h-[42px] w-full items-start justify-between gap-2 rounded-md border bg-white px-2.5 py-2 text-left text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-100 ${
+          className={`flex h-10 w-full items-center justify-between gap-2 rounded-md border bg-white px-2.5 py-1 text-left text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-100 ${
             open
               ? "border-blue-500 ring-2 ring-blue-500/40"
               : "border-gray-300 focus:border-blue-500 focus:ring-blue-500/50"
           } ${className}`}
         >
-          <span className="flex flex-1 flex-wrap items-center gap-1">
+          <span className="flex flex-1 flex-nowrap items-center gap-1 overflow-hidden">
             {selectedOptions.length === 0 ? (
-              <span className="px-1 py-0.5 text-gray-400">
+              <span className="truncate px-1 py-0.5 text-gray-400">
                 {loading ? loadingLabel : placeholder}
               </span>
             ) : (
@@ -311,7 +313,7 @@ function SearchableMultiSelect({
                 {selectedOptions.slice(0, maxChips).map((option) => (
                   <span
                     key={option.value}
-                    className="inline-flex max-w-full items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-800"
+                    className="inline-flex shrink-0 max-w-[9rem] items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-800"
                   >
                     <span className="truncate">{option.label}</span>
                     <span
@@ -322,21 +324,21 @@ function SearchableMultiSelect({
                         event.stopPropagation();
                         removeValue(option.value);
                       }}
-                      className="text-blue-700 hover:text-red-600"
+                      className="shrink-0 text-blue-700 hover:text-red-600"
                     >
                       <FaTimes className="text-[10px]" />
                     </span>
                   </span>
                 ))}
                 {hiddenChipCount > 0 && (
-                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
+                  <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
                     +{hiddenChipCount} more
                   </span>
                 )}
               </>
             )}
           </span>
-          <span className="mt-0.5 flex shrink-0 items-center gap-2 text-gray-400">
+          <span className="flex shrink-0 items-center gap-2 text-gray-400">
             {selectedOptions.length > 0 && (
               <span className="rounded bg-gray-100 px-1.5 text-xs font-bold text-gray-600">
                 {selectedOptions.length}
@@ -456,7 +458,7 @@ function SearchableMultiSelect({
                 </span>
               </div>
             </div>,
-            document.body
+            document.body,
           )}
       </div>
 

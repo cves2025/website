@@ -47,7 +47,7 @@ export const ADD_EXAM_PATH = "/welcome/exam/add";
 export const academicYears = generateAcademicYears();
 
 export const inputClass =
-  "w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed";
+  "w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed";
 
 export function toExamCategory(value: unknown): ExamCategory {
   return value === "MAIN_EXAM" ? "MAIN_EXAM" : "UNIT_TEST";

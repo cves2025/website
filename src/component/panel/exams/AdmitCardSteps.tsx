@@ -150,22 +150,10 @@ function SelectExamStep({ generator }: SelectExamStepProps) {
 
 interface GenerateAdmitCardStepProps {
   generator: AdmitCardGenerator;
-  /** When false (inside a modal) the amber button is skipped and the Modal's
-      footer button is used instead. */
-  showGenerateButton?: boolean;
-  /** Called when the user clicks the amber Generate button. */
-  onGenerate?: () => void;
-  /** Optional link shown when the user may go back to the exam picker. */
-  onChangeExam?: () => void;
 }
 
 /** Step 2 of the flow — pick the class and the student(s), then generate. */
-function GenerateAdmitCardStep({
-  generator,
-  showGenerateButton = true,
-  onGenerate,
-  onChangeExam,
-}: GenerateAdmitCardStepProps) {
+function GenerateAdmitCardStep({ generator }: GenerateAdmitCardStepProps) {
   const {
     selectedExam,
     selectedYear,
@@ -174,12 +162,10 @@ function GenerateAdmitCardStep({
     selectedClass,
     handleClassChange,
     scheduledClasses,
-    classStudents,
     loadingStudents,
     selectedEnrollments,
     setSelectedEnrollments,
     allStudents,
-    handleSelectAllStudents,
     studentOptions,
     visibleStudents,
     studentListNote,
@@ -195,25 +181,7 @@ function GenerateAdmitCardStep({
 
   return (
     <div className="mt-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="text-lg font-bold text-gray-800">
-            Generate Admit Card
-          </h3>
-          <p className="text-sm text-gray-600 mt-0.5">
-            Pick the class and the student. Only the papers applicable to that
-            class are printed on the card.
-          </p>
-          {onChangeExam && (
-            <button
-              type="button"
-              onClick={onChangeExam}
-              className="mt-1 text-xs font-bold text-blue-600 underline hover:text-blue-800"
-            >
-              ← Change exam
-            </button>
-          )}
-        </div>
+      <div className="flex flex-wrap items-start justify-end gap-3">
         <span className="flex flex-wrap items-center gap-2">
           <span className="rounded-md border border-gray-300 bg-gray-50 px-3 py-1 text-xs font-bold text-gray-700">
             {!selectedExam
@@ -223,9 +191,7 @@ function GenerateAdmitCardStep({
                 : `${cardPapers.length} paper${
                     cardPapers.length === 1 ? "" : "s"
                   } for ${
-                    selectedClass
-                      ? toOrdinalLabel(selectedClass)
-                      : "the class"
+                    selectedClass ? toOrdinalLabel(selectedClass) : "the class"
                   }`}
           </span>
           <span className="rounded-md border border-blue-300 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-800">
@@ -234,8 +200,8 @@ function GenerateAdmitCardStep({
         </span>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-4">
-        <div>
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-12">
+        <div className="lg:col-span-3">
           <label
             htmlFor="modalCardClass"
             className="block text-sm font-semibold text-gray-700 mb-1"
@@ -263,7 +229,7 @@ function GenerateAdmitCardStep({
           )}
         </div>
 
-        <div className="lg:col-span-2 xl:col-span-2">
+        <div className="lg:col-span-9">
           <SearchableMultiSelect
             id="modalCardStudent"
             label="Student"
@@ -285,44 +251,10 @@ function GenerateAdmitCardStep({
                 ? `No student found for ${toOrdinalLabel(selectedClass)}`
                 : "Select a class first"
             }
-            helpText={`${visibleStudents.length} of ${classStudents.length} student(s) of ${
-              selectedClass ? toOrdinalLabel(selectedClass) : "the class"
-            } listed. Search covers name, father's name, section and enrollment.`}
-            footer={
-              <label className="mt-2 flex w-full cursor-pointer items-center gap-2 rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800">
-                <input
-                  type="checkbox"
-                  checked={allStudents}
-                  onChange={(event) =>
-                    handleSelectAllStudents(event.target.checked)
-                  }
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                Select all {visibleStudents.length} student(s) of{" "}
-                {selectedClass
-                  ? toOrdinalLabel(selectedClass)
-                  : "this class"}{" "}
-                (matching the selected session)
-              </label>
-            }
           />
         </div>
 
-        <div className="flex items-start gap-2 sm:items-end">
-          {showGenerateButton && (
-            <button
-              type="button"
-              onClick={onGenerate}
-              disabled={!selectedExam || !selectedClass || studentCount === 0}
-              className="rounded-md bg-amber-600 px-6 py-2 text-sm font-bold text-white transition-colors hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {studentCount > 1
-                ? `Generate ${studentCount} Admit Cards`
-                : "Generate Admit Card"}
-            </button>
-          )}
         </div>
-      </div>
 
       {otherSessionStudents.length > 0 && (
         <label className="mt-4 flex flex-wrap items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">

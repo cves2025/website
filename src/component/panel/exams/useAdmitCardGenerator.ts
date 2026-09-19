@@ -263,7 +263,7 @@ export function useAdmitCardGenerator(
     : classStudents.filter(matchesSelectedSession);
 
   /* Options of the searchable student box: name, father's name, section and
-     enrollment are all searchable, the session is shown as a hint. */
+     enrollment are all searchable. */
   const studentOptions: SearchableOption[] = visibleStudents.map((student) => {
     const name =
       student.studentName ||
@@ -274,11 +274,6 @@ export function useAdmitCardGenerator(
       label: `${student.enrollment} — ${name}${
         student.section ? ` (Sec ${student.section})` : ""
       }`,
-      hint: student.academicYear
-        ? matchesSelectedSession(student)
-          ? `Session ${student.academicYear}`
-          : `Session ${student.academicYear} · other session`
-        : "Session not set",
       keywords: [
         student.studentName,
         student.firstName,
