@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { useForm, SubmitHandler } from "react-hook-form";
+import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import {
-  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -10,15 +9,18 @@ import {
   query,
   QueryDocumentSnapshot,
   serverTimestamp,
-  updateDoc,
   where,
   orderBy,
+  writeBatch,
 } from "firebase/firestore";
 import toast from "react-hot-toast";
 import Modal from "../../../custom-components/Modal";
 import CustomButton from "../../../custom-components/CustomButton";
 import CustomInput from "../../../custom-components/CustomInput";
 import CustomSelect from "../../../custom-components/CustomSelect";
+import SearchableMultiSelect, {
+  SearchableOption,
+} from "../../../custom-components/SearchableMultiSelect";
 import { CLASSES, COLLECTION } from "../../../constants";
 import { db } from "../../../firebase/config";
 
@@ -53,13 +55,21 @@ interface SubjectFormValues {
   name: string;
   type: SubjectType;
   order: string;
+  /** Classes the subject is created for (batch write on add). */
+  classes: string[];
 }
 
 const DEFAULT_FORM: SubjectFormValues = {
   name: "",
   type: "Theory",
   order: "",
+  classes: [],
 };
+
+const CLASS_OPTIONS: SearchableOption[] = CLASSES.map((className) => ({
+  value: className,
+  label: className,
+}));
 
 const toSubjectDoc = (
   documentSnapshot: QueryDocumentSnapshot<DocumentData>,
@@ -93,6 +103,7 @@ function Subject() {
   });
 
   const subjectName = watch("name");
+  const subjectClasses = watch("classes");
   const [saving, setSaving] = useState(false);
   const [subjectToDelete, setSubjectToDelete] = useState<SubjectDoc | null>(
     null
@@ -134,7 +145,14 @@ function Subject() {
       subjects.length > 0
         ? Math.max(...subjects.map((subject) => subject.order)) + 1
         : 1;
-    reset({ name: "", type: "Theory", order: String(nextOrder) });
+    // Pre-select the currently open class; the user can add or remove classes
+    // from the multi-select before submitting.
+    reset({
+      name: "",
+      type: "Theory",
+      order: String(nextOrder),
+      classes: [selectedClass],
+    });
     setModalOpen(true);
   };
 
@@ -144,6 +162,9 @@ function Subject() {
       name: subject.name,
       type: subject.type,
       order: String(subject.order),
+      // Pre-select the class this subject row belongs to; the user can add
+      // more classes before saving.
+      classes: [subject.className],
     });
     setModalOpen(true);
   };
@@ -163,24 +184,87 @@ function Subject() {
     setSaving(true);
     try {
       if (editingId) {
-        await updateDoc(doc(db, COLLECTION.SUBJECTS, editingId), {
-          name,
-          type: data.type,
-          order,
-          className: selectedClass,
-          updatedAt: serverTimestamp(),
-        });
-        toast.success("Subject updated.");
+        const classes = Array.isArray(data.classes) ? data.classes : [];
+        if (classes.length === 0) return;
+
+        // Sync the subject across the selected classes in a single batch:
+        // the row being edited belongs to the currently open class, so that
+        // doc is kept (or moved to the first selected class when its original
+        // class was deselected) and new docs are created for the extra classes.
+        const batch = writeBatch(db);
+        const originalClass = selectedClass;
+        if (classes.includes(originalClass)) {
+          batch.update(doc(db, COLLECTION.SUBJECTS, editingId), {
+            name,
+            type: data.type,
+            order,
+            className: originalClass,
+            updatedAt: serverTimestamp(),
+          });
+          for (const className of classes.filter(
+            (cls) => cls !== originalClass
+          )) {
+            batch.set(doc(collection(db, COLLECTION.SUBJECTS)), {
+              name,
+              type: data.type,
+              order,
+              className,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            });
+          }
+        } else {
+          const [firstClass, ...restClasses] = classes;
+          batch.update(doc(db, COLLECTION.SUBJECTS, editingId), {
+            name,
+            type: data.type,
+            order,
+            className: firstClass,
+            updatedAt: serverTimestamp(),
+          });
+          for (const className of restClasses) {
+            batch.set(doc(collection(db, COLLECTION.SUBJECTS)), {
+              name,
+              type: data.type,
+              order,
+              className,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            });
+          }
+        }
+        await batch.commit();
+        toast.success(
+          classes.length === 1
+            ? "Subject updated."
+            : `Subject updated for ${classes.length} classes.`
+        );
       } else {
-        await addDoc(collection(db, COLLECTION.SUBJECTS), {
-          name,
-          type: data.type,
-          order,
-          className: selectedClass,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-        toast.success("Subject added.");
+        const classes = Array.isArray(data.classes) ? data.classes : [];
+        // Safety net: the submit button is disabled while no class is selected,
+        // so this can only be reached on a direct form submission.
+        if (classes.length === 0) return;
+
+        // Create the subject for every selected class with a single atomic
+        // batch write instead of opening the modal for each class separately.
+        const batch = writeBatch(db);
+        for (const className of classes) {
+          const subjectRef = doc(collection(db, COLLECTION.SUBJECTS));
+          batch.set(subjectRef, {
+            name,
+            type: data.type,
+            order,
+            className,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+        }
+        await batch.commit();
+        toast.success(
+          classes.length === 1
+            ? "Subject added."
+            : `Subject added to ${classes.length} classes.`
+        );
       }
       setModalOpen(false);
     } catch (error) {
@@ -356,7 +440,10 @@ function Subject() {
         cancelText="Cancel"
         submitText={editingId ? "Update" : "Add Subject"}
         loading={saving}
-        submitDisabled={!subjectName?.trim()}
+        submitDisabled={
+          !subjectName?.trim() ||
+          (!Array.isArray(subjectClasses) || subjectClasses.length === 0)
+        }
         onSubmit={handleSubmit(onSubmit)}
       >
         <div className="mt-4 space-y-4">
@@ -390,6 +477,36 @@ function Subject() {
                 message: "Order must be a positive whole number",
               },
             }}
+          />
+          <Controller
+            control={control}
+            name="classes"
+            rules={{ required: "Select at least one class." }}
+            render={({ field, fieldState }) => (
+              <>
+                <SearchableMultiSelect
+                  id="subjectClasses"
+                  label="Applicable Classes"
+                  required
+                  options={CLASS_OPTIONS}
+                  values={Array.isArray(field.value) ? field.value : []}
+                  onChange={field.onChange}
+                  placeholder="Select class(es) for this subject"
+                  searchPlaceholder="Type to search classes..."
+                  emptyMessage="No matching class found"
+                  helpText={
+                    editingId
+                      ? `The subject will be saved for every selected class. The currently open class (${selectedClass}) is pre-selected.`
+                      : `The subject will be created for every selected class at once. The currently open class (${selectedClass}) is pre-selected.`
+                  }
+                />
+                {fieldState.error && (
+                  <p className="text-xs font-medium text-red-600">
+                    {fieldState.error.message}
+                  </p>
+                )}
+              </>
+            )}
           />
         </div>
       </Modal>

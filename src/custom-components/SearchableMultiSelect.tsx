@@ -1,6 +1,8 @@
 import {
   ReactNode,
+  useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -87,6 +89,50 @@ function SearchableMultiSelect({
   const [query, setQuery] = useState("");
   const containerRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
+  /* Opens below the trigger by default, but flips above it when the drop-down
+     no longer fits below (e.g. a select near the bottom edge of the screen
+     or inside a modal). The panel is measured right after it mounts, before
+     paint, so it never visibly jumps. */
+  const [openUp, setOpenUp] = useState(false);
+
+  const measureDirection = useCallback(() => {
+    const button = buttonRef.current;
+    const panel = panelRef.current;
+    if (!button || !panel) return;
+
+    const buttonRect = button.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - buttonRect.bottom;
+    const spaceAbove = buttonRect.top;
+    const panelHeight = panel.offsetHeight;
+
+    if (panelHeight <= spaceBelow) {
+      setOpenUp(false);
+    } else if (panelHeight <= spaceAbove) {
+      setOpenUp(true);
+    } else {
+      setOpenUp(spaceAbove > spaceBelow);
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    measureDirection();
+  }, [open, measureDirection]);
+
+  /* Re-measure while open so the panel stays on the right side if the window
+     is resized or the page scrolls under it. */
+  useEffect(() => {
+    if (!open) return;
+    window.addEventListener("resize", measureDirection);
+    window.addEventListener("scroll", measureDirection, true);
+    return () => {
+      window.removeEventListener("resize", measureDirection);
+      window.removeEventListener("scroll", measureDirection, true);
+    };
+  }, [open, measureDirection]);
 
   const selectedSet = useMemo(() => new Set(values), [values]);
 
@@ -199,6 +245,7 @@ function SearchableMultiSelect({
         <button
           type="button"
           id={id}
+          ref={buttonRef}
           disabled={disabled}
           onClick={() => setOpen((prev) => !prev)}
           aria-haspopup="listbox"
@@ -257,7 +304,12 @@ function SearchableMultiSelect({
         </button>
 
         {open && (
-          <div className="absolute left-0 right-0 z-30 mt-1 overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
+          <div
+            ref={panelRef}
+            className={`absolute left-0 right-0 z-30 overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg ${
+              openUp ? "bottom-full mb-1" : "mt-1"
+            }`}
+          >
             {/* Search box */}
             <div className="flex items-center gap-2 border-b border-gray-200 px-3 py-2">
               <FaSearch className="text-xs text-gray-400" />
