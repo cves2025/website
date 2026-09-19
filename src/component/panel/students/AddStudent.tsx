@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useForm, SubmitHandler, FieldPath } from "react-hook-form";
+import { useForm, SubmitHandler, FieldPath, get } from "react-hook-form";
 import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { AdmissionStudentFormValues } from "../../../utils/type";
@@ -452,6 +452,34 @@ function AddStudent() {
 
   const onSubmit: SubmitHandler<AdmissionStudentFormValues> = async (data) => {
     try {
+      // The "Previous School Info" tab can be opened without passing the
+      // Student Info validation (the tab buttons switch freely). Re-check
+      // the required Student Info fields here so a student can never be
+      // saved while that section is incomplete.
+      const formValues = getValues();
+      const missingPage1Field = page1RequiredFields.find((name) => {
+        const value = get(formValues, name);
+        return typeof value !== "string" || value.trim() === "";
+      });
+      const { dobDay, dobMonth, dobYear } = formValues;
+      if (
+        missingPage1Field ||
+        !dobDay.trim() ||
+        !dobMonth.trim() ||
+        !dobYear.trim()
+      ) {
+        toast.error(
+          "Please fill all the required fields on the Student Info page.",
+        );
+        setActiveTab("info");
+        // Once the Student Info tab has mounted, re-run validation so the
+        // missing fields are highlighted with their error messages.
+        setTimeout(() => {
+          void trigger(page1RequiredFields);
+        }, 0);
+        return;
+      }
+
       const studentFields = buildStudentFields(data);
       const batch = writeBatch(db);
 
