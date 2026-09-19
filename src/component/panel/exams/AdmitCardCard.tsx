@@ -1,4 +1,12 @@
+import { useEffect, useState } from "react";
+import { doc, getDoc } from "firebase/firestore";
 import { QRCodeCanvas } from "qrcode.react";
+import {
+  COLLECTION,
+  STAMP_SIGN_FIELDS,
+  STAMP_SIGN_PRINCIPLE_DOC,
+} from "../../../constants";
+import { db } from "../../../firebase/config";
 import { CardStudent, ExamDoc } from "../../../utils/type";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import {
@@ -7,6 +15,28 @@ import {
 } from "./examScheduleShared";
 import type { CardPaper } from "./useAdmitCardGenerator";
 import schoolLogo from "../../../assets/image/schoolLogo.jpg";
+
+/** Principal's signed+stamped image URL, read ONCE from the
+    "stampSign"/"principle" document and cached for the whole session so every
+    printed card shares the same single fetch (no repeated Firestore reads). */
+let principalSignUrlPromise: Promise<string | null> | null = null;
+
+function loadPrincipalSignUrl(): Promise<string | null> {
+  if (!principalSignUrlPromise) {
+    principalSignUrlPromise = getDoc(
+      doc(db, COLLECTION.STAMP_SIGN, STAMP_SIGN_PRINCIPLE_DOC)
+    )
+      .then((snapshot) => {
+        if (!snapshot.exists()) return null;
+        const data = snapshot.data();
+        const url = data ? data[STAMP_SIGN_FIELDS.PRINCIPLE_SIGN_WITH_STAMP] : undefined;
+        return typeof url === "string" ? url : null;
+      })
+      // Never block the card for a missing/broken image document.
+      .catch(() => null);
+  }
+  return principalSignUrlPromise;
+}
 
 /**
  * Prints one admit card schedule table. Shared by the written papers table and
@@ -77,6 +107,18 @@ function AdmitCardCard({
   writtenPapers,
   practicalPapers,
 }: AdmitCardCardProps) {
+  const [principalSignUrl, setPrincipalSignUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void loadPrincipalSignUrl().then((url) => {
+      if (active) setPrincipalSignUrl(url);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <div className="mx-auto mt-2 max-w-3xl overflow-hidden rounded-xl border-4 border-double border-blue-800 bg-white shadow-lg print:break-after-page print:last:break-after-auto">
       {/* Card header */}
@@ -248,6 +290,13 @@ function AdmitCardCard({
             </span>
           </div>
           <div className="text-center">
+            {principalSignUrl && (
+              <img
+                src={principalSignUrl}
+                alt="Principal"
+                className="mx-auto mb-1 h-32 w-32 object-contain"
+              />
+            )}
             <p className="w-36 border-t-2 border-gray-400 pt-2">Principal</p>
           </div>
         </div>

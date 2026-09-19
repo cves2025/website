@@ -4,7 +4,19 @@ export const COLLECTION = {
   SUBJECTS: "subjects",
   EXAMS: "exams",
   EXAM_SCHEDULES: "examSchedules",
+  STAMP_SIGN: "stampSign",
 };
+
+/** Document id inside COLLECTION.STAMP_SIGN that stores the Principal's
+    signature and the school stamp image URLs. */
+export const STAMP_SIGN_PRINCIPLE_DOC = "principle";
+
+/** Field names of the "stampSign"/"principle" document. */
+export const STAMP_SIGN_FIELDS = {
+  PRINCIPAL_SIGN_URL: "principalSignUrl",
+  PRINCIPLE_SIGN_WITH_STAMP: "principleSignWithStamp",
+  SCHOOL_STAMP_URL: "schoolStampUrl",
+} as const;
 
 export const CLASSES: string[] = [
   "PG",
