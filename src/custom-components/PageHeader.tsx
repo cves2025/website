@@ -6,7 +6,7 @@ interface PageHeaderProps {
   /** Extra Tailwind classes for the title (default text colour is black). */
   titleStyle?: string;
   /** Supporting text rendered underneath the title. */
-  description?: string;
+  description?: string | ReactNode;
   /** Extra Tailwind classes for the description (default text colour is black). */
   descriptionStyle?: string;
   /** Any node (e.g. a <Button />) rendered on the right side. */

@@ -11,7 +11,6 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import toast from "react-hot-toast";
-import { NavLink, useNavigate } from "react-router-dom";
 import { FaEdit } from "react-icons/fa";
 import { CLASSES, COLLECTION } from "../../../constants";
 import { db } from "../../../firebase/config";
@@ -23,6 +22,9 @@ import {
   marksSchemeBadge,
   marksSchemeFromDoc,
 } from "../../../utils/examMarksScheme";
+import PageHeader from "../../../custom-components/PageHeader";
+import Modal from "../../../custom-components/Modal";
+import AddExam from "./AddExam";
 
 type ExamStatus = "active" | "archived";
 
@@ -86,7 +88,6 @@ const inputClass =
   "w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 function ExamList() {
-  const navigate = useNavigate();
   const [exams, setExams] = useState<ExamDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState(
@@ -94,6 +95,10 @@ function ExamList() {
   );
   const [selectedClass, setSelectedClass] = useState("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  // Add / edit exam modal. editingExamId is set in edit mode and is
+  // null/cleared when a brand new exam is being created.
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingExamId, setEditingExamId] = useState<string | null>(null);
 
   /* Real-time listener: keeps the list in sync with Firestore.
      Data is small (exam definitions), so the year/class filters run in-memory,
@@ -145,28 +150,45 @@ function ExamList() {
     }
   };
 
+  // Opens the Add Exam form in a modal for a brand new exam.
+  const openAddModal = () => {
+    setEditingExamId(null);
+    setModalOpen(true);
+  };
+
+  // Opens the same modal in edit mode, pre-loaded with the exam's data.
+  const openEditModal = (examId: string) => {
+    setEditingExamId(examId);
+    setModalOpen(true);
+  };
+
+  const closeModal = () => setModalOpen(false);
+
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div>
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
-            Exam List
-          </h2>
+      <PageHeader
+        title="Exam List"
+        titleStyle="text-primaryBlue"
+        description={
           <p className="text-gray-600 mt-1">
             {exams.length} exam template(s) defined. Archived exams are hidden
             from active use but kept for existing marks records.
           </p>
-        </div>
-        <NavLink
-          to="/welcome/exam/add"
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-md px-4 py-2 text-sm transition-colors"
-        >
-          + Add Exam
-        </NavLink>
-      </div>
+        }
+        descriptionStyle="text-gray-500"
+        button={
+          <button
+            type="button"
+            onClick={openAddModal}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-md px-4 py-2 text-sm transition-colors"
+          >
+            + Add Exam
+          </button>
+        }
+      />      
 
       {/* Filters */}
-      <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="mb-4 bg-white mt-2 rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label htmlFor="filterYear" className="block text-sm font-semibold text-gray-700 mb-1">
             Academic Year
@@ -216,12 +238,13 @@ function ExamList() {
       ) : filteredExams.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-dashed border-gray-300 p-10 text-center">
           <p className="text-gray-500 font-semibold">No exams found.</p>
-          <NavLink
-            to="/welcome/exam/add"
+          <button
+            type="button"
+            onClick={openAddModal}
             className="text-blue-600 underline inline-block mt-2"
           >
             Add the first exam
-          </NavLink>
+          </button>
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
@@ -278,9 +301,7 @@ function ExamList() {
                       <button
                         type="button"
                         title={`Edit ${exam.examName}`}
-                        onClick={() =>
-                          navigate(`/welcome/exam/add?edit=${exam.id}`)
-                        }
+                        onClick={() => openEditModal(exam.id)}
                         className="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white rounded px-3 py-1 text-xs font-bold transition-colors"
                       >
                         <FaEdit /> Edit
@@ -308,6 +329,22 @@ function ExamList() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* Add / Edit exam modal */}
+      {modalOpen && (
+        <Modal
+          isOpen
+          onClose={closeModal}
+          title={editingExamId ? "Edit Exam" : "Add Exam"}
+          description="Define exam templates for classes and academic years. Student marks are entered later on the Marks Entry page."
+          cancelText="Cancel"
+          hideSubmit
+          onSubmit={() => {}}
+          modalClassName="max-w-4xl"
+        >
+          <AddExam initialEditId={editingExamId} onClose={closeModal} />
+        </Modal>
       )}
     </div>
   );

@@ -319,9 +319,29 @@ async function findSequenceConflicts(
   return null;
 }
 
-function AddExam() {
+interface AddExamProps {
+  /**
+   * When the form renders inside the Exam List modal this is the id of the
+   * exam being edited (null for a brand new exam). On the standalone
+   * /welcome/exam/add page the id is read from the ?edit=<id> query param
+   * instead.
+   */
+  initialEditId?: string | null;
+  /**
+   * Provided by the Exam List modal. When set the form renders as a modal
+   * body (no page header / cross-page navigation) and is called after a
+   * successful save so the modal can close.
+   */
+  onClose?: () => void;
+}
+
+function AddExam({ initialEditId, onClose }: AddExamProps) {
+  const isModal = typeof onClose === "function";
+
   const [searchParams, setSearchParams] = useSearchParams();
   const editExamIdFromUrl = searchParams.get("edit");
+  // Modal mode passes the exam id directly; page mode reads it from the URL.
+  const editExamId = initialEditId ?? editExamIdFromUrl;
 
   const [message, setMessage] = useState("");
   const [submitError, setSubmitError] = useState("");
@@ -343,9 +363,10 @@ function AddExam() {
     defaultValues: defaultExamValues(),
   });
 
-  // Load the exam when the page opens in edit mode: /welcome/exam/add?edit=<id>
+  // Load the exam when the form opens in edit mode: either the ?edit=<id>
+  // query param (standalone page) or the modal's initialEditId prop.
   useEffect(() => {
-    if (!editExamIdFromUrl) {
+    if (!editExamId) {
       setEditingId(null);
       setLoadingExam(false);
       return;
@@ -357,7 +378,7 @@ function AddExam() {
       setLoadingExam(true);
       try {
         const snapshot = await getDoc(
-          doc(db, COLLECTION.EXAMS, editExamIdFromUrl)
+          doc(db, COLLECTION.EXAMS, editExamId)
         );
         if (!snapshot.exists()) {
           throw new Error("Exam document not found.");
@@ -365,7 +386,7 @@ function AddExam() {
         if (cancelled) return;
 
         reset(examDocToForm(snapshot.data()));
-        setEditingId(editExamIdFromUrl);
+        setEditingId(editExamId);
         setMessage("");
         setSubmitError("");
         clearErrors();
@@ -378,7 +399,8 @@ function AddExam() {
         );
         reset(defaultExamValues());
         setEditingId(null);
-        setSearchParams({}, { replace: true });
+        // Only the standalone page carries the ?edit= param; the modal has none.
+        if (editExamIdFromUrl) setSearchParams({}, { replace: true });
       } finally {
         if (!cancelled) setLoadingExam(false);
       }
@@ -389,7 +411,7 @@ function AddExam() {
     return () => {
       cancelled = true;
     };
-  }, [editExamIdFromUrl, reset, clearErrors, setSearchParams]);
+  }, [editExamId, reset, clearErrors, setSearchParams]);
 
   // Watched values, used for conditional fields and the live sequence check.
   const watchExamName = watch("examName");
@@ -672,6 +694,10 @@ function AddExam() {
       setMessage(successMessage);
       toast.success(successMessage);
       setTimeout(() => setMessage(""), 6000);
+
+      // Modal mode only: the Exam List updates itself through its real-time
+      // listener, so the modal closes right after a successful save.
+      if (typeof onClose === "function") onClose();
     } catch (error) {
       console.error("Failed to save exam:", error);
       setSubmitError(firestoreErrorMessage(error));
@@ -681,27 +707,37 @@ function AddExam() {
   };
 
   return (
-    <div className="max-w-4xl">
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
-            {editingId ? "Edit Exam" : "Add Exam"}
-          </h2>
-          <p className="text-gray-600 mt-1">
-            Define exam templates for classes and academic years. Student marks
-            are entered later on the Marks Entry page.
-          </p>
-          <p className="text-xs font-semibold text-amber-700 mt-1">
+    <div className={isModal ? "" : "max-w-4xl"}>
+      {isModal ? (
+        /* The modal supplies the title and description; the body only shows
+           the live marks-scheme summary that reflects the current inputs. */
+        <div className="mb-4">
+          <p className="text-xs font-semibold text-amber-700">
             Classes 1 to 8: {marksSchemeSummary(watchExamCategory, watchScheme)}
           </p>
         </div>
-        <NavLink
-          to="/welcome/exam/list"
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-md px-4 py-2 text-sm transition-colors"
-        >
-          View Exam List
-        </NavLink>
-      </div>
+      ) : (
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
+              {editingId ? "Edit Exam" : "Add Exam"}
+            </h2>
+            <p className="text-gray-600 mt-1">
+              Define exam templates for classes and academic years. Student marks
+              are entered later on the Marks Entry page.
+            </p>
+            <p className="text-xs font-semibold text-amber-700 mt-1">
+              Classes 1 to 8: {marksSchemeSummary(watchExamCategory, watchScheme)}
+            </p>
+          </div>
+          <NavLink
+            to="/welcome/exam/list"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-md px-4 py-2 text-sm transition-colors"
+          >
+            View Exam List
+          </NavLink>
+        </div>
+      )}
 
       {editingId && (
         <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800">
@@ -727,7 +763,11 @@ function AddExam() {
         <form
           onSubmit={handleSubmit(onSubmit)}
           noValidate
-          className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6"
+          className={
+            isModal
+              ? ""
+              : "bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6"
+          }
         >
           {/* Exam name */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1069,12 +1109,14 @@ function AddExam() {
             >
               Reset Form
             </CustomButton>
-            <NavLink
-              to="/welcome/exam/list"
-              className="bg-green-600 hover:bg-green-700 text-white font-bold rounded-md px-6 py-2.5 transition-colors text-center"
-            >
-              Exam List
-            </NavLink>
+            {!isModal && (
+              <NavLink
+                to="/welcome/exam/list"
+                className="bg-green-600 hover:bg-green-700 text-white font-bold rounded-md px-6 py-2.5 transition-colors text-center"
+              >
+                Exam List
+              </NavLink>
+            )}
           </div>
         </form>
       )}
