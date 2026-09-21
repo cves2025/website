@@ -15,7 +15,6 @@ import {
 } from "firebase/firestore";
 import toast from "react-hot-toast";
 import Modal from "../../../custom-components/Modal";
-import CustomButton from "../../../custom-components/CustomButton";
 import CustomInput from "../../../custom-components/CustomInput";
 import CustomSelect from "../../../custom-components/CustomSelect";
 import SearchableMultiSelect, {
@@ -23,6 +22,8 @@ import SearchableMultiSelect, {
 } from "../../../custom-components/SearchableMultiSelect";
 import { CLASSES, COLLECTION } from "../../../constants";
 import { db } from "../../../firebase/config";
+import PageHeader from "../../../custom-components/PageHeader";
+import Button from "../../../custom-components/Button";
 
 type SubjectType = "Written + Oral" | "Theory" | "Practical" | "Scholastic";
 
@@ -301,20 +302,26 @@ function Subject() {
   };
 
   return (
-    <div>
+    <div className="flex flex-col gap-2">
       {/* Page header */}
-      <div className="mb-6">
-        <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
-          Subject
-        </h2>
-        <p className="text-gray-600 mt-1">
-          Set and manage subjects for every class. Select a class below to view
-          and update its subjects.
-        </p>
-      </div>
+      <PageHeader
+        title="Subject"
+        titleStyle="text-primaryBlue"
+        description="Set and manage subjects for every class. Select a class below to view and update its subjects."
+        descriptionStyle="text-gray-500"
+        button={
+          <Button
+            buttonName="+ Add Subject"
+            variant="success"
+            size="md"
+            buttonStyle="rounded-full bg-blue-600 hover:bg-blue-700"
+            onClick={openAddModal}
+          />
+        }
+      />
 
       {/* Class selector */}
-      <div className="mb-6">
+      <div className="bg-white rounded-lg px-4 py-2">
         <span className="block text-sm font-semibold text-gray-700 mb-2">
           Select Class
         </span>
@@ -337,7 +344,7 @@ function Subject() {
       </div>
 
       {/* Subject management card */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-200 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="font-bold text-gray-800">
@@ -348,14 +355,7 @@ function Subject() {
                 ? "Loading..."
                 : `${subjects.length} subject${subjects.length === 1 ? "" : "s"}`}
             </p>
-          </div>
-          <CustomButton
-            type="button"
-            variant="success"
-            onClick={openAddModal}
-          >
-            + Add Subject
-          </CustomButton>
+          </div>          
         </div>
         {loading ? (
           <div className="px-4 py-10 text-center">

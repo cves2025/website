@@ -18,6 +18,7 @@ import { useNavigate } from "react-router-dom";
 import { FaEdit, FaTrash } from "react-icons/fa";
 
 import {
+  ADD_STUDENT_PATH,
   CLASSES,
   COLLECTION,
 } from "../../../constants";
@@ -25,6 +26,8 @@ import {
 import { db } from "../../../firebase/config";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
 import Modal from "../../../custom-components/Modal";
+import PageHeader from "../../../custom-components/PageHeader";
+import Button from "../../../custom-components/Button";
 
 const PAGE_SIZE = 10;
 const SEARCH_DELAY = 350;
@@ -363,24 +366,26 @@ export default function StudentList() {
   };
 
   return (
-    <div className="p-6">
-      {/* Header */}
-
-      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">
-            Students
-          </h1>
-
-          <p className="text-sm text-gray-500">
-            Manage students by academic year and class.
-          </p>
-        </div>
-      </div>
+    <div className="flex flex-col gap-2">
+      <PageHeader
+        title="Student List"
+        titleStyle="text-primaryBlue"
+        description="Manage students by academic year and class."
+        descriptionStyle="text-gray-500"
+        button={
+          <Button
+            buttonName="+ Add Student"
+            variant="success"
+            size="md"
+            buttonStyle="rounded-full bg-blue-600 hover:bg-blue-700"
+            onClick={() => navigate(ADD_STUDENT_PATH)}
+          />
+        }
+      />
 
       {/* Filters */}
 
-      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3 bg-white rounded-lg py-2 px-4">
         {/* Search */}
 
         <div>

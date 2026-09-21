@@ -7,11 +7,11 @@ import {
   query,
   QueryDocumentSnapshot,
 } from "firebase/firestore";
-import { CLASSES, COLLECTION } from "../../constants";
-import { db } from "../../firebase/config";
-import { generateAcademicYears } from "../../utils/generateAcademicYears";
-import { toOrdinalLabel } from "../../utils/toOrdinalLabel";
-import { class_1_to_8 } from "../admin/subjectDefined";
+import { CLASSES, COLLECTION } from "../../../../constants";
+import { db } from "../../../../firebase/config";
+import { generateAcademicYears } from "../../../../utils/generateAcademicYears";
+import { toOrdinalLabel } from "../../../../utils/toOrdinalLabel";
+import { class_1_to_8 } from "../../../admin/subjectDefined";
 import {
   ExamCategory,
   MarksScheme,
@@ -22,7 +22,8 @@ import {
   marksSchemeBadge,
   marksSchemeFromDoc,
   subjectMarksBreakdown,
-} from "../../utils/examMarksScheme";
+} from "../../../../utils/examMarksScheme";
+import PageHeader from "../../../../custom-components/PageHeader";
 
 const academicYears = generateAcademicYears();
 
@@ -207,16 +208,17 @@ function ResultPanel() {
 
   return (
     <div>
-      <h2 className="text-2xl md:text-3xl font-bold text-gray-800">Result</h2>
-      <p className="text-gray-600 mt-1 mb-6">
-        View student results by class and exam. Test/Theory, Notebook and
+      <PageHeader
+        title="Results"
+        titleStyle="text-primaryBlue"
+        description="View student results by class and exam. Test/Theory, Notebook and
         Practical columns come from the exam template saved on the Add Exam
-        page.
-      </p>
-
+        page."
+        descriptionStyle="text-gray-500"        
+      />
       <form
         onSubmit={handleLoad}
-        className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"
+        className="mb-6 mt-2 bg-white rounded-lg px-4 py-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"
       >
         <select
           value={selectedYear}

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import toast from "react-hot-toast";
 import { FaTrash } from "react-icons/fa";
@@ -10,7 +10,6 @@ import { marksSchemeBadge } from "../../../utils/examMarksScheme";
 import { ScheduleRow } from "../../../utils/type";
 import {
   ADD_EXAM_PATH,
-  ADMIT_CARD_PATH,
   academicYears,
   formatScheduleDate,
   inputClass,
@@ -21,6 +20,8 @@ import {
   useRequestedExamYear,
   useSubjectOptions,
 } from "./examScheduleShared";
+import PageHeader from "../../../custom-components/PageHeader";
+import Button from "../../../custom-components/Button";
 
 /**
  * Exam Schedule page (step 1 of the Admit Card module).
@@ -48,6 +49,7 @@ function ExamSchedule() {
     useExamScheduleDraft(selectedExamId);
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [scheduleErrors, setScheduleErrors] = useState<string[]>([]);
+  const navigate = useNavigate();
 
   /* Keeps the year filter aligned with the exam asked for in the URL. */
   useRequestedExamYear(requestedExamId, exams, loadingExams, setSelectedYear);
@@ -215,36 +217,26 @@ function ExamSchedule() {
   };
 
   return (
-    <div className="max-w-5xl">
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
-            Exam Schedule
-          </h2>
-          <p className="text-gray-600 mt-1">
-            Add every subject paper of the selected exam with its date, time and
-            the classes it applies to.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <NavLink
-            to={ADMIT_CARD_PATH}
-            className="bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-md px-4 py-2 text-sm transition-colors"
-          >
-            ← Admit Card
-          </NavLink>
-          <NavLink
-            to={ADD_EXAM_PATH}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-md px-4 py-2 text-sm transition-colors"
-          >
-            + Add Exam
-          </NavLink>
-        </div>
-      </div>
+    <div className="flex flex-col gap-2">
+      <PageHeader
+        title="Exam Schedule"
+        titleStyle="text-primaryBlue"
+        description="Add every subject paper of the selected exam with its date, time and the classes it applies to."
+        descriptionStyle="text-gray-500"
+        button={
+          <Button
+            buttonName="+ Add Exam"
+            variant="success"
+            size="md"
+            buttonStyle="rounded-full bg-blue-600 hover:bg-blue-700"
+            onClick={() => navigate(`/welcome/exam/list/?add-exam`)}
+          />
+        }
+      />
 
       {/* ---------------- Subject papers of the selected exam ---------------- */}
-      <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6 print:hidden">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-2 md:p-4 print:hidden">
+        <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h3 className="text-lg font-bold text-gray-800">Subject Papers</h3>
             <p className="text-sm text-gray-600 mt-0.5">
