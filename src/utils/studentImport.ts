@@ -476,7 +476,8 @@ const ALIAS_PRIORITY: Record<string, number> = {};
 for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
   aliases.forEach((alias, i) => {
     const normalized = normalizeKey(alias);
-    if (normalized) {
+    if (!normalized) return;
+    if (ALIAS_MAP[normalized] === undefined || i < ALIAS_PRIORITY[normalized]) {
       ALIAS_MAP[normalized] = field as FieldKey;
       ALIAS_PRIORITY[normalized] = i;
     }
@@ -522,7 +523,11 @@ const HEADER_WORD_RULES: HeaderWordRule[] = [
     all: ["class"],
     any: ["previous", "last", "passed", "passing", "qualifying"],
   },
-  { field: "maxMarks", all: ["marks"], any: ["max", "maximum", "total", "full"] },
+  {
+    field: "maxMarks",
+    all: ["marks"],
+    any: ["max", "maximum", "total", "full"],
+  },
   {
     field: "marksObtained",
     all: ["marks"],
@@ -581,7 +586,11 @@ const HEADER_WORD_RULES: HeaderWordRule[] = [
   },
   // ---- contact ------------------------------------------------------------
   { field: "phone2", any: ["alternate", "second", "secondary"] },
-  { field: "email", any: ["email", "mail", "gmail"], none: ["school", "college"] },
+  {
+    field: "email",
+    any: ["email", "mail", "gmail"],
+    none: ["school", "college"],
+  },
   {
     field: "phone",
     any: ["phone", "mobile", "contact", "telephone", "whatsapp", "cell"],
@@ -1029,7 +1038,8 @@ export async function parseStudentFile(
     header: 1,
     defval: "",
   });
-  if (!matrix.length) throw new Error("The file is empty - no data rows found.");
+  if (!matrix.length)
+    throw new Error("The file is empty - no data rows found.");
 
   // ---- Locate the header row ----------------------------------------------
   // The row matching the most known columns wins, so a "STUDENT LIST" or school
@@ -1064,7 +1074,19 @@ export async function parseStudentFile(
     const { field, priority } = resolveHeaderField(header);
     if (!field) return;
     const existing = columnPriority.get(field);
-    if (existing === undefined || priority < existing) {
+    // First matching column wins. The only exception: a later column may
+    // upgrade a loose word-rule guess (priority === WORD_RULE_PRIORITY) into a
+    // confirmed exact-alias match. This stops unrelated columns further right
+    // in wide exports (a blank "name" column for a sibling, a "standard"/
+    // "grade" column from prior-school marks, etc.) from overriding a field
+    // that's already correctly matched to an earlier column.
+    if (existing === undefined) {
+      columnByField.set(field, columnIndex);
+      columnPriority.set(field, priority);
+    } else if (
+      existing === WORD_RULE_PRIORITY &&
+      priority < WORD_RULE_PRIORITY
+    ) {
       columnByField.set(field, columnIndex);
       columnPriority.set(field, priority);
     }
@@ -1155,7 +1177,9 @@ export async function parseStudentFile(
       ? splitFromSectionColumn.section
       : normalizeSection(sectionColumnValue);
     const section =
-      sectionFromSectionColumn || splitFromClassColumn.section || DEFAULT_SECTION;
+      sectionFromSectionColumn ||
+      splitFromClassColumn.section ||
+      DEFAULT_SECTION;
 
     // ---- Enumerated fields ---------------------------------------------------
     const gender = normalizeEnum(getValue("gender"));
@@ -1494,7 +1518,11 @@ export function studentCsvTemplate(): string {
   ];
   // Every field is quoted when needed - an unquoted comma in an address used to
   // shift all following columns of the sample row.
-  return [headerRow.map(csvField).join(","), sampleRow.map(csvField).join(","), ""].join("\n");
+  return [
+    headerRow.map(csvField).join(","),
+    sampleRow.map(csvField).join(","),
+    "",
+  ].join("\n");
 }
 
 export function downloadCsvTemplate(): void {

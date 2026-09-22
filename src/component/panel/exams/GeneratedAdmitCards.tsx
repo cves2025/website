@@ -1,9 +1,11 @@
-import { NavLink, useSearchParams } from "react-router-dom";
+import { NavLink, useNavigate, useSearchParams } from "react-router-dom";
 import { FaPrint } from "react-icons/fa";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import { useAdmitCardGenerator } from "./useAdmitCardGenerator";
 import AdmitCardCard from "./AdmitCardCard";
 import { ADMIT_CARD_PATH } from "./examScheduleShared";
+import PageHeader from "../../../custom-components/PageHeader";
+import Button from "../../../custom-components/Button";
 
 /**
  * Shows the admit cards that were generated through the Admit Card hub modal.
@@ -15,6 +17,7 @@ import { ADMIT_CARD_PATH } from "./examScheduleShared";
  * by the old generator page.
  */
 function GeneratedAdmitCards() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const examId = searchParams.get("exam") ?? "";
   const year = searchParams.get("year") ?? "";
@@ -76,29 +79,21 @@ function GeneratedAdmitCards() {
   return (
     <div className="mx-auto max-w-5xl">
       {/* Top bar */}
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3 print:hidden">
-        <div>
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-800">
-            Admit Cards
-          </h2>
-          <p className="text-gray-600 mt-1">
+      <div className="print:hidden">
+      <PageHeader
+        title="Admit Cards"
+        titleStyle="text-primaryBlue"
+        description={
+          <p>
             {selectedExam ? selectedExam.examName : "Loading exam..."}
-            {gen.selectedClass
-              ? ` · ${toOrdinalLabel(gen.selectedClass)}`
-              : ""}
+            {gen.selectedClass ? ` · ${toOrdinalLabel(gen.selectedClass)}` : ""}
             {gen.cards.length > 0 ? ` · ${gen.cards.length} student(s)` : ""}
           </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <NavLink
-            to={ADMIT_CARD_PATH}
-            className="rounded-md bg-gray-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-gray-700"
-          >
-            ← Admit Card
-          </NavLink>
-          {renderPrintButton()}
-        </div>
-      </div>
+        }
+        descriptionStyle="text-gray-500"
+        button={<>{renderPrintButton()}</>}
+      />
+      </div>      
 
       {gen.generateError && gen.cards.length === 0 && (
         <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 print:hidden">

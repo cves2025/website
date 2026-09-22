@@ -14,7 +14,7 @@ import {
   formatScheduleTime,
 } from "./examScheduleShared";
 import type { CardPaper } from "./useAdmitCardGenerator";
-import schoolLogo from "../../../assets/image/schoolLogo.jpg";
+import schoolLogo from "../../../assets/image/schoolLogo1.png";
 
 /** Principal's signed+stamped image URL, read ONCE from the
     "stampSign"/"principle" document and cached for the whole session so every
@@ -123,7 +123,7 @@ function AdmitCardCard({
     <div className="mx-auto mt-2 max-w-3xl overflow-hidden rounded-xl border-4 border-double border-blue-800 bg-white shadow-lg print:break-after-page print:last:break-after-auto">
       {/* Card header */}
       <div className="border-b-4 border-double border-blue-800 bg-white px-4 py-2 md:px-6">
-        <div className="flex items-center justify-between gap-3 text-sm font-semibold text-gray-600">
+        <div className="flex items-center justify-between gap-3 text-sm font-semibold text-black">
           <span>School Code: 09670911304</span>
           <span>Affiliation No.: 14203-05</span>
         </div>
@@ -133,29 +133,29 @@ function AdmitCardCard({
             <img
               src={schoolLogo}
               alt="school logo"
-              className="h-full w-full scale-125 object-cover"
+              className="h-full w-full scale-125 object-cover grayscale"
               loading="lazy"
             />
           </div>
 
           <div className="text-left sm:text-center">
-            <h3 className="font-cancun text-lg sm:text-2xl font-extrabold tracking-tight leading-tight">
-              <span className="text-green-700">CHILDREN&apos;S</span>{" "}
-              <span className="text-indigo-800">VALLEY</span>{" "}
-              <span className="text-red-600">ENGLISH</span>{" "}
-              <span className="text-pink-600">SCHOOL</span>
+            <h3 className="text-lg sm:text-2xl font-extrabold tracking-tight leading-tight">
+              <span className="text-black">CHILDREN&apos;S</span>{" "}
+              <span className="text-black">VALLEY</span>{" "}
+              <span className="text-black">ENGLISH</span>{" "}
+              <span className="text-black">SCHOOL</span>
             </h3>
-            <p className="mt-0.5 text-xs font-semibold italic text-gray-700 md:text-sm">
+            <p className="mt-0.5 text-xs font-semibold italic text-black md:text-sm">
               D 59/295 A, Mahmoorganj, Varanasi &middot; 0542-2220107,
               9336576690
             </p>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs sm:text-sm font-bold sm:justify-center">
-              <span className="text-red-700">A Gov. Affiliated</span>
-              <span className="text-green-700">C.B.S.E. Pattern</span>
-              <span className="text-indigo-800">Co - Education</span>
+              <span className="text-black">A Gov. Affiliated</span>
+              <span className="text-black">C.B.S.E. Pattern</span>
+              <span className="text-black">Co - Education</span>
             </div>
             <div className="mt-2 flex justify-center">
-              <div className="inline-block rounded bg-pink-500 px-8 py-1 text-sm font-bold tracking-wide text-white md:text-base">
+              <div className="inline-block rounded bg-black px-8 py-1 text-sm font-bold tracking-wide text-white md:text-base">
                 ADMIT CARD
               </div>
             </div>
@@ -166,11 +166,11 @@ function AdmitCardCard({
       {/* Exam strip */}
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b-2 border-blue-800 bg-blue-50 px-4 py-1 text-sm md:px-6">
         <p>
-          <span className="font-semibold">Examination:</span> {exam.examName}
-        </p>
-        <p>
           <span className="font-semibold">Session:</span>{" "}
           {card.academicYear || exam.academicYear || "-"}
+        </p>
+        <p>
+          <span className="font-semibold">Examination:</span> {exam.examName}
         </p>
         <p>
           <span className="font-semibold">Class:</span>{" "}
@@ -212,7 +212,7 @@ function AdmitCardCard({
             <span>: {card.motherName || "-"}</span>
           </p>
         </div>
-        <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded border-2 border-dashed border-gray-400 text-center text-xs text-gray-400">
+        <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded border border-gray-400 text-center text-xs text-gray-400">
           {card.studentPhoto ? (
             <img
               src={card.studentPhoto}
