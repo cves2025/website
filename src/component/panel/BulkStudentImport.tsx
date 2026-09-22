@@ -288,6 +288,12 @@ const handleImport = async () => {
               </p>
             ))}
           </div>
+          <p className="mt-2 text-xs text-yellow-800">
+            Header names are matched loosely (e.g. <em>Name of Student</em>, <em>Class &amp; Section</em>,{" "}
+            <em>Mobile No.</em> all work). If a required field is reported as missing, check the{" "}
+            <span className="font-semibold">"Columns detected in your file"</span> list below and rename the
+            column to the template spelling, or download the CSV template and paste your rows into it.
+          </p>
         </div>
       )}
 

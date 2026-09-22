@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import type { PhysicalStatus, PreviousQualifyingExam } from "./type";
-import { EMAIL_PATTERN, PHONE_PATTERN } from "../constants";
+import { EMAIL_PATTERN, PHONE_PATTERN, SECTIONS } from "../constants";
 import { normalizeClassName } from "./normalizeClassName";
 
 export type FieldKey =
@@ -56,6 +56,7 @@ const FIELD_ALIASES: Record<FieldKey, string[]> = {
   firstName: ["firstname", "first name", "fname"],
   lastName: ["lastname", "last name", "lname", "surname", "sirname"],
   fullName: [
+    "student_name",
     "name",
     "student name",
     "student's name",
@@ -66,7 +67,15 @@ const FIELD_ALIASES: Record<FieldKey, string[]> = {
     "student",
     "child name",
     "candidate name",
-    "student_name",
+    "name of student",
+    "name of the student",
+    "student full name",
+    "students full name",
+    "student's full name",
+    "name of child",
+    "name of the child",
+    "name of pupil",
+    "pupil name",
   ],
   enrollment: [
     "enrollment",
@@ -86,6 +95,11 @@ const FIELD_ALIASES: Record<FieldKey, string[]> = {
     "regno",
     "form no",
     "formno",
+    "scholar no",
+    "scholar number",
+    "student id",
+    "student code",
+    "school admission no",
   ],
   className: [
     "class",
@@ -95,6 +109,12 @@ const FIELD_ALIASES: Record<FieldKey, string[]> = {
     "standard",
     "grade",
     "std",
+    "present class",
+    "current class",
+    "class of admission",
+    "admission class",
+    "class studying",
+    "studying class",
   ],
   section: [
     "section",
@@ -103,6 +123,9 @@ const FIELD_ALIASES: Record<FieldKey, string[]> = {
     "div",
     "class section",
     "classsection",
+    "class sec",
+    "class div",
+    "class section no",
   ],
   academicYear: [
     "academic year",
@@ -460,8 +483,226 @@ for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
   });
 }
 
+/**
+ * Priority of a column matched by the loose word rules below. Exact alias
+ * matches are always preferred, so a real "Phone" column is never overruled by
+ * a stray "Father's Mobile No" column.
+ */
+const WORD_RULE_PRIORITY = 1000;
+
+interface HeaderWordRule {
+  field: FieldKey;
+  /** Every token must appear somewhere in the header. */
+  all?: string[];
+  /** At least one of these tokens must appear in the header. */
+  any?: string[];
+  /** None of these tokens may appear in the header. */
+  none?: string[];
+}
+
+/**
+ * Fallback matcher for the header spellings the alias table does not know
+ * verbatim ("Name of Student", "Class & Sec", "Student's Name (In English)",
+ * "Mobile No.", headers wrapped over several lines, ...). The header is reduced
+ * to letters/digits and every rule is tested in order, so the specific rules
+ * sit above the generic ones.
+ */
+const HEADER_WORD_RULES: HeaderWordRule[] = [
+  // ---- school of the previous year ---------------------------------------
+  { field: "lastSchoolAddress", all: ["school"], any: ["address", "addr"] },
+  { field: "lastSchoolName", all: ["school"], any: ["name"] },
+  // ---- family -------------------------------------------------------------
+  { field: "fatherName", all: ["name"], any: ["father", "guardian", "parent"] },
+  { field: "motherName", all: ["name"], any: ["mother"] },
+  { field: "correspondenceName", all: ["name"], any: ["correspondence"] },
+  { field: "fatherOccupation", any: ["occupation"] },
+  // ---- previous qualifying exam -------------------------------------------
+  {
+    field: "previousClass",
+    all: ["class"],
+    any: ["previous", "last", "passed", "passing", "qualifying"],
+  },
+  { field: "maxMarks", all: ["marks"], any: ["max", "maximum", "total", "full"] },
+  {
+    field: "marksObtained",
+    all: ["marks"],
+    any: ["obtained", "scored", "secured", "gain"],
+  },
+  { field: "percentage", any: ["percentage", "percent"] },
+  {
+    field: "passingYear",
+    all: ["year"],
+    any: ["passed", "passing", "pass", "completion"],
+  },
+  // ---- class / section ----------------------------------------------------
+  {
+    field: "className",
+    any: ["class", "grade", "standard", "std", "studying"],
+    none: [
+      "previous",
+      "last",
+      "passed",
+      "passing",
+      "section",
+      "sec",
+      "division",
+      "div",
+      "teacher",
+      "subject",
+    ],
+  },
+  { field: "section", any: ["section", "sec", "division", "div"] },
+  // ---- date of birth ------------------------------------------------------
+  { field: "dobDay", all: ["day"], any: ["birth", "dob"] },
+  { field: "dobMonth", all: ["month"], any: ["birth", "dob"] },
+  { field: "dobYear", all: ["year"], any: ["birth", "dob"] },
+  {
+    field: "dob",
+    any: ["dob", "birth"],
+    none: ["place", "time", "hospital", "certificate"],
+  },
+  // ---- personal details ---------------------------------------------------
+  { field: "gender", any: ["gender", "sex"], none: ["father", "mother"] },
+  {
+    field: "category",
+    any: ["category", "caste", "community"],
+    none: ["father", "mother"],
+  },
+  { field: "nationality", any: ["nationality", "citizenship"] },
+  { field: "bloodGroup", any: ["blood"] },
+  { field: "weight", any: ["weight"] },
+  { field: "height", any: ["height"] },
+  { field: "allergyMedicine", all: ["allergy"], any: ["medicine", "drug"] },
+  { field: "allergyOther", any: ["allergy"] },
+  { field: "disease", any: ["disease", "illness", "ailment"] },
+  {
+    field: "otherInformation",
+    any: ["remarks", "remark", "note", "comment", "additionalinformation"],
+  },
+  // ---- contact ------------------------------------------------------------
+  { field: "phone2", any: ["alternate", "second", "secondary"] },
+  { field: "email", any: ["email", "mail", "gmail"], none: ["school", "college"] },
+  {
+    field: "phone",
+    any: ["phone", "mobile", "contact", "telephone", "whatsapp", "cell"],
+    none: [
+      "alternate",
+      "second",
+      "secondary",
+      "emergency",
+      "aadhaar",
+      "reference",
+    ],
+  },
+  // ---- address ------------------------------------------------------------
+  { field: "permanentPin", all: ["permanent"], any: ["pin", "postal", "zip"] },
+  { field: "permanentState", all: ["permanent", "state"] },
+  {
+    field: "permanentCity",
+    all: ["permanent"],
+    any: ["city", "town", "village", "district"],
+  },
+  { field: "permanentAddress", all: ["permanent"], any: ["address", "addr"] },
+  {
+    field: "pin",
+    any: ["pincode", "pin", "zip", "postal"],
+    none: ["permanent", "perm"],
+  },
+  {
+    field: "city",
+    any: ["city", "town", "village", "district"],
+    none: ["permanent", "perm"],
+  },
+  { field: "state", any: ["state"], none: ["permanent", "perm"] },
+  {
+    field: "address",
+    any: ["address", "addr"],
+    none: ["permanent", "perm", "school", "email"],
+  },
+  // ---- identity -----------------------------------------------------------
+  {
+    field: "enrollment",
+    any: [
+      "enrollment",
+      "enrolment",
+      "admission",
+      "admno",
+      "roll",
+      "registration",
+      "scholar",
+      "formno",
+      "studentid",
+    ],
+    none: ["date", "year", "fee", "status", "medium", "class", "total"],
+  },
+  { field: "penOfStudent", any: ["penofstudent", "penno", "pennumber"] },
+  // ---- name (last: any remaining "... name" column is the student's name) --
+  {
+    field: "fullName",
+    all: ["name"],
+    none: [
+      "bank",
+      "book",
+      "village",
+      "city",
+      "state",
+      "district",
+      "religion",
+      "nationality",
+      "blood",
+      "subject",
+      "teacher",
+      "address",
+      "nominee",
+      "account",
+      "holder",
+      "signature",
+      "library",
+      "bus",
+    ],
+  },
+  {
+    field: "fullName",
+    any: ["student", "pupil", "child", "candidate"],
+    none: ["photo", "id", "code", "address", "mobile", "phone"],
+  },
+];
+
+function guessFieldFromWords(normalized: string): FieldKey | null {
+  for (const rule of HEADER_WORD_RULES) {
+    if (rule.all && !rule.all.every((token) => normalized.includes(token))) {
+      continue;
+    }
+    if (rule.any && !rule.any.some((token) => normalized.includes(token))) {
+      continue;
+    }
+    if (rule.none && rule.none.some((token) => normalized.includes(token))) {
+      continue;
+    }
+    return rule.field;
+  }
+  return null;
+}
+
+/**
+ * Resolve a spreadsheet header to a student field: exact alias first, then the
+ * loose word rules. The priority decides which column wins when the same field
+ * appears twice (lower priority = better match).
+ */
+export function resolveHeaderField(header: unknown): {
+  field: FieldKey | null;
+  priority: number;
+} {
+  const normalized = normalizeKey(String(header ?? ""));
+  if (!normalized) return { field: null, priority: 0 };
+  const exact = ALIAS_MAP[normalized];
+  if (exact) return { field: exact, priority: ALIAS_PRIORITY[normalized] ?? 0 };
+  const loose = guessFieldFromWords(normalized);
+  return { field: loose, priority: loose ? WORD_RULE_PRIORITY : 0 };
+}
+
 export function mapHeaderToField(header: string): FieldKey | null {
-  return ALIAS_MAP[normalizeKey(header)] || null;
+  return resolveHeaderField(header).field;
 }
 
 /** Trim a cell value and treat placeholder values (n/a, -, nil, ...) as empty. */
@@ -728,6 +969,44 @@ function resolveSession(
 }
 
 /**
+ * Many sheets keep the class and the section in the same cell ("Class & Sec" ->
+ * "5-A", "V/B", "Nursery A"). This splits such a value into the stored CLASSES
+ * spelling plus the section letter. An empty `className` means the value is not
+ * a combined class + section.
+ */
+function splitClassAndSection(value: string): {
+  className: string;
+  section: string;
+} {
+  const empty = { className: "", section: "" };
+  const text = value.trim();
+  if (!text) return empty;
+  const match = text.match(/^(.*?)[\s\-_./&,]*([A-Za-z])$/);
+  if (!match) return empty;
+  const section = match[2].toUpperCase();
+  if (!SECTIONS.includes(section)) return empty;
+  const className = normalizeClassName(match[1]);
+  return className ? { className, section } : empty;
+}
+
+/** "Section A" / "sec-A" / "- B" -> "A"; values that are no section -> "". */
+function normalizeSection(value: string): string {
+  const cleaned = value
+    .trim()
+    .replace(/^(section|sec|division|div)\b[.\s:/-]*/i, "")
+    .trim();
+  if (!cleaned) return "";
+  const upper = cleaned.toUpperCase();
+  if (SECTIONS.includes(upper)) return upper;
+  // Single letters (schools also use D, E, ...) and values such as "A1" are
+  // kept; anything else is not a section.
+  return /^[A-Za-z]\d?$/.test(cleaned) ? upper : "";
+}
+
+/** Section stored when the sheet carries none - same default as the form. */
+const DEFAULT_SECTION = "A";
+
+/**
  * Parse an Excel (.xlsx / .xls) or CSV file into validated student rows.
  * Rows with missing/invalid required data are returned in `errors` with the
  * exact problem and are NOT uploadable.
@@ -736,40 +1015,83 @@ export async function parseStudentFile(
   file: File,
 ): Promise<StudentImportResult> {
   const buffer = await file.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: "array" });
+  // `raw: true` keeps CSV cells as written - without it SheetJS converts
+  // "10-05-2016" into a US-ordered date serial (5 October) instead of leaving
+  // the day-first text for parseDob().
+  const workbook = XLSX.read(buffer, { type: "array", raw: true });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) throw new Error("Excel file has no sheets.");
   const sheet = workbook.Sheets[sheetName];
-  const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, {
+  // Cell matrix instead of sheet_to_json's object form: merged / blank cells
+  // stay under control and the row that really carries the column names can be
+  // located (files exported from other software often put a title row above it).
+  const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    header: 1,
     defval: "",
   });
-  if (!rows.length) throw new Error("The file is empty - no data rows found.");
+  if (!matrix.length) throw new Error("The file is empty - no data rows found.");
 
-  const headers = Object.keys(rows[0]);
-
-  // Resolve each header to a field ONCE; per-row lookups are then O(1).
-  const columnByField = new Map<FieldKey, string>();
-  const columnPriority = new Map<FieldKey, number>();
-  for (const header of headers) {
-    const normalized = normalizeKey(header);
-    const field = ALIAS_MAP[normalized];
-    if (!field) continue;
-    const priority = ALIAS_PRIORITY[normalized] ?? Infinity;
-    const existing = columnPriority.get(field);
-    if (existing === undefined || priority < existing) {
-      columnByField.set(field, header);
-      columnPriority.set(field, priority);
+  // ---- Locate the header row ----------------------------------------------
+  // The row matching the most known columns wins, so a "STUDENT LIST" or school
+  // name title row above the headers no longer makes every column unknown.
+  const HEADER_SEARCH_ROWS = 15;
+  let headerRowIndex = 0;
+  let bestHeaderScore = -1;
+  const headerSearchLimit = Math.min(matrix.length, HEADER_SEARCH_ROWS);
+  for (let i = 0; i < headerSearchLimit; i += 1) {
+    const cells = matrix[i] || [];
+    let score = 0;
+    for (const cell of cells) {
+      if (resolveHeaderField(cell).field) score += 1;
+    }
+    if (score > bestHeaderScore) {
+      bestHeaderScore = score;
+      headerRowIndex = i;
     }
   }
+  if (bestHeaderScore < 2) headerRowIndex = 0;
+
+  const headerCells = (matrix[headerRowIndex] || []).map((cell) =>
+    String(cell ?? "").trim(),
+  );
+  const headers = headerCells.filter((header) => header !== "");
+
+  // Resolve each column to a field ONCE; per-row lookups are then O(1).
+  const columnByField = new Map<FieldKey, number>();
+  const columnPriority = new Map<FieldKey, number>();
+  headerCells.forEach((header, columnIndex) => {
+    if (!header) return;
+    const { field, priority } = resolveHeaderField(header);
+    if (!field) return;
+    const existing = columnPriority.get(field);
+    if (existing === undefined || priority < existing) {
+      columnByField.set(field, columnIndex);
+      columnPriority.set(field, priority);
+    }
+  });
+
+  const dataRows = matrix.slice(headerRowIndex + 1).map((cells, i) => ({
+    cells: cells || [],
+    rowNumber: headerRowIndex + i + 2,
+  }));
+  // A sheet without any filled data row is reported instead of importing zero
+  // students without a word.
+  const hasDataRow = dataRows.some(({ cells }) =>
+    cells.some((cell) => String(cell ?? "").trim() !== ""),
+  );
+  if (!hasDataRow) throw new Error("The file is empty - no data rows found.");
 
   const students: StudentRow[] = [];
   const errors: StudentImportError[] = [];
   const seenDocIds = new Set<string>();
 
-  rows.forEach((row, index) => {
+  dataRows.forEach(({ cells, rowNumber }) => {
+    // Fully blank spacer rows (and the empty tail of a formatted sheet) are
+    // ignored instead of being reported as invalid rows.
+    if (cells.every((cell) => String(cell ?? "").trim() === "")) return;
     const getValue = (field: FieldKey): string => {
-      const header = columnByField.get(field);
-      return header === undefined ? "" : cellText(row[header]);
+      const columnIndex = columnByField.get(field);
+      return columnIndex === undefined ? "" : cellText(cells[columnIndex]);
     };
 
     // ---- Name --------------------------------------------------------------
@@ -812,12 +1134,28 @@ export async function parseStudentFile(
       getValue("academicYear"),
     );
 
-    // ---- Class ---------------------------------------------------------------
-    // Spreadsheets spell the class in many ways ("5th", "Class 5", "V"); the
-    // value is mapped onto the CLASSES spelling used everywhere else so the
-    // uploaded students land in the same class bucket as the manual ones.
-    const classNameRaw = getValue("className");
-    const className = normalizeClassName(classNameRaw) || classNameRaw;
+    // ---- Class / section -----------------------------------------------------
+    // Spreadsheets spell the class in many ways ("5th", "Class 5", "V") and often
+    // keep the section in the same cell ("5-A", "Class 5 B"). The class is mapped
+    // onto the CLASSES spelling used everywhere else (so the uploaded students
+    // land in the same class bucket as the manual ones) and the section is split
+    // out instead of ending up inside the class value.
+    const classColumnValue = getValue("className");
+    const sectionColumnValue = getValue("section");
+    const splitFromClassColumn = splitClassAndSection(classColumnValue);
+    const splitFromSectionColumn = splitClassAndSection(sectionColumnValue);
+    const className =
+      splitFromClassColumn.className ||
+      normalizeClassName(classColumnValue) ||
+      classColumnValue.trim() ||
+      splitFromSectionColumn.className ||
+      normalizeClassName(sectionColumnValue);
+    // A combined column ("Class & Section" -> "5-A") carries the section too.
+    const sectionFromSectionColumn = splitFromSectionColumn.className
+      ? splitFromSectionColumn.section
+      : normalizeSection(sectionColumnValue);
+    const section =
+      sectionFromSectionColumn || splitFromClassColumn.section || DEFAULT_SECTION;
 
     // ---- Enumerated fields ---------------------------------------------------
     const gender = normalizeEnum(getValue("gender"));
@@ -844,7 +1182,7 @@ export async function parseStudentFile(
     const checks: Record<string, string> = {
       fullName,
       enrollment: getValue("enrollment"),
-      className: getValue("className"),
+      className,
       sessionStart: session.sessionStart,
       sessionEnd: session.sessionEnd,
       motherName: getValue("motherName"),
@@ -859,7 +1197,10 @@ export async function parseStudentFile(
 
     const missing: string[] = [];
     for (const required of REQUIRED_STUDENT_FIELDS) {
-      if (!checks[required.key]) missing.push(required.label);
+      // "Session / Academic Year" covers two entries, so the label is deduped.
+      if (!checks[required.key] && !missing.includes(required.label)) {
+        missing.push(required.label);
+      }
     }
 
     const badFormat: string[] = [];
@@ -874,7 +1215,7 @@ export async function parseStudentFile(
 
     if (missing.length || badFormat.length) {
       errors.push({
-        row: index + 2,
+        row: rowNumber,
         enrollment: getValue("enrollment") || "-",
         name: fullName || "-",
         message: [
@@ -894,7 +1235,7 @@ export async function parseStudentFile(
     const enrollmentKey = enrollmentValue.trim().toLowerCase();
     if (seenDocIds.has(enrollmentKey)) {
       errors.push({
-        row: index + 2,
+        row: rowNumber,
         enrollment: enrollmentValue,
         name: fullName || "-",
         message: "Duplicate enrollment number in file",
@@ -907,7 +1248,7 @@ export async function parseStudentFile(
     const motherName = getValue("motherName");
 
     students.push({
-      id: `${Date.now().toString(36)}${index.toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+      id: `${Date.now().toString(36)}${rowNumber.toString(36)}${Math.random().toString(36).slice(2, 8)}`,
       firstName,
       lastName,
       fullName: trimmedFullName,
@@ -915,7 +1256,7 @@ export async function parseStudentFile(
       lastNameLower: lastName.toLowerCase(),
       enrollment: enrollmentValue,
       className,
-      section: getValue("section") || "A",
+      section,
       academicYear: session.academicYear,
       sessionStart: session.sessionStart,
       sessionEnd: session.sessionEnd,
@@ -972,6 +1313,8 @@ export async function parseStudentFile(
   // Inform the caller which required fields have NO usable column in the file.
   const satisfiedBy: Partial<Record<FieldKey, FieldKey>> = {
     fullName: "firstName",
+    // A "Class & Section" column carries the class as well.
+    className: "section",
     sessionStart: "academicYear",
     sessionEnd: "academicYear",
     dobYear: "dob",
@@ -981,9 +1324,13 @@ export async function parseStudentFile(
     const alternative = satisfiedBy[key];
     return alternative !== undefined && columnByField.has(alternative);
   };
-  const missingRequiredColumns = REQUIRED_STUDENT_FIELDS.filter(
-    ({ key }) => !hasColumn(key),
-  ).map(({ label }) => label);
+  const missingRequiredColumns = [
+    ...new Set(
+      REQUIRED_STUDENT_FIELDS.filter(({ key }) => !hasColumn(key)).map(
+        ({ label }) => label,
+      ),
+    ),
+  ];
 
   return { students, errors, headers, missingRequiredColumns };
 }
@@ -1052,6 +1399,11 @@ export function toFirestoreEnrollment(row: StudentRow, studentId: string) {
     fatherName: row.fatherName,
     phone: row.phone,
   };
+}
+
+/** Quote a CSV field when it carries a comma / quote / line break. */
+function csvField(value: string): string {
+  return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
 /** Generate a .csv template string with a sample row covering every field. */
@@ -1140,7 +1492,9 @@ export function studentCsvTemplate(): string {
     "None",
     "None",
   ];
-  return [headerRow.join(","), sampleRow.join(","), ""].join("\n");
+  // Every field is quoted when needed - an unquoted comma in an address used to
+  // shift all following columns of the sample row.
+  return [headerRow.map(csvField).join(","), sampleRow.map(csvField).join(","), ""].join("\n");
 }
 
 export function downloadCsvTemplate(): void {
