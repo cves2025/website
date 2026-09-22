@@ -1,11 +1,10 @@
-import { NavLink, useNavigate, useSearchParams } from "react-router-dom";
+import { NavLink, useSearchParams } from "react-router-dom";
 import { FaPrint } from "react-icons/fa";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import { useAdmitCardGenerator } from "./useAdmitCardGenerator";
 import AdmitCardCard from "./AdmitCardCard";
 import { ADMIT_CARD_PATH } from "./examScheduleShared";
 import PageHeader from "../../../custom-components/PageHeader";
-import Button from "../../../custom-components/Button";
 
 /**
  * Shows the admit cards that were generated through the Admit Card hub modal.
@@ -17,7 +16,6 @@ import Button from "../../../custom-components/Button";
  * by the old generator page.
  */
 function GeneratedAdmitCards() {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const examId = searchParams.get("exam") ?? "";
   const year = searchParams.get("year") ?? "";
