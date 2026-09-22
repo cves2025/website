@@ -342,6 +342,7 @@ function ExamList() {
           hideSubmit
           onSubmit={() => {}}
           modalClassName="max-w-4xl"
+          titleStyle="text-center"
         >
           <AddExam initialEditId={editingExamId} onClose={closeModal} />
         </Modal>

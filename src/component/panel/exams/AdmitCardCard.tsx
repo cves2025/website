@@ -48,14 +48,14 @@ function AdmitScheduleTable({ papers }: { papers: CardPaper[] }) {
       <table className="w-full min-w-[560px] border border-gray-300 text-sm">
         <thead>
           <tr className="bg-gray-100 text-gray-800">
-            <th className="border border-gray-300 px-3 py-2 text-left">
+            <th className="border border-gray-300 px-3 py-1 text-left">
               Subject
             </th>
-            <th className="border border-gray-300 px-3 py-2">Type</th>
-            <th className="border border-gray-300 px-3 py-2">Date</th>
-            <th className="border border-gray-300 px-3 py-2">Reporting Time</th>
-            <th className="border border-gray-300 px-3 py-2">End Time</th>
-            <th className="border border-gray-300 px-3 py-2">
+            <th className="border border-gray-300 px-3 py-1">Type</th>
+            <th className="border border-gray-300 px-3 py-1">Date</th>
+            <th className="border border-gray-300 px-3 py-1">Reporting Time</th>
+            <th className="border border-gray-300 px-3 py-1">End Time</th>
+            <th className="border border-gray-300 px-3 py-1">
               Invigilator Sign
             </th>
           </tr>
@@ -63,22 +63,22 @@ function AdmitScheduleTable({ papers }: { papers: CardPaper[] }) {
         <tbody>
           {papers.map((paper) => (
             <tr key={paper.id}>
-              <td className="border border-gray-300 px-3 py-1 font-semibold">
+              <td className="border border-gray-300 px-3 font-semibold">
                 {paper.subject}
               </td>
-              <td className="border border-gray-300 px-3 py-1 text-center">
+              <td className="border border-gray-300 px-3 text-center">
                 {paper.type || "-"}
               </td>
-              <td className="border border-gray-300 px-3 py-1 text-center">
+              <td className="border border-gray-300 px-3 text-center">
                 {formatScheduleDate(paper.date)}
               </td>
-              <td className="border border-gray-300 px-3 py-1 text-center">
+              <td className="border border-gray-300 px-3 text-center">
                 {formatScheduleTime(paper.fromTime)}
               </td>
-              <td className="border border-gray-300 px-3 py-1 text-center">
+              <td className="border border-gray-300 px-3 text-center">
                 {formatScheduleTime(paper.toTime)}
               </td>
-              <td className="border border-gray-300 px-3 py-1 text-center text-gray-400">
+              <td className="border border-gray-300 px-3 text-center text-gray-400">
                 &nbsp;
               </td>
             </tr>
