@@ -8,6 +8,21 @@ interface PhotoUploadBoxProps {
   onFileSelected: (file: File | null) => void;
   disabled?: boolean;
   className?: string;
+  /**
+   * Optional key identifying this box in the parent's copy-paste routing
+   * (e.g. "student" | "mother" | "father"). When set together with
+   * `registerPasteTarget`, the box registers its internal file handler, so the
+   * parent can push an image pasted from the clipboard into this box exactly
+   * like a file pick. Focus changes are reported through `onActiveChange`.
+   */
+  pasteKey?: string;
+  /** Registers (key -> handler) or unregisters (key -> null) this box. */
+  registerPasteTarget?: (
+    key: string,
+    handler: ((file: File | null) => void) | null
+  ) => void;
+  /** Reports whether this box (or something inside it) has keyboard focus. */
+  onActiveChange?: (active: boolean) => void;
 }
 
 /**
@@ -23,6 +38,9 @@ function PhotoUploadBox({
   onFileSelected,
   disabled,
   className = "",
+  pasteKey,
+  registerPasteTarget,
+  onActiveChange,
 }: PhotoUploadBoxProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [localPreview, setLocalPreview] = useState<string | null>(null);
@@ -45,10 +63,23 @@ function PhotoUploadBox({
     onFileSelected(file);
   };
 
+  // Lets the parent form push an image pasted from the clipboard into this box
+  // through the exact same path as a file pick (preview + onFileSelected).
+  useEffect(() => {
+    if (!pasteKey || !registerPasteTarget) return;
+    registerPasteTarget(pasteKey, handleFile);
+    return () => registerPasteTarget(pasteKey, null);
+  });
+
   const displayUrl = localPreview || photoUrl;
 
   return (
-    <div className={`flex flex-col items-center gap-1 ${className}`}>
+    <div
+      data-photo-upload={pasteKey}
+      onFocusCapture={() => onActiveChange?.(true)}
+      onBlurCapture={() => onActiveChange?.(false)}
+      className={`flex flex-col items-center gap-1 ${className}`}
+    >
       <button
         type="button"
         disabled={disabled}

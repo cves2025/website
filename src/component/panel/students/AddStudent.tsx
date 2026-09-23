@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm, SubmitHandler, FieldPath, get } from "react-hook-form";
 import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -322,6 +322,27 @@ function firestoreErrorMessage(error: unknown): string {
   return "Something went wrong while saving to Firestore.";
 }
 
+/**
+ * Pulls the first image from a paste/clipboard payload, if any. Works for both
+ * images copied inside the browser (clipboard items) and image files copied
+ * from the OS file manager (clipboard files).
+ */
+function imageFileFromClipboard(
+  clipboardData: DataTransfer | null | undefined
+): File | null {
+  if (!clipboardData) return null;
+  for (const item of clipboardData.items) {
+    const type = item.type.toLowerCase();
+    if (type.startsWith("image/")) {
+      const file = item.getAsFile();
+      if (file) return file;
+    }
+  }
+  const file = clipboardData.files?.[0];
+  if (file && file.type.toLowerCase().startsWith("image/")) return file;
+  return null;
+}
+
 function AddStudent() {
   const [searchParams, setSearchParams] = useSearchParams();
   const editEnrollmentId = searchParams.get("edit");
@@ -337,6 +358,25 @@ function AddStudent() {
   const [pendingMotherPhoto, setPendingMotherPhoto] = useState<File | null>(
     null,
   );
+
+  /* Copy-paste photo routing: which photo box receives an image pasted from
+     the clipboard. A focused photo box wins, otherwise the last-focused box is
+     used, and the student photo is the final default. */
+  const photoPasteTargets = useRef<
+    Record<string, ((file: File | null) => void) | null>
+  >({});
+  const activePhotoKey = useRef<string>("student");
+
+  const registerPhotoPasteTarget = (
+    key: string,
+    handler: ((file: File | null) => void) | null
+  ) => {
+    if (handler) {
+      photoPasteTargets.current[key] = handler;
+    } else {
+      delete photoPasteTargets.current[key];
+    }
+  };
 
   const {
     control,
@@ -395,6 +435,37 @@ function AddStudent() {
     };
   }, [isDirty]);
 
+  // Copy-paste a photo into the form: click a photo box (or leave it on the
+  // last-focused box; the student photo is the default) and press Ctrl+V while
+  // anywhere on the Student Info tab.
+  useEffect(() => {
+    if (activeTab !== "info") return;
+
+    const handleWindowPaste = (event: ClipboardEvent) => {
+      const file = imageFileFromClipboard(event.clipboardData);
+      if (!file) return;
+
+      // A paste while a photo box is focused targets that exact box.
+      const target = event.target as HTMLElement | null;
+      const boxKey =
+        target?.closest?.("[data-photo-upload]")?.getAttribute(
+          "data-photo-upload"
+        ) ?? "";
+
+      const handler =
+        photoPasteTargets.current[boxKey] ||
+        photoPasteTargets.current[activePhotoKey.current] ||
+        photoPasteTargets.current["student"];
+      if (!handler) return;
+
+      event.preventDefault();
+      handler(file);
+    };
+
+    window.addEventListener("paste", handleWindowPaste);
+    return () => window.removeEventListener("paste", handleWindowPaste);
+  }, [activeTab]);
+
   useEffect(() => {
     if (!editEnrollmentId) {
       setEditingStudentId(null);
@@ -429,6 +500,7 @@ function AddStudent() {
         setPendingFatherPhoto(null);
         setPendingMotherPhoto(null);
         setEditingStudentId(studentId);
+        activePhotoKey.current = "student";
         setActiveTab("info");
       } catch (error) {
         if (cancelled) return;
@@ -549,6 +621,7 @@ function AddStudent() {
         setPendingStudentPhoto(null);
         setPendingFatherPhoto(null);
         setPendingMotherPhoto(null);
+        activePhotoKey.current = "student";
         setActiveTab("info");
         setEditingStudentId(null);
         setSearchParams({}, { replace: true });
@@ -581,6 +654,7 @@ function AddStudent() {
       setPendingStudentPhoto(null);
       setPendingFatherPhoto(null);
       setPendingMotherPhoto(null);
+      activePhotoKey.current = "student";
       setActiveTab("info");
 
       toast.success(`Student ${studentFields.fullName} added successfully!`);
@@ -899,6 +973,11 @@ function AddStudent() {
 
             <div className="flex gap-4 justify-center">
               <PhotoUploadBox
+                pasteKey="mother"
+                registerPasteTarget={registerPhotoPasteTarget}
+                onActiveChange={(active) => {
+                  if (active) activePhotoKey.current = "mother";
+                }}
                 label={"MOTHER'S\nPHOTO"}
                 photoUrl={motherPhotoUrl}
                 onFileSelected={(file) => {
@@ -907,6 +986,11 @@ function AddStudent() {
                 }}
               />
               <PhotoUploadBox
+                pasteKey="father"
+                registerPasteTarget={registerPhotoPasteTarget}
+                onActiveChange={(active) => {
+                  if (active) activePhotoKey.current = "father";
+                }}
                 label={"FATHER'S\nPHOTO"}
                 photoUrl={fatherPhotoUrl}
                 onFileSelected={(file) => {
@@ -915,6 +999,11 @@ function AddStudent() {
                 }}
               />
               <PhotoUploadBox
+                pasteKey="student"
+                registerPasteTarget={registerPhotoPasteTarget}
+                onActiveChange={(active) => {
+                  if (active) activePhotoKey.current = "student";
+                }}
                 label={"STUDENT'S\nPHOTO"}
                 photoUrl={studentPhotoUrl}
                 onFileSelected={(file) => {
