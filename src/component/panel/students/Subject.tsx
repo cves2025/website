@@ -25,9 +25,11 @@ import { db } from "../../../firebase/config";
 import PageHeader from "../../../custom-components/PageHeader";
 import Button from "../../../custom-components/Button";
 
-type SubjectType = "Written + Oral" | "Theory" | "Practical" | "Scholastic";
+type SubjectType = "Written" | "Oral" | "Written + Oral" | "Theory" | "Practical" | "Scholastic";
 
 const SUBJECT_TYPES: SubjectType[] = [
+  "Written",
+  "Oral",
   "Written + Oral",
   "Theory",
   "Practical",
@@ -35,6 +37,8 @@ const SUBJECT_TYPES: SubjectType[] = [
 ];
 
 const SUBJECT_TYPE_BADGE: Record<SubjectType, string> = {
+  "Written": "bg-green-200 text-green-700",
+  "Oral": "bg-green-300 text-green-700",
   "Written + Oral": "bg-green-100 text-green-700",
   Theory: "bg-blue-100 text-blue-700",
   Practical: "bg-amber-100 text-amber-700",

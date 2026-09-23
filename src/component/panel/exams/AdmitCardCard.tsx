@@ -39,10 +39,42 @@ function loadPrincipalSignUrl(): Promise<string | null> {
 }
 
 /**
+ * Compares two schedule papers by exam date, so the printed table always
+ * follows the calendar order of the examination. Papers of the same date are
+ * ordered by their reporting time, then end time and subject.
+ *
+ * Dates are stored as "yyyy-MM-dd" and times as 24h "HH:mm", so both compare
+ * chronologically as plain strings.
+ */
+function comparePapersByDate(a: CardPaper, b: CardPaper): number {
+  if (a.date && b.date) {
+    const dateOrder = a.date.localeCompare(b.date);
+    if (dateOrder !== 0) return dateOrder;
+  } else if (a.date) {
+    return -1;
+  } else if (b.date) {
+    return 1;
+  }
+
+  const timeToMinutes = (value: string): number => {
+    const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+    return match ? Number(match[1]) * 60 + Number(match[2]) : Number.MAX_VALUE;
+  };
+  const fromOrder = timeToMinutes(a.fromTime) - timeToMinutes(b.fromTime);
+  if (fromOrder !== 0) return fromOrder;
+  const toOrder = timeToMinutes(a.toTime) - timeToMinutes(b.toTime);
+  if (toOrder !== 0) return toOrder;
+  return a.subject.localeCompare(b.subject);
+}
+
+/**
  * Prints one admit card schedule table. Shared by the written papers table and
  * the practical papers table shown below it.
  */
 function AdmitScheduleTable({ papers }: { papers: CardPaper[] }) {
+  // Show the papers in the calendar order of the exam (date-wise). The input
+  // list is never mutated; the copy is sorted instead.
+  const sortedPapers = [...papers].sort(comparePapersByDate);
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[560px] border border-gray-300 text-sm">
@@ -61,7 +93,7 @@ function AdmitScheduleTable({ papers }: { papers: CardPaper[] }) {
           </tr>
         </thead>
         <tbody>
-          {papers.map((paper) => (
+          {sortedPapers.map((paper) => (
             <tr key={paper.id}>
               <td className="border border-gray-300 px-3 font-semibold">
                 {paper.subject}

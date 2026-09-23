@@ -12,6 +12,7 @@ import {
   ADD_EXAM_PATH,
   academicYears,
   formatScheduleDate,
+  formatSubjectWithType,
   inputClass,
   newRowId,
   useExamScheduleDraft,
@@ -22,6 +23,20 @@ import {
 } from "./examScheduleShared";
 import PageHeader from "../../../custom-components/PageHeader";
 import Button from "../../../custom-components/Button";
+
+/**
+ * One subject dropdown option: a subject name combined with one of its types
+ * (e.g. "English (Written)"). `type` is empty for legacy subjects that were
+ * saved without a type.
+ */
+interface SubjectChoice {
+  /** Value used by the dropdown, e.g. "English (Written)". */
+  value: string;
+  /** Subject name without the type, e.g. "English". */
+  name: string;
+  /** Subject type, e.g. "Written". */
+  type: string;
+}
 
 /**
  * Exam Schedule page (step 1 of the Admit Card module).
@@ -41,8 +56,51 @@ function ExamSchedule() {
   const [selectedExamId, setSelectedExamId] = useState(requestedExamId);
 
   /* ------------------------------------------------------------- subjects */
-  const { subjectOptions, loadingSubjects, classesOfSubject } =
+  const { subjectOptions, loadingSubjects, classesOfSubject, classesOfSubjectType } =
     useSubjectOptions();
+
+  /* One dropdown option per <subject name, type> pair. A subject like English
+     that is created with several types (Written, Oral, Written + Oral, ...)
+     shows one option for each, e.g. "English (Written)". */
+  const { subjectChoices, subjectByValue } = useMemo(() => {
+    // Types in the same order the Subjects page lists them.
+    const TYPE_ORDER = [
+      "Written",
+      "Oral",
+      "Written + Oral",
+      "Theory",
+      "Practical",
+      "Scholastic",
+    ];
+    const typeRank = (type: string) => {
+      const index = TYPE_ORDER.indexOf(type);
+      return index === -1 ? TYPE_ORDER.length : index;
+    };
+
+    const choices: SubjectChoice[] = [];
+    const byValue = new Map<string, SubjectChoice>();
+    subjectOptions.forEach((option) => {
+      const types =
+        option.types.length > 0
+          ? [...option.types].sort((a, b) => typeRank(a) - typeRank(b))
+          : [""];
+      types.forEach((type) => {
+        const value = formatSubjectWithType(option.name, type);
+        const choice: SubjectChoice = { value, name: option.name, type };
+        choices.push(choice);
+        byValue.set(value, choice);
+      });
+    });
+    return { subjectChoices: choices, subjectByValue: byValue };
+  }, [subjectOptions]);
+
+  /* Classes a scheduled paper applies to: only classes teaching the exact
+     subject + type when a type was picked, otherwise every class of the subject
+     (legacy rows saved before types existed). */
+  const rowClassesOf = (subjectName: string, subjectType: string): string[] =>
+    subjectType.trim()
+      ? classesOfSubjectType(subjectName, subjectType)
+      : classesOfSubject(subjectName);
 
   /* ------------------------------------------------------------- schedule */
   const { rows, setRows, loadingSchedule, scheduleCreatedAt } =
@@ -75,6 +133,7 @@ function ExamSchedule() {
       {
         id: newRowId(),
         subject: "",
+        subjectType: "",
         // Prefill with the exam window start so most rows need no typing.
         date: selectedExam?.examStartDate || "",
         fromTime: "",
@@ -90,8 +149,24 @@ function ExamSchedule() {
       prev.map((row) => {
         if (row.id !== id) return row;
         if (patch.subject !== undefined) {
-          // A new subject starts from "all classes where it is offered".
-          return { ...row, ...patch, allClasses: true, classes: [] };
+          // The dropdown value is "Name (Type)"; split it back into the plain
+          // subject name and its type so the admit card prints exactly the
+          // selected paper (e.g. "English" -> Written).
+          const choice = patch.subject
+            ? subjectByValue.get(patch.subject)
+            : undefined;
+          if (choice) {
+            return {
+              ...row,
+              subject: choice.name,
+              subjectType: choice.type,
+              // A new subject starts from "all classes where it is offered".
+              allClasses: true,
+              classes: [],
+            };
+          }
+          // Blank option, or an unknown value from a legacy saved schedule.
+          return { ...row, ...patch, subjectType: "", allClasses: true, classes: [] };
         }
         return { ...row, ...patch };
       })
@@ -140,14 +215,18 @@ function ExamSchedule() {
     const seenSubjects = new Set<string>();
     list.forEach((row, index) => {
       const subject = row.subject.trim();
-      const label = subject || `Row ${index + 1}`;
+      const subjectType = row.subjectType.trim();
+      const label =
+        formatSubjectWithType(subject, subjectType) || `Row ${index + 1}`;
 
       if (!subject) {
         problems.push(`Row ${index + 1}: select a subject.`);
-      } else if (seenSubjects.has(subject.toLowerCase())) {
+      } else if (
+        seenSubjects.has(`${subject.toLowerCase()}::${subjectType.toLowerCase()}`)
+      ) {
         problems.push(`${label} is added more than once.`);
       } else {
-        seenSubjects.add(subject.toLowerCase());
+        seenSubjects.add(`${subject.toLowerCase()}::${subjectType.toLowerCase()}`);
       }
 
       if (!row.date) {
@@ -163,7 +242,7 @@ function ExamSchedule() {
           `${label}: select at least one class or choose "All classes".`
         );
       }
-      if (row.allClasses && subject && classesOfSubject(subject).length === 0) {
+      if (row.allClasses && subject && rowClassesOf(subject, subjectType).length === 0) {
         problems.push(
           `${label}: this subject is not added to any class yet, so it cannot be scheduled. Add it on the Subjects page first.`
         );
@@ -196,6 +275,7 @@ function ExamSchedule() {
           rows: rows.map((row) => ({
             id: row.id,
             subject: row.subject.trim(),
+            subjectType: row.subjectType.trim(),
             date: row.date,
             fromTime: row.fromTime,
             toTime: row.toTime,
@@ -353,7 +433,7 @@ function ExamSchedule() {
             ) : (
               <div className="mt-4 space-y-3">
                 {rows.map((row, index) => {
-                  const rowClasses = classesOfSubject(row.subject);
+                  const rowClasses = rowClassesOf(row.subject, row.subjectType);
                   return (
 <div
                       key={row.id}
@@ -379,7 +459,7 @@ function ExamSchedule() {
                             Subject
                           </label>
                           <select
-                            value={row.subject}
+                            value={formatSubjectWithType(row.subject, row.subjectType)}
                             onChange={(event) =>
                               handleRowChange(row.id, {
                                 subject: event.target.value,
@@ -393,9 +473,9 @@ function ExamSchedule() {
                                 ? "Loading subjects..."
                                 : "Select subject"}
                             </option>
-                            {subjectOptions.map((option) => (
-                              <option key={option.name} value={option.name}>
-                                {option.name}
+                            {subjectChoices.map((choice) => (
+                              <option key={choice.value} value={choice.value}>
+                                {choice.value}
                               </option>
                             ))}
                           </select>
@@ -489,7 +569,7 @@ function ExamSchedule() {
                             {rowClasses.length === 0 ? (
                               <p className="text-xs font-semibold text-amber-700">
                                 {row.subject
-                                  ? `"${row.subject}" is not added to any class yet. Add it on the Subjects page first.`
+                                  ? `"${formatSubjectWithType(row.subject, row.subjectType)}" is not added to any class yet. Add it on the Subjects page first.`
                                   : "Select a subject to see the classes it is applicable to."}
                               </p>
                             ) : (

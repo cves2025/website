@@ -141,6 +141,8 @@ export function toScheduleRows(data: DocumentData): ScheduleRow[] {
           ? row.id
           : `row-${index}-${Date.now()}`,
       subject: typeof row.subject === "string" ? row.subject : "",
+      subjectType:
+        typeof row.subjectType === "string" ? row.subjectType : "",
       date: typeof row.date === "string" ? row.date : "",
       fromTime: typeof row.fromTime === "string" ? row.fromTime : "",
       toTime: typeof row.toTime === "string" ? row.toTime : "",
@@ -151,6 +153,16 @@ export function toScheduleRows(data: DocumentData): ScheduleRow[] {
     }));
 }
 
+
+/**
+ * "English" + "Written" -> "English (Written)". Returns the plain name when no
+ * type is given, so legacy subjects keep showing as before.
+ */
+export function formatSubjectWithType(name: string, type: string): string {
+  const trimmedName = name.trim();
+  const trimmedType = type.trim();
+  return trimmedType ? `${trimmedName} (${trimmedType})` : trimmedName;
+}
 
 /** Date / Timestamp / string -> "yyyy-MM-dd" for <input type="date">. */
 export function toDateInputValue(value: unknown): string {
@@ -350,10 +362,14 @@ export function useSubjectOptions(): {
   subjectOptions: SubjectOption[];
   loadingSubjects: boolean;
   classesOfSubject: (subjectName: string) => string[];
+  classesOfSubjectType: (subjectName: string, subjectType: string) => string[];
   typeOfSubjectInClass: (subjectName: string, className: string) => string[];
 } {
   const [subjectOptions, setSubjectOptions] = useState<SubjectOption[]>([]);
   const [subjectTypesByClass, setSubjectTypesByClass] = useState<
+    Map<string, string[]>
+  >(new Map());
+  const [classesBySubjectType, setClassesBySubjectType] = useState<
     Map<string, string[]>
   >(new Map());
   const [loadingSubjects, setLoadingSubjects] = useState(true);
@@ -384,6 +400,32 @@ export function useSubjectOptions(): {
         });
         setSubjectTypesByClass(typesByClass);
 
+        /* Classes that teach each <subject, type> pair. The Exam Schedule page
+           uses this to know which classes a paper like "English (Written)" is
+           applicable to. */
+        const classesByType = new Map<string, string[]>();
+        snapshot.docs.forEach((documentSnapshot) => {
+          const data = documentSnapshot.data();
+          const name =
+            typeof data.name === "string" ? data.name.trim() : "";
+          const className =
+            typeof data.className === "string" ? data.className.trim() : "";
+          const type = typeof data.type === "string" ? data.type : "";
+          if (!name || !className || !type) return;
+          const key = `${name.toLowerCase()}::${type.toLowerCase()}`;
+          const classes = classesByType.get(key) ?? [];
+          if (!classes.includes(className)) classes.push(className);
+          classesByType.set(key, classes);
+        });
+        const toClassOrder = (className: string) => {
+          const index = CLASSES.indexOf(className);
+          return index === -1 ? CLASSES.length : index;
+        };
+        classesByType.forEach((classes) =>
+          classes.sort((a, b) => toClassOrder(a) - toClassOrder(b))
+        );
+        setClassesBySubjectType(classesByType);
+
         setLoadingSubjects(false);
       },
       (error) => {
@@ -407,6 +449,15 @@ export function useSubjectOptions(): {
   const classesOfSubject = (subjectName: string): string[] =>
     subjectByName.get(subjectName.trim().toLowerCase())?.classes ?? [];
 
+  /* Classes that teach one <subject, type> pair (case-insensitive). */
+  const classesOfSubjectType = (
+    subjectName: string,
+    subjectType: string
+  ): string[] =>
+    classesBySubjectType.get(
+      `${subjectName.trim().toLowerCase()}::${subjectType.trim().toLowerCase()}`
+    ) ?? [];
+
   /* Types of one subject in one class (case-insensitive subject & class). */
   const typeOfSubjectInClass = (
     subjectName: string,
@@ -420,6 +471,7 @@ export function useSubjectOptions(): {
     subjectOptions,
     loadingSubjects,
     classesOfSubject,
+    classesOfSubjectType,
     typeOfSubjectInClass,
   };
 }

@@ -103,7 +103,13 @@ export interface SubjectOption {
 
 export interface ScheduleRow {
   id: string;
+  /** Plain subject name, e.g. "English" (type is stored separately). */
   subject: string;
+  /**
+   * Subject type of the scheduled paper, e.g. "Written". Empty for legacy
+   * rows that were saved before subject types existed.
+   */
+  subjectType: string;
   date: string;
   fromTime: string;
   toTime: string;

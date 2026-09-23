@@ -10,7 +10,7 @@ import {
 import { CLASSES, COLLECTION } from "../../../constants";
 import { db } from "../../../firebase/config";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
-import { CardStudent } from "../../../utils/type";
+import { CardStudent, ScheduleRow } from "../../../utils/type";
 import type { SearchableOption } from "../../../custom-components/SearchableMultiSelect";
 import {
   academicYears,
@@ -60,7 +60,8 @@ export function useAdmitCardGenerator(
   options: UseAdmitCardGeneratorOptions = {},
 ) {
   const { exams, loadingExams } = useExamTemplates();
-  const { classesOfSubject, typeOfSubjectInClass } = useSubjectOptions();
+  const { classesOfSubject, classesOfSubjectType, typeOfSubjectInClass } =
+    useSubjectOptions();
 
   const [selectedYear, setSelectedYear] = useState(
     options.initialYear || academicYears[0]?.value || "",
@@ -199,12 +200,21 @@ export function useAdmitCardGenerator(
   const selectedExam =
     yearExams.find((exam) => exam.id === selectedExamId) ?? null;
 
+  /* Classes that teach the paper of a schedule row: only the classes teaching
+     the exact subject + type when the row was saved with a type (e.g. English
+     with Written), every class of the subject for legacy rows saved by name
+     only. */
+  const classesOfRow = (row: ScheduleRow) =>
+    row.subjectType
+      ? classesOfSubjectType(row.subject, row.subjectType)
+      : classesOfSubject(row.subject);
+
   /* Classes that have at least one applicable paper in the schedule. */
   const scheduledClasses = CLASSES.filter((className) =>
     rows.some(
       (row) =>
         row.subject &&
-        rowAppliesToClass(row, className, classesOfSubject(row.subject)),
+        rowAppliesToClass(row, className, classesOfRow(row)),
     ),
   );
 
@@ -213,18 +223,32 @@ export function useAdmitCardGenerator(
     ? rows.filter(
         (row) =>
           row.subject &&
-          rowAppliesToClass(row, selectedClass, classesOfSubject(row.subject)),
+          rowAppliesToClass(row, selectedClass, classesOfRow(row)),
       )
     : [];
 
-  /* One printed paper per subject type. A subject saved with several types
-     (e.g. "Computer" -> Theory & Practical) is printed once for each of them,
-     so the practical papers can live in their own table below the written
-     ones. The schedule itself allows only one row per subject. */
+  /* One printed paper per schedule row. A row selected as e.g. "English
+     (Written)" on the Exam Schedule page is exactly that one paper; only
+     legacy rows saved without a type are expanded into one paper per subject
+     type of the class (e.g. "Computer" -> Theory & Practical). */
   const cardPapers: CardPaper[] = useMemo(() => {
     if (!selectedClass) return [];
     const papers: CardPaper[] = [];
     cardRows.forEach((row) => {
+      /* A row saved with a type is the exact paper it was scheduled as. */
+      if (row.subjectType) {
+        papers.push({
+          id: `${row.id}::${row.subjectType}`,
+          subject: row.subject,
+          type: row.subjectType,
+          date: row.date,
+          fromTime: row.fromTime,
+          toTime: row.toTime,
+        });
+        return;
+      }
+      /* Legacy row (no type): print one paper per type of the subject in the
+         selected class. */
       const types = typeOfSubjectInClass(row.subject, selectedClass);
       (types.length > 0 ? types : [""]).forEach((type) => {
         papers.push({
