@@ -75,7 +75,7 @@ function GeneratedAdmitCards() {
   );
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="mx-auto max-w-5xl print:p-0 print:m-0 print:max-w-none">
       {/* Top bar */}
       <div className="print:hidden">
       <PageHeader

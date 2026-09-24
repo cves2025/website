@@ -189,7 +189,8 @@ function AdmitCardCard({
     card.studentName || `${card.firstName} ${card.lastName}`.trim() || "-";
 
   return (
-    <div className="mx-auto mt-2 max-w-4xl overflow-hidden rounded-xl border-4 border-double border-blue-800 bg-white shadow-lg print:break-after-page print:break-inside-avoid print:last:break-after-auto">
+    <div className="mx-auto mt-2 max-w-4xl print:m-0 print:h-[296mm] print:w-[210mm] print:max-w-none print:overflow-hidden print:break-after-page print:p-[10px] print:box-border print:last:break-after-auto">
+      <div className="flex h-full flex-col overflow-hidden rounded-xl border-4 border-double border-blue-800 bg-white shadow-lg print:rounded-none print:shadow-none">
       {/* Card header */}
       <div className="border-b-4 border-double border-blue-800 bg-white px-4 py-2 md:px-6">
         <div className="flex items-center justify-between gap-3 text-sm font-semibold text-black">
@@ -275,7 +276,7 @@ function AdmitCardCard({
       {/* Subject wise schedule: the written papers table comes first, and the
           practical / viva papers of the same subjects are printed in their own
           table right below it. */}
-      <div className="p-2 md:p-1">
+      <div className="flex flex-1 flex-col p-2 md:p-1">
         {writtenPapers.length > 0 && (
           <>
             <h4 className="mb-1 text-center font-bold text-gray-800">
@@ -324,7 +325,7 @@ function AdmitCardCard({
         </div>
 
         {/* QR + signatures */}
-        <div className="mt-6 flex flex-wrap items-end justify-between gap-6 text-sm text-gray-700">
+        <div className="mt-auto flex flex-wrap items-end justify-between gap-6 pt-6 text-sm text-gray-700">
           <div className="text-center">
             <p className="w-36 border-t-2 border-gray-400 pt-2">
               Class Teacher
@@ -341,7 +342,7 @@ function AdmitCardCard({
               <img
                 src={principalSignUrl}
                 alt="Principal"
-                className="mx-auto mb-1 h-32 w-32 object-contain"
+                className="mx-auto mb-1 h-32 w-32 object-contain print:h-24 print:w-24"
               />
             )}
             <p className="w-36 border-t-2 border-gray-400 pt-2">Principal</p>
@@ -355,6 +356,7 @@ function AdmitCardCard({
             produced on every examination day.
           </FitText>
         </div>
+      </div>
       </div>
     </div>
   );

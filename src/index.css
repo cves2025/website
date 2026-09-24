@@ -62,3 +62,17 @@ body {
 .animate-zoomIn {
   animation: zoomIn 0.3s ease-out;
 }
+
+/* Print rules: one admit card fits exactly one A4 portrait page with a 10px
+   margin on all four sides (the card itself sets the A4 size + padding). */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+  }
+}

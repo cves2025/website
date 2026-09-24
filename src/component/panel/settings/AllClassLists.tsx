@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useState, useContext } from "react";
 import { FaTrash } from "react-icons/fa";
 import toast from "react-hot-toast";
 
 import Modal from "../../../custom-components/Modal";
+import { myContext } from "../../context/MyContextProvider";
 import { useAllClassesLengthOfStudents } from "../../../hooks/useAllClassesLengthOfStudents";
 import { deleteClassStudents } from "../../../utils/classStudents";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
+import { verifyAccountPassword } from "../../../utils/verifyAccountPassword";
 import type {
   ClassStudentCount,
   ClassStudentsDeleteMode,
@@ -24,17 +26,22 @@ const selectClass =
  *
  * The numbers come from Firestore aggregation queries (see
  * `useAllClassesLengthOfStudents`), so nothing but the counts is downloaded.
- * The delete button of a row opens the two-way confirmation modal:
+ * The delete button of a row opens a two-step confirmation modal:
  *
- *   - "Move to Recycle Bin" marks the students as deleted (`isDeleted: true`) -
- *     in `enrollments` always, and in `students` as well once the student has
- *     no other enrollment left. Hidden everywhere, but recoverable.
- *   - "Permanent Delete" removes both documents with `deleteDoc()`.
+ *   1. Password check - the signed-in user must enter their account password
+ *      (re-authenticated against Firebase Auth), so a visitor who simply
+ *      reached the settings page cannot wipe a whole class by accident.
+ *   2. Once the password is verified the real choices appear:
+ *      - "Move to Recycle Bin" marks the students as deleted (`isDeleted: true`)
+ *        - in `enrollments` always, and in `students` as well once the student
+ *        has no other enrollment left. Hidden everywhere, but recoverable.
+ *      - "Permanent Delete" removes both documents with `deleteDoc()`.
  *
  * Both actions are limited to the selected academic session, so the history of
  * earlier sessions is never touched.
  */
 function AllClassLists() {
+  const { user } = useContext(myContext);
   const [selectedYear, setSelectedYear] = useState(
     academicYears[0]?.value ?? ""
   );
@@ -43,6 +50,13 @@ function AllClassLists() {
   );
   const [pendingAction, setPendingAction] =
     useState<ClassStudentsDeleteMode | null>(null);
+
+  // Step 1 of the delete flow: the user confirms the signed-in account's
+  // password before the delete-mode choices (recycle bin / permanent) appear.
+  const [password, setPassword] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [verifyingPassword, setVerifyingPassword] = useState(false);
+  const [passwordVerified, setPasswordVerified] = useState(false);
 
   const { classes, loading, error, refresh } = useAllClassesLengthOfStudents({
     academicYear: selectedYear,
@@ -53,10 +67,53 @@ function AllClassLists() {
     0
   );
 
+  /**
+   * Opening the modal starts the two-step flow from scratch, so a stale
+   * password / verification can never leak into the next class.
+   */
+  const openDeleteModal = (item: ClassStudentCount) => {
+    setPassword("");
+    setPasswordError(null);
+    setPasswordVerified(false);
+    setVerifyingPassword(false);
+    setClassToDelete(item);
+  };
+
   /** The modal is never closed while a delete/recycle write is running. */
   const closeDeleteModal = () => {
     if (pendingAction) return;
     setClassToDelete(null);
+    setPassword("");
+    setPasswordError(null);
+    setPasswordVerified(false);
+    setVerifyingPassword(false);
+  };
+
+  /**
+   * Step 1 - re-authenticates the signed-in user with the entered password.
+   * Only a verified password unlocks the actual delete-mode buttons.
+   */
+  const handlePasswordSubmit = async () => {
+    if (!classToDelete || verifyingPassword) return;
+    if (password.trim().length === 0) {
+      setPasswordError("Please enter your account password.");
+      return;
+    }
+
+    setVerifyingPassword(true);
+    setPasswordError(null);
+    try {
+      const errorMessage = await verifyAccountPassword(user?.email, password);
+      if (errorMessage) {
+        setPasswordError(errorMessage);
+        return;
+      }
+      // Success: drop the password immediately and reveal the delete choices.
+      setPassword("");
+      setPasswordVerified(true);
+    } finally {
+      setVerifyingPassword(false);
+    }
   };
 
   const handleDelete = async (mode: ClassStudentsDeleteMode) => {
@@ -80,6 +137,9 @@ function AllClassLists() {
           : `${result.enrollments} student(s) of ${classLabel} moved to the recycle bin${profiles}.`
       );
       setClassToDelete(null);
+      setPassword("");
+      setPasswordError(null);
+      setPasswordVerified(false);
       // Re-run the aggregation queries so the table shows the new numbers.
       await refresh();
     } catch (cause) {
@@ -182,7 +242,7 @@ function AllClassLists() {
                         item.className
                       )}`}
                       disabled={item.totalStudents === 0}
-                      onClick={() => setClassToDelete(item)}
+                      onClick={() => openDeleteModal(item)}
                       className="rounded border p-2 text-sm text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <FaTrash />
@@ -195,44 +255,104 @@ function AllClassLists() {
         </table>
       </div>
 
-      {/* Delete the students of a class — recycle bin or permanent delete */}
+      {/* Delete the students of a class — Step 1 asks for the account password,
+          Step 2 (revealed once verified) offers recycle bin / permanent delete */}
       <Modal
         isOpen={classToDelete !== null}
         onClose={closeDeleteModal}
         title="Delete Students"
         description={
           classToDelete
-            ? `The ${classToDelete.totalStudents} student(s) of Class ${toOrdinalLabel(
-                classToDelete.className
-              )} (session ${selectedYear}) will be affected. Choose how they should be deleted.`
+            ? passwordVerified
+              ? `The ${classToDelete.totalStudents} student(s) of Class ${toOrdinalLabel(
+                  classToDelete.className
+                )} (session ${selectedYear}) are confirmed for deletion. Choose how they should be deleted.`
+              : `The ${classToDelete.totalStudents} student(s) of Class ${toOrdinalLabel(
+                  classToDelete.className
+                )} (session ${selectedYear}) will be affected. Enter your account password to continue.`
             : ""
         }
         cancelText="Cancel"
-        submitText="Permanent Delete"
+        submitText={passwordVerified ? "Permanent Delete" : "Delete"}
         submitClassName="bg-red-600 hover:bg-red-700"
-        submitDisabled={pendingAction !== null}
-        loading={pendingAction === "permanent"}
-        onSubmit={() => void handleDelete("permanent")}
-        secondaryText="Move to Recycle Bin"
+        loading={
+          passwordVerified
+            ? pendingAction === "permanent"
+            : verifyingPassword
+        }
+        submitDisabled={
+          passwordVerified
+            ? pendingAction !== null
+            : verifyingPassword || password.trim().length === 0
+        }
+        onSubmit={
+          passwordVerified
+            ? () => void handleDelete("permanent")
+            : () => void handlePasswordSubmit()
+        }
+        secondaryText={passwordVerified ? "Move to Recycle Bin" : undefined}
         secondaryClassName="border-amber-500 text-amber-600 hover:bg-amber-50"
         secondaryLoading={pendingAction === "recycle"}
-        onSecondarySubmit={() => void handleDelete("recycle")}
+        onSecondarySubmit={
+          passwordVerified ? () => void handleDelete("recycle") : undefined
+        }
       >
-        <div className="mt-4 space-y-2 rounded-md bg-gray-50 p-3 text-sm text-gray-600">
-          <p>
-            <span className="font-semibold text-amber-600">
-              Move to Recycle Bin
-            </span>{" "}
-            - the students are only marked as deleted. They disappear from every
-            list but remain in Firestore, so they can be restored later.
-          </p>
-          <p>
-            <span className="font-semibold text-red-600">Permanent Delete</span>{" "}
-            - the student records of that class are removed from the
-            enrollments and students collections with deleteDoc() and cannot be
-            recovered.
-          </p>
-        </div>
+        {passwordVerified ? (
+          <div className="mt-4 space-y-2 rounded-md bg-gray-50 p-3 text-sm text-gray-600">
+            <p className="font-medium text-emerald-600">
+              Password verified - you can now choose the delete mode.
+            </p>
+            <p>
+              <span className="font-semibold text-amber-600">
+                Move to Recycle Bin
+              </span>{" "}
+              - the students are only marked as deleted. They disappear from
+              every list but remain in Firestore, so they can be restored
+              later.
+            </p>
+            <p>
+              <span className="font-semibold text-red-600">
+                Permanent Delete
+              </span>{" "}
+              - the student records of that class are removed from the
+              enrollments and students collections with deleteDoc() and cannot
+              be recovered.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-4">
+            <label
+              htmlFor="deleteConfirmPassword"
+              className="mb-1 block text-sm font-semibold text-gray-700"
+            >
+              Enter your account password
+            </label>
+            <input
+              id="deleteConfirmPassword"
+              type="password"
+              autoFocus
+              value={password}
+              onChange={(event) => {
+                setPassword(event.target.value);
+                if (passwordError) setPasswordError(null);
+              }}
+              onKeyDown={(event) => {
+                if (
+                  event.key === "Enter" &&
+                  password.trim().length > 0 &&
+                  !verifyingPassword
+                ) {
+                  void handlePasswordSubmit();
+                }
+              }}
+              placeholder="Your account password"
+              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {passwordError && (
+              <p className="mt-2 text-sm text-red-600">{passwordError}</p>
+            )}
+          </div>
+        )}
       </Modal>
     </>
   );
