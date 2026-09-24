@@ -288,7 +288,7 @@ function AdmitCardCard({
         {practicalPapers.length > 0 && (
           <>
             <h4 className="mb-1 mt-2 text-center font-bold text-gray-800">
-              Practical / Viva-Voce Exam Schedule
+              Practical Exam Schedule
             </h4>
             <AdmitScheduleTable papers={practicalPapers} />
           </>

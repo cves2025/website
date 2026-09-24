@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useContext } from "react";
 import Navbar2 from "./Navbar2";
 import Header from "./Header";
+import { myContext } from "./context/MyContextProvider";
 import banner1 from "../assets/image/banner/1.jpg";
 import banner2 from "../assets/image/banner/2.jpg";
 import banner3 from "../assets/image/banner/3.jpg";
@@ -66,6 +67,9 @@ const extendedBanners = [...banners, ...banners];
 
 function Banner() {
   const [scrollNav, setScrollNav] = useState(false);
+  // The public menu is only for visitors (before login); the panel has its own
+  // sidebar, so a logged-in user does not see it here (same rule as Head.tsx).
+  const { user } = useContext(myContext);
   const [index, setIndex] = useState(0);
   const sliderRef = useRef<HTMLDivElement | null>(null);
   const total = banners.length;
@@ -161,13 +165,15 @@ function Banner() {
             {/* Make Header sticky */}
             <div className="fixed w-full top-0 z-50">
               <Header />
-              <div
-                className={`w-full z-50 md:flex md:justify-center md:items-center transition-colors duration-300 ${
-                  scrollNav ? "bg-gray-100" : "bg-transparent"
-                }`}
-              >
-                <Navbar2 />
-              </div>
+              {!user && (
+                <div
+                  className={`w-full z-50 md:flex md:justify-center md:items-center transition-colors duration-300 ${
+                    scrollNav ? "bg-gray-100" : "bg-transparent"
+                  }`}
+                >
+                  <Navbar2 />
+                </div>
+              )}
             </div>
           </div>
         </div>

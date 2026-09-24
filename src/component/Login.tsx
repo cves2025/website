@@ -8,7 +8,6 @@ import {
 } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { myContext } from "./context/MyContextProvider";
-import loginSideImage from "../assets/image/loginSide.jpg";
 
 function Login() {
   const [email, setEmail] = useState("");
@@ -214,7 +213,7 @@ function Login() {
       {/* Right side - Image (hidden on mobile) */}
       <div className="hidden md:block md:w-1/2 min-h-screen relative overflow-hidden">
         <img
-          src={loginSideImage}
+          src="https://firebasestorage.googleapis.com/v0/b/schoolproject-284dc.appspot.com/o/loginPage%2Fschool_login.jpg?alt=media&token=a1418638-edda-4303-9c2c-1ed801242b0f"
           alt="Nature"
           className="cves-kenburns w-full h-screen object-cover"
         />
