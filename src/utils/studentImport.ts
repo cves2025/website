@@ -457,13 +457,13 @@ export const REQUIRED_STUDENT_FIELDS: ReadonlyArray<{
   { key: "className", label: "Class" },
   { key: "sessionStart", label: "Session / Academic Year" },
   { key: "sessionEnd", label: "Session / Academic Year" },
-  { key: "motherName", label: "Mother's Name" },
-  { key: "fatherName", label: "Father's Name" },
-  { key: "gender", label: "Gender" },
-  { key: "category", label: "Category" },
-  { key: "nationality", label: "Nationality" },
+  // { key: "motherName", label: "Mother's Name" },
+  // { key: "fatherName", label: "Father's Name" },
+  // { key: "gender", label: "Gender" },
+  // { key: "category", label: "Category" },
+  // { key: "nationality", label: "Nationality" },
   //   { key: "dobYear", label: "Date of Birth" },
-  { key: "phone", label: "Phone" },
+  // { key: "phone", label: "Phone" },
 ];
 
 const normalizeKey = (key: string): string =>
