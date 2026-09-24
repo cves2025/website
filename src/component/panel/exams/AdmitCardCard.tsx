@@ -15,6 +15,7 @@ import {
 } from "./examScheduleShared";
 import type { CardPaper } from "./useAdmitCardGenerator";
 import schoolLogo from "../../../assets/image/schoolLogo1.png";
+import FitText from "../../../custom-components/FitText";
 
 /** Principal's signed+stamped image URL, read ONCE from the
     "stampSign"/"principle" document and cached for the whole session so every
@@ -67,52 +68,75 @@ function comparePapersByDate(a: CardPaper, b: CardPaper): number {
   return a.subject.localeCompare(b.subject);
 }
 
+const CELL = "border border-gray-300 px-2 py-0.5 overflow-hidden";
+
 /**
  * Prints one admit card schedule table. Shared by the written papers table and
  * the practical papers table shown below it.
+ * Fixed column widths + single-line FitText cells keep every row on one line.
  */
 function AdmitScheduleTable({ papers }: { papers: CardPaper[] }) {
   // Show the papers in the calendar order of the exam (date-wise). The input
   // list is never mutated; the copy is sorted instead.
   const sortedPapers = [...papers].sort(comparePapersByDate);
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[560px] border border-gray-300 text-sm">
+    <div className="overflow-x-auto print:overflow-visible">
+      <table className="w-full table-fixed border border-gray-300 text-sm">
+        <colgroup>
+          <col style={{ width: "28%" }} />
+          <col style={{ width: "12%" }} />
+          <col style={{ width: "17%" }} />
+          <col style={{ width: "15%" }} />
+          <col style={{ width: "13%" }} />
+          <col style={{ width: "15%" }} />
+        </colgroup>
         <thead>
           <tr className="bg-gray-100 text-gray-800">
-            <th className="border border-gray-300 px-3 py-1 text-left">
-              Subject
+            <th className={`${CELL} text-left`}>
+              <FitText>Subject</FitText>
             </th>
-            <th className="border border-gray-300 px-3 py-1">Type</th>
-            <th className="border border-gray-300 px-3 py-1">Date</th>
-            <th className="border border-gray-300 px-3 py-1">Reporting Time</th>
-            <th className="border border-gray-300 px-3 py-1">End Time</th>
-            <th className="border border-gray-300 px-3 py-1">
-              Invigilator Sign
+            <th className={CELL}>
+              <FitText className="text-center">Type</FitText>
+            </th>
+            <th className={CELL}>
+              <FitText className="text-center">Date</FitText>
+            </th>
+            <th className={CELL}>
+              <FitText className="text-center">Reporting Time</FitText>
+            </th>
+            <th className={CELL}>
+              <FitText className="text-center">End Time</FitText>
+            </th>
+            <th className={CELL}>
+              <FitText className="text-center">Invigilator Sign</FitText>
             </th>
           </tr>
         </thead>
         <tbody>
           {sortedPapers.map((paper) => (
-            <tr key={paper.id}>
-              <td className="border border-gray-300 px-3 font-semibold">
-                {paper.subject}
+            <tr key={paper.id} className="print:break-inside-avoid">
+              <td className={`${CELL} font-semibold`}>
+                <FitText>{paper.subject}</FitText>
               </td>
-              <td className="border border-gray-300 px-3 text-center">
-                {paper.type || "-"}
+              <td className={CELL}>
+                <FitText className="text-center">{paper.type || "-"}</FitText>
               </td>
-              <td className="border border-gray-300 px-3 text-center">
-                {formatScheduleDate(paper.date)}
+              <td className={CELL}>
+                <FitText className="text-center">
+                  {formatScheduleDate(paper.date)}
+                </FitText>
               </td>
-              <td className="border border-gray-300 px-3 text-center">
-                {formatScheduleTime(paper.fromTime)}
+              <td className={CELL}>
+                <FitText className="text-center">
+                  {formatScheduleTime(paper.fromTime)}
+                </FitText>
               </td>
-              <td className="border border-gray-300 px-3 text-center">
-                {formatScheduleTime(paper.toTime)}
+              <td className={CELL}>
+                <FitText className="text-center">
+                  {formatScheduleTime(paper.toTime)}
+                </FitText>
               </td>
-              <td className="border border-gray-300 px-3 text-center text-gray-400">
-                &nbsp;
-              </td>
+              <td className={`${CELL} text-center text-gray-400`}>&nbsp;</td>
             </tr>
           ))}
         </tbody>
@@ -130,6 +154,16 @@ interface AdmitCardCardProps {
   writtenPapers: CardPaper[];
   /** Practical / viva papers of the class (rendered in the second table). */
   practicalPapers: CardPaper[];
+}
+
+/** Label + single-line value row used in the student details block. */
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <p className="flex gap-1.5">
+      <span className="w-28 shrink-0 font-semibold text-gray-600">{label}</span>
+      <FitText className="flex-1">: {value}</FitText>
+    </p>
+  );
 }
 
 /** One printed admit card. */
@@ -151,13 +185,18 @@ function AdmitCardCard({
     };
   }, []);
 
+  const studentName =
+    card.studentName || `${card.firstName} ${card.lastName}`.trim() || "-";
+
   return (
-    <div className="mx-auto mt-2 max-w-4xl overflow-hidden rounded-xl border-4 border-double border-blue-800 bg-white shadow-lg print:break-after-page print:last:break-after-auto">
+    <div className="mx-auto mt-2 max-w-4xl overflow-hidden rounded-xl border-4 border-double border-blue-800 bg-white shadow-lg print:break-after-page print:break-inside-avoid print:last:break-after-auto">
       {/* Card header */}
       <div className="border-b-4 border-double border-blue-800 bg-white px-4 py-2 md:px-6">
         <div className="flex items-center justify-between gap-3 text-sm font-semibold text-black">
-          <span>School Code: 09670911304</span>
-          <span>Affiliation No.: 14203-05</span>
+          <FitText className="flex-1">School Code: 09670911304</FitText>
+          <FitText className="flex-1 text-right">
+            Affiliation No.: 14203-05
+          </FitText>
         </div>
 
         <div className="mt-1 flex items-start justify-center gap-3 sm:gap-4">
@@ -170,92 +209,68 @@ function AdmitCardCard({
             />
           </div>
 
-          <div className="text-left sm:text-center">
-            <h3 className="text-lg sm:text-2xl font-extrabold tracking-tight leading-tight">
-              <span className="text-black">CHILDREN&apos;S</span>{" "}
-              <span className="text-black">VALLEY</span>{" "}
-              <span className="text-black">ENGLISH</span>{" "}
-              <span className="text-black">SCHOOL</span>
+          <div className="min-w-0 flex-1 text-left sm:text-center">
+            <h3 className="text-lg font-extrabold leading-tight tracking-tight text-black sm:text-2xl">
+              <FitText>CHILDREN&apos;S VALLEY ENGLISH SCHOOL</FitText>
             </h3>
             <p className="mt-0.5 text-xs font-semibold italic text-black md:text-sm">
-              D 59/295 A, Mahmoorganj, Varanasi &middot; 0542-2220107,
-              9336576690
+              <FitText>
+                D 59/295 A, Mahmoorganj, Varanasi &middot; 0542-2220107,
+                9336576690
+              </FitText>
             </p>
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs sm:text-sm font-bold sm:justify-center">
-              <span className="text-black">A Gov. Affiliated</span>
-              <span className="text-black">C.B.S.E. Pattern</span>
-              <span className="text-black">Co - Education</span>
+            <div className="mt-1 text-xs font-bold text-black sm:text-sm">
+              <FitText>
+                <span className="mr-3">A Gov. Affiliated</span>
+                <span className="mr-3">C.B.S.E. Pattern</span>
+                <span>Co - Education</span>
+              </FitText>
             </div>
             <div className="mt-2 flex justify-center">
-              <div className="inline-block rounded bg-black px-8 py-1 text-sm font-bold tracking-wide text-white md:text-base">
-                ADMIT CARD
-              </div>
-            </div>
+  <div className="inline-block rounded bg-black px-8 py-1 text-sm font-bold tracking-wide text-white md:text-base [-webkit-print-color-adjust:exact] [print-color-adjust:exact]">
+    ADMIT CARD
+  </div>
+</div>
           </div>
         </div>
       </div>
 
       {/* Exam strip */}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b-2 border-blue-800 bg-blue-50 px-4 py-1 text-sm md:px-6">
-        <p>
+      <div className="flex items-center justify-between gap-x-4 border-b-2 border-blue-800 bg-blue-50 px-4 py-1 text-sm md:px-6">
+        <FitText className="flex-1">
           <span className="font-semibold">Session:</span>{" "}
           {card.academicYear || exam.academicYear || "-"}
-        </p>
-        <p>
+        </FitText>
+        <FitText className="flex-[2] text-center">
           <span className="font-semibold">Examination:</span> {exam.examName}
-        </p>
-        <p>
+        </FitText>
+        <FitText className="flex-1 text-right">
           <span className="font-semibold">Class:</span>{" "}
           {toOrdinalLabel(card.className)}{" "}
           {card.section ? `- ${card.section}` : ""}
-        </p>
+        </FitText>
       </div>
 
       {/* Student details + photo */}
-      <div className="grid grid-cols-1 items-start gap-6 border-b border-gray-200 py-1 md:px-6 sm:grid-cols-[1fr_auto]">
-        <div className="grid content-start grid-cols-1 gap-x-4 gap-y-1.5 text-sm">
-          <p className="flex gap-1.5">
-            <span className="w-28 shrink-0 font-semibold text-gray-600">
-              Enrollment No.
-            </span>
-            <span>: {card.enrollment || "-"}</span>
-          </p>
-          <p className="flex gap-1.5">
-            <span className="w-28 shrink-0 font-semibold text-gray-600">
-              Student Name
-            </span>
-            <span>
-              :{" "}
-              {card.studentName ||
-                `${card.firstName} ${card.lastName}`.trim() ||
-                "-"}
-            </span>
-          </p>
-          <p className="flex gap-1.5">
-            <span className="w-28 shrink-0 font-semibold text-gray-600">
-              Father&apos;s Name
-            </span>
-            <span>: {card.fatherName || "-"}</span>
-          </p>
-          <p className="flex gap-1.5">
-            <span className="w-28 shrink-0 font-semibold text-gray-600">
-              Mother&apos;s Name
-            </span>
-            <span>: {card.motherName || "-"}</span>
-          </p>
-        </div>
-        <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded border border-gray-400 text-center text-xs text-gray-400">
-          {card.studentPhoto ? (
-            <img
-              src={card.studentPhoto}
-              alt="Student"
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <span className="px-2">Affix recent photograph</span>
-          )}
-        </div>
-      </div>
+<div className="grid grid-cols-1 items-start gap-6 border-b border-gray-200 px-4 py-1 sm:grid-cols-[minmax(0,1fr)_auto] md:px-6 print:grid-cols-[minmax(0,1fr)_auto] print:px-6">
+  <div className="grid min-w-0 grid-cols-1 content-start gap-x-4 gap-y-1.5 text-sm">
+    <DetailRow label="Enrollment No." value={card.enrollment || "-"} />
+    <DetailRow label="Student Name" value={studentName} />
+    <DetailRow label="Father's Name" value={card.fatherName || "-"} />
+    <DetailRow label="Mother's Name" value={card.motherName || "-"} />
+  </div>
+  <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded border border-gray-400 text-center text-xs text-gray-400">
+    {card.studentPhoto ? (
+      <img
+        src={card.studentPhoto}
+        alt="Student"
+        className="h-full w-full object-cover"
+      />
+    ) : (
+      <span className="px-2">Affix recent photograph</span>
+    )}
+  </div>
+</div>
 
       {/* Subject wise schedule: the written papers table comes first, and the
           practical / viva papers of the same subjects are printed in their own
@@ -333,11 +348,13 @@ function AdmitCardCard({
           </div>
         </div>
 
-        <p className="mt-3 text-center text-xs text-gray-500">
-          This admit card is valid only for {exam.examName}
-          {exam.academicYear ? ` (${exam.academicYear})` : ""} and must be
-          produced on every examination day.
-        </p>
+        <div className="mt-3 text-xs text-gray-500">
+          <FitText className="text-center">
+            This admit card is valid only for {exam.examName}
+            {exam.academicYear ? ` (${exam.academicYear})` : ""} and must be
+            produced on every examination day.
+          </FitText>
+        </div>
       </div>
     </div>
   );
