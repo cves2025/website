@@ -259,7 +259,7 @@ function AdmitCardCard({
           <DetailRow label="Father's Name" value={card.fatherName || "-"} />
           <DetailRow label="Mother's Name" value={card.motherName || "-"} />
         </div>
-        <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded bg-white text-center text-xs text-gray-400">
+        <div className={`flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded ${!card.studentPhoto ? "border border-gray-400" : ""} bg-white text-center text-xs text-gray-400`}>
           {card.studentPhoto ? (
             <img
               src={card.studentPhoto}

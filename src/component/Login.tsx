@@ -6,7 +6,7 @@ import {
   type FormEvent,
   type MouseEvent,
 } from "react";
-import { useNavigate, NavLink, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { myContext } from "./context/MyContextProvider";
 import loginSideImage from "../assets/image/loginSide.jpg";
 
@@ -202,18 +202,6 @@ function Login() {
               </button>
             </div>
           </form>
-
-          <div
-            className="cves-fade-up"
-            style={{ animationDelay: "0.54s" }}
-          >
-            <NavLink
-              to="/signup"
-              className="text-blue-900 font-bold pt-4 hover:underline inline-block mt-4"
-            >
-              Create an account
-            </NavLink>
-          </div>
 
           {error && (
             <label className="cves-shake text-red-700 text-base font-bold pt-3 text-center">

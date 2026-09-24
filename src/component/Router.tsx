@@ -12,7 +12,6 @@ import AdmissionOpen from './AdmissionOpen'
 import PayFee from './PayFee'
 import Result from './Result'
 import Login from './Login'
-import Signup from './Signup'
 import Welcome from './Welcome'
 import PanelHome from './panel/PanelHome'
 import AddStudent from './panel/students/AddStudent'
@@ -53,7 +52,6 @@ function Router() {
         <Route path="/facilities/sports" element={<Sports />} />
         <Route path="/download/result" element={<Result />} />
         <Route path="/login" element={<Login />} />
-        <Route path='/signup' element={<Signup />}/>
         <Route path="/welcome" element={<Welcome />}>
           <Route index element={<PanelHome />} />
           <Route path="student/add" element={<AddStudent />} />
