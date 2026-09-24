@@ -227,10 +227,10 @@ function AdmitCardCard({
               </FitText>
             </div>
             <div className="mt-2 flex justify-center">
-  <div className="inline-block rounded bg-black px-8 py-1 text-sm font-bold tracking-wide text-white md:text-base [-webkit-print-color-adjust:exact] [print-color-adjust:exact]">
-    ADMIT CARD
-  </div>
-</div>
+              <div className="inline-block rounded bg-black px-8 py-1 text-sm font-bold tracking-wide text-white md:text-base [-webkit-print-color-adjust:exact] [print-color-adjust:exact]">
+                ADMIT CARD
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -252,25 +252,25 @@ function AdmitCardCard({
       </div>
 
       {/* Student details + photo */}
-<div className="grid grid-cols-1 items-start gap-6 border-b border-gray-200 px-4 py-1 sm:grid-cols-[minmax(0,1fr)_auto] md:px-6 print:grid-cols-[minmax(0,1fr)_auto] print:px-6">
-  <div className="grid min-w-0 grid-cols-1 content-start gap-x-4 gap-y-1.5 text-sm">
-    <DetailRow label="Enrollment No." value={card.enrollment || "-"} />
-    <DetailRow label="Student Name" value={studentName} />
-    <DetailRow label="Father's Name" value={card.fatherName || "-"} />
-    <DetailRow label="Mother's Name" value={card.motherName || "-"} />
-  </div>
-  <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded border border-gray-400 text-center text-xs text-gray-400">
-    {card.studentPhoto ? (
-      <img
-        src={card.studentPhoto}
-        alt="Student"
-        className="h-full w-full object-cover"
-      />
-    ) : (
-      <span className="px-2">Affix recent photograph</span>
-    )}
-  </div>
-</div>
+      <div className="grid grid-cols-1 items-start gap-6 border-b border-gray-200 px-4 py-1 sm:grid-cols-[minmax(0,1fr)_auto] md:px-6 print:grid-cols-[minmax(0,1fr)_auto] print:px-6">
+        <div className="grid min-w-0 grid-cols-1 content-start gap-x-4 gap-y-1.5 text-sm">
+          <DetailRow label="Enrollment No." value={card.enrollment || "-"} />
+          <DetailRow label="Student Name" value={studentName} />
+          <DetailRow label="Father's Name" value={card.fatherName || "-"} />
+          <DetailRow label="Mother's Name" value={card.motherName || "-"} />
+        </div>
+        <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded bg-white text-center text-xs text-gray-400">
+          {card.studentPhoto ? (
+            <img
+              src={card.studentPhoto}
+              alt="Student"
+              className="h-full w-full object-contain"
+            />
+          ) : (
+            <span className="px-2">Affix recent photograph</span>
+          )}
+        </div>
+      </div>
 
       {/* Subject wise schedule: the written papers table comes first, and the
           practical / viva papers of the same subjects are printed in their own

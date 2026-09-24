@@ -11,10 +11,15 @@ import { ScheduleRow } from "../../../utils/type";
 import {
   ADD_EXAM_PATH,
   academicYears,
+  findPaperClassClashes,
+  findScheduleRowProblems,
   formatScheduleDate,
   formatSubjectWithType,
   inputClass,
   newRowId,
+  paperKeyOfRow,
+  rowClassScope,
+  scheduleRowName,
   useExamScheduleDraft,
   useExamTemplates,
   useRequestedExam,
@@ -102,6 +107,11 @@ function ExamSchedule() {
       ? classesOfSubjectType(subjectName, subjectType)
       : classesOfSubject(subjectName);
 
+  /* Classes that teach the paper of one row (used by the "All classes" mode and
+     by the clash checks below). */
+  const subjectClassesOfRow = (row: ScheduleRow): string[] =>
+    rowClassesOf(row.subject, row.subjectType);
+
   /* ------------------------------------------------------------- schedule */
   const { rows, setRows, loadingSchedule, scheduleCreatedAt } =
     useExamScheduleDraft(selectedExamId);
@@ -125,6 +135,14 @@ function ExamSchedule() {
 
   const selectedExam =
     yearExams.find((exam) => exam.id === selectedExamId) ?? null;
+
+  /* One class that two papers of the same subject + type both cover. The same
+     paper may be scheduled several times - normally for another group of classes
+     on another date (Science (Theory) for UKG on 10 Jan, for class 5 on 12 Jan) -
+     but no class may receive it twice, or its admit card would show two dates for
+     one paper. Recomputed on every render on purpose: the subjects list decides
+     which classes the "All classes" mode covers. */
+  const paperClashes = findPaperClassClashes(rows, subjectClassesOfRow);
 
   /* ----------------------------------------------------------- handlers -- */
   const handleAddRow = () => {
@@ -156,11 +174,47 @@ function ExamSchedule() {
             ? subjectByValue.get(patch.subject)
             : undefined;
           if (choice) {
+            const samePaper = (other: ScheduleRow) =>
+              other.id !== id &&
+              paperKeyOfRow(other) ===
+                paperKeyOfRow({
+                  ...row,
+                  subject: choice.name,
+                  subjectType: choice.type,
+                });
+
+            /* Classes another paper of the same subject + type already covers
+               (e.g. Science (Theory) scheduled for UKG on 10 Jan). */
+            const coveredClasses = new Set<string>();
+            prev.filter(samePaper).forEach((other) =>
+              rowClassScope(
+                other,
+                rowClassesOf(other.subject, other.subjectType)
+              ).forEach((className) => coveredClasses.add(className))
+            );
+
+            /* When the paper is already scheduled for some classes, this new
+               paper starts on the classes that are still free, so only its own
+               date has to be filled in. When no class is free (or none is known
+               yet) the row keeps the "All classes" default and the clash warning
+               asks the user to split the class groups. */
+            const freeClasses = rowClassesOf(choice.name, choice.type).filter(
+              (className) => !coveredClasses.has(className)
+            );
+            if (coveredClasses.size > 0 && freeClasses.length > 0) {
+              return {
+                ...row,
+                subject: choice.name,
+                subjectType: choice.type,
+                allClasses: false,
+                classes: freeClasses,
+              };
+            }
             return {
               ...row,
               subject: choice.name,
               subjectType: choice.type,
-              // A new subject starts from "all classes where it is offered".
+              // A new paper starts from "all classes where it is offered".
               allClasses: true,
               classes: [],
             };
@@ -201,10 +255,12 @@ function ExamSchedule() {
     setScheduleErrors([]);
   };
 
-  /** Collects every problem that would stop the schedule from being saved. */
+  /**
+   * Collects every problem that would stop the schedule from being saved: the
+   * exam selection here, then the subject-paper rows (including the check that no
+   * class is scheduled twice for the same paper) through the shared helper.
+   */
   const validateSchedule = (list: ScheduleRow[]): string[] => {
-    const problems: string[] = [];
-
     if (!selectedExam) {
       return ["Select an exam before saving the schedule."];
     }
@@ -212,44 +268,7 @@ function ExamSchedule() {
       return ["Add at least one subject paper to the schedule."];
     }
 
-    const seenSubjects = new Set<string>();
-    list.forEach((row, index) => {
-      const subject = row.subject.trim();
-      const subjectType = row.subjectType.trim();
-      const label =
-        formatSubjectWithType(subject, subjectType) || `Row ${index + 1}`;
-
-      if (!subject) {
-        problems.push(`Row ${index + 1}: select a subject.`);
-      } else if (
-        seenSubjects.has(`${subject.toLowerCase()}::${subjectType.toLowerCase()}`)
-      ) {
-        problems.push(`${label} is added more than once.`);
-      } else {
-        seenSubjects.add(`${subject.toLowerCase()}::${subjectType.toLowerCase()}`);
-      }
-
-      if (!row.date) {
-        problems.push(`${label}: exam date is required.`);
-      }
-      if (!row.fromTime || !row.toTime) {
-        problems.push(`${label}: from time and to time are required.`);
-      } else if (row.toTime <= row.fromTime) {
-        problems.push(`${label}: "to" time must be after the "from" time.`);
-      }
-      if (!row.allClasses && row.classes.length === 0) {
-        problems.push(
-          `${label}: select at least one class or choose "All classes".`
-        );
-      }
-      if (row.allClasses && subject && rowClassesOf(subject, subjectType).length === 0) {
-        problems.push(
-          `${label}: this subject is not added to any class yet, so it cannot be scheduled. Add it on the Subjects page first.`
-        );
-      }
-    });
-
-    return problems;
+    return findScheduleRowProblems(list, subjectClassesOfRow);
   };
 
   const handleSaveSchedule = async () => {
@@ -322,6 +341,19 @@ function ExamSchedule() {
             <p className="text-sm text-gray-600 mt-0.5">
               Choose the exam, then add every subject paper with its date, time
               and the classes it applies to.
+            </p>
+            <p className="mt-1 text-sm text-gray-600">
+              The same paper can be scheduled more than once for a different group
+              of classes, each group with its own date and time — for example{" "}
+              <span className="font-semibold text-gray-700">
+                Science (Theory) for UKG on 10 Jan
+              </span>{" "}
+              and{" "}
+              <span className="font-semibold text-gray-700">
+                Science (Theory) for Class 5 on 12 Jan
+              </span>
+              . Add one paper per class group with “Specific classes”. A class can
+              appear only once per paper, so the class groups must not overlap.
             </p>
           </div>
           <span className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800">
@@ -434,14 +466,58 @@ function ExamSchedule() {
               <div className="mt-4 space-y-3">
                 {rows.map((row, index) => {
                   const rowClasses = rowClassesOf(row.subject, row.subjectType);
+
+                  /* Papers of this row's subject + type that also schedule one of
+                     this paper's classes, grouped by the other paper. */
+                  const clashesByOtherPaper = new Map<number, string[]>();
+                  paperClashes
+                    .filter((clash) => clash.rowIndex === index)
+                    .forEach((clash) => {
+                      const classNames =
+                        clashesByOtherPaper.get(clash.otherRowIndex) ?? [];
+                      classNames.push(clash.className);
+                      clashesByOtherPaper.set(clash.otherRowIndex, classNames);
+                    });
+
+                  /* Class -> index of the earlier paper that already covers it. */
+                  const classTakenBy = new Map<string, number>();
+                  clashesByOtherPaper.forEach((classNames, otherIndex) =>
+                    classNames.forEach((className) =>
+                      classTakenBy.set(className, otherIndex)
+                    )
+                  );
+
+                  /* Papers of the same subject + type scheduled elsewhere. The
+                     same paper for another group of classes on another date is
+                     valid and normal, so it is only shown as information. */
+                  const siblingPapers = rows
+                    .map((sibling, siblingIndex) => ({ sibling, siblingIndex }))
+                    .filter(
+                      ({ sibling, siblingIndex }) =>
+                        siblingIndex !== index &&
+                        sibling.subject.trim() &&
+                        paperKeyOfRow(sibling) === paperKeyOfRow(row)
+                    );
                   return (
 <div
                       key={row.id}
                       className="rounded-lg border border-gray-200 bg-gray-50 p-3"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-bold text-gray-500">
+                        <span className="flex flex-wrap items-baseline gap-x-2 text-xs font-bold text-gray-500">
                           Paper {index + 1}
+                          {row.subject && (
+                            <span className="font-semibold text-gray-600">
+                              {formatSubjectWithType(row.subject, row.subjectType)}
+                              {" · "}
+                              {rowClassScope(row, rowClasses)
+                                .map(toOrdinalLabel)
+                                .join(", ") || "no class yet"}
+                              {row.date
+                                ? ` · ${formatScheduleDate(row.date)}`
+                                : ""}
+                            </span>
+                          )}
                         </span>
                         <button
                           type="button"
@@ -574,30 +650,94 @@ function ExamSchedule() {
                               </p>
                             ) : (
                               <div className="flex flex-wrap gap-2">
-                                {rowClasses.map((className) => (
-                                  <label
-                                    key={className}
-                                    className="flex cursor-pointer items-center gap-2 rounded border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:border-blue-300"
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={row.classes.includes(className)}
-                                      onChange={(event) =>
-                                        handleToggleRowClass(
-                                          row.id,
-                                          className,
-                                          event.target.checked
-                                        )
-                                      }
-                                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                    />
-                                    {toOrdinalLabel(className)}
-                                  </label>
-                                ))}
+                                {rowClasses.map((className) => {
+                                  /* Class already scheduled for the same paper on
+                                     another date: ticking it would print the paper
+                                     twice on one admit card. */
+                                  const takenBy = classTakenBy.get(className);
+                                  return (
+                                    <label
+                                      key={className}
+                                      className={`flex cursor-pointer items-center gap-2 rounded border px-3 py-1.5 text-sm font-medium ${
+                                        takenBy === undefined
+                                          ? "border-gray-200 bg-white text-gray-700 hover:border-blue-300"
+                                          : "border-red-300 bg-red-50 text-red-700"
+                                      }`}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={row.classes.includes(className)}
+                                        onChange={(event) =>
+                                          handleToggleRowClass(
+                                            row.id,
+                                            className,
+                                            event.target.checked
+                                          )
+                                        }
+                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                      />
+                                      {toOrdinalLabel(className)}
+                                      {takenBy !== undefined && (
+                                        <span className="text-[11px] font-semibold">
+                                          · already on{" "}
+                                          {formatScheduleDate(
+                                            rows[takenBy].date
+                                          )}{" "}
+                                          (Paper {takenBy + 1})
+                                        </span>
+                                      )}
+                                    </label>
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
                         )}
+
+                        {/* Class groups of one paper may carry different dates, but a
+                            class can never be in two of them. */}
+                        {Array.from(clashesByOtherPaper.entries()).map(
+                          ([otherIndex, classNames]) => (
+                            <p
+                              key={otherIndex}
+                              className="mt-2 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700"
+                            >
+                              {classNames.map(toOrdinalLabel).join(", ")}: this
+                              same paper is already scheduled on{" "}
+                              {formatScheduleDate(rows[otherIndex].date)} (
+                              {scheduleRowName(rows[otherIndex], otherIndex)}). A
+                              class can have only one date for the same paper, so
+                              untick the class here or on that paper.
+                            </p>
+                          )
+                        )}
+
+                        {clashesByOtherPaper.size === 0 &&
+                          siblingPapers.length > 0 && (
+                            <p className="mt-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+                              The same paper is also scheduled for{" "}
+                              {siblingPapers
+                                .map(({ sibling, siblingIndex }) =>
+                                  [
+                                    rowClassScope(
+                                      sibling,
+                                      rowClassesOf(
+                                        sibling.subject,
+                                        sibling.subjectType
+                                      )
+                                    )
+                                      .map(toOrdinalLabel)
+                                      .join(", ") || "no class yet",
+                                    `on ${
+                                      sibling.date
+                                        ? formatScheduleDate(sibling.date)
+                                        : "no date yet"
+                                    } (Paper ${siblingIndex + 1})`,
+                                  ].join(" ")
+                                )
+                                .join("; ")}.
+                            </p>
+                          )}
                       </div>
                     </div>
                   );

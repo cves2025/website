@@ -23,6 +23,7 @@ import { CLASSES, COLLECTION } from "../../../constants";
 import { db } from "../../../firebase/config";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
 import { toDateOrNull } from "../../../utils/toDateOrNull";
+import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import { isSameClassName } from "../../../utils/normalizeClassName";
 import { ExamCategory, marksSchemeFromDoc } from "../../../utils/examMarksScheme";
 import {
@@ -211,6 +212,150 @@ export function rowAppliesToClass(
   if (!row.subject) return false;
   if (row.allClasses) return subjectClasses.includes(className);
   return row.classes.includes(className);
+}
+
+/**
+ * How one row is named in the messages: "Paper 2 — Science (Theory)", or just
+ * "Paper 2" while its subject is still empty. Two papers of the same subject
+ * (e.g. Science (Theory) for UKG and for class 5) stay tellable apart this way.
+ */
+export function scheduleRowName(row: ScheduleRow, index: number): string {
+  const label = formatSubjectWithType(row.subject, row.subjectType);
+  return label ? `Paper ${index + 1} — ${label}` : `Paper ${index + 1}`;
+}
+
+/** Identity of one scheduled paper: subject + type, compared case-insensitively. */
+export function paperKeyOfRow(row: ScheduleRow): string {
+  return `${row.subject.trim().toLowerCase()}::${row.subjectType
+    .trim()
+    .toLowerCase()}`;
+}
+
+/**
+ * Classes a schedule row actually covers: every class the paper is taught in
+ * when the row is set to "All classes", otherwise the classes ticked on the row.
+ */
+export function rowClassScope(
+  row: ScheduleRow,
+  subjectClasses: string[]
+): string[] {
+  if (!row.subject.trim()) return [];
+  return row.allClasses ? subjectClasses : row.classes;
+}
+
+/** One class that two rows of the same paper (<subject, type>) both schedule. */
+export interface PaperClassClash {
+  /** Index of the later row in the schedule list. */
+  rowIndex: number;
+  /** Index of the earlier row that already covers this class. */
+  otherRowIndex: number;
+  /** Class both rows cover. */
+  className: string;
+}
+
+/**
+ * Finds every class that two rows of the same paper cover.
+ *
+ * A paper may be scheduled more than once - normally for another group of
+ * classes on another date (Science (Theory) for UKG on 10 Jan and for class 5 on
+ * 12 Jan) - but one class must never receive the same paper twice, because its
+ * admit card would then print one paper with two dates.
+ *
+ * `subjectClassesOf` returns the classes that teach the paper of a row (like
+ * `classesOfSubjectType`); it is only needed for rows set to "All classes".
+ */
+export function findPaperClassClashes(
+  rows: ScheduleRow[],
+  subjectClassesOf: (row: ScheduleRow) => string[]
+): PaperClassClash[] {
+  const clashes: PaperClassClash[] = [];
+
+  rows.forEach((row, rowIndex) => {
+    if (!row.subject.trim()) return;
+    const scope = new Set(rowClassScope(row, subjectClassesOf(row)));
+    if (scope.size === 0) return;
+
+    for (let otherIndex = 0; otherIndex < rowIndex; otherIndex += 1) {
+      const other = rows[otherIndex];
+      if (!other.subject.trim() || paperKeyOfRow(other) !== paperKeyOfRow(row)) {
+        continue;
+      }
+      rowClassScope(other, subjectClassesOf(other)).forEach((className) => {
+        if (scope.has(className)) {
+          clashes.push({ rowIndex, otherRowIndex: otherIndex, className });
+        }
+      });
+    }
+  });
+
+  return clashes;
+}
+
+/**
+ * Collects every problem of the subject-paper rows that would stop the schedule
+ * from being saved. The selected exam is checked by the caller.
+ *
+ * A paper (subject + type) may be scheduled several times - normally for another
+ * group of classes and on another date (Science (Theory) for UKG on 10 Jan and
+ * for class 5 on 12 Jan) - so a repeated subject is not a problem. What is a
+ * problem is one class receiving the same paper twice, because its admit card
+ * would then print the paper on two dates. That is what the clash check below
+ * reports.
+ *
+ * `subjectClassesOf` returns the classes a paper is taught in (like
+ * `classesOfSubjectType`), needed by the "All classes" rows.
+ */
+export function findScheduleRowProblems(
+  rows: ScheduleRow[],
+  subjectClassesOf: (row: ScheduleRow) => string[]
+): string[] {
+  const problems: string[] = [];
+
+  rows.forEach((row, index) => {
+    const subject = row.subject.trim();
+    const subjectType = row.subjectType.trim();
+    const label =
+      formatSubjectWithType(subject, subjectType) || `Row ${index + 1}`;
+
+    if (!subject) {
+      problems.push(`Row ${index + 1}: select a subject.`);
+    }
+
+    if (!row.date) {
+      problems.push(`${label}: exam date is required.`);
+    }
+    if (!row.fromTime || !row.toTime) {
+      problems.push(`${label}: from time and to time are required.`);
+    } else if (row.toTime <= row.fromTime) {
+      problems.push(`${label}: "to" time must be after the "from" time.`);
+    }
+    if (!row.allClasses && row.classes.length === 0) {
+      problems.push(
+        `${label}: select at least one class or choose "All classes".`
+      );
+    }
+    if (row.allClasses && subject && subjectClassesOf(row).length === 0) {
+      problems.push(
+        `${label}: this subject is not added to any class yet, so it cannot be scheduled. Add it on the Subjects page first.`
+      );
+    }
+  });
+
+  findPaperClassClashes(rows, subjectClassesOf).forEach((clash) => {
+    const otherRow = rows[clash.otherRowIndex];
+    problems.push(
+      `${scheduleRowName(rows[clash.rowIndex], clash.rowIndex)}: ${toOrdinalLabel(
+        clash.className
+      )} is already scheduled for this same paper on ${formatScheduleDate(
+        otherRow.date
+      )} (${scheduleRowName(
+        otherRow,
+        clash.otherRowIndex
+      )}). A class can have only one date per paper - remove the class from one of the two papers.`
+    );
+  });
+
+  return problems;
 }
 
 export function newRowId(): string {

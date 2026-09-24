@@ -50,9 +50,8 @@ function Navbar2({ dynemicClass }: { dynemicClass?: string }) {
           >
             Downloads
             <svg
-              className={`w-5 h-5 transform transition-transform duration-200 ${
-                downloadIsOpen ? "rotate-180" : ""
-              }`}
+              className={`w-5 h-5 transform transition-transform duration-200 ${downloadIsOpen ? "rotate-180" : ""
+                }`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -66,11 +65,10 @@ function Navbar2({ dynemicClass }: { dynemicClass?: string }) {
               />
             </svg>
             <div
-              className={`${
-                downloadIsOpen
-                  ? "absolute flex flex-col top-10 left-10 bg-gray-100"
-                  : "hidden"
-              }`}
+              className={`${downloadIsOpen
+                ? "absolute flex flex-col top-10 left-10 bg-gray-100"
+                : "hidden"
+                }`}
             >
               <ul className="">
                 <li>
@@ -86,15 +84,15 @@ function Navbar2({ dynemicClass }: { dynemicClass?: string }) {
                   </NavLink>
                 </li>
                 <li><NavLink
-                    className={({ isActive }) =>
-                      isActive
-                        ? "text-blue-600 flex flex-row justify-center items-center"
-                        : "hover:text-amber-600 flex justify-row justify-center items-center"
-                    }
-                    to="/download/result"
-                  >
-                    Result
-                  </NavLink></li>
+                  className={({ isActive }) =>
+                    isActive
+                      ? "text-blue-600 flex flex-row justify-center items-center"
+                      : "hover:text-amber-600 flex justify-row justify-center items-center"
+                  }
+                  to="/download/result"
+                >
+                  Result
+                </NavLink></li>
               </ul>
             </div>
           </h1>
@@ -129,6 +127,13 @@ function Navbar2({ dynemicClass }: { dynemicClass?: string }) {
             to="/pay-fee"
           >
             Pay Fee
+          </NavLink>
+          <NavLink
+            className={({ isActive }) =>
+              isActive ? "text-blue-600" : "hover:text-amber-600"
+            }
+            to="/login">
+            Admin
           </NavLink>
         </div>
         {/* Mobile view navbar start from here */}
@@ -191,6 +196,11 @@ function Navbar2({ dynemicClass }: { dynemicClass?: string }) {
                   onClick={() => setIsMenuOpen(false)}
                 >
                   Pay Fee
+                </NavLink>
+                <NavLink
+                  className={linkClasses}
+                  to="/login">
+                  Admin Login
                 </NavLink>
               </div>
             )}
