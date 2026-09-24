@@ -152,7 +152,7 @@ function AdmitCardCard({
   }, []);
 
   return (
-    <div className="mx-auto mt-2 max-w-3xl overflow-hidden rounded-xl border-4 border-double border-blue-800 bg-white shadow-lg print:break-after-page print:last:break-after-auto">
+    <div className="mx-auto mt-2 max-w-4xl overflow-hidden rounded-xl border-4 border-double border-blue-800 bg-white shadow-lg print:break-after-page print:last:break-after-auto">
       {/* Card header */}
       <div className="border-b-4 border-double border-blue-800 bg-white px-4 py-2 md:px-6">
         <div className="flex items-center justify-between gap-3 text-sm font-semibold text-black">

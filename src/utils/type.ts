@@ -134,3 +134,38 @@ export interface CardStudent {
   motherName: string;
   studentPhoto?: string;
 }
+
+/* -------------------------------------------------------------- settings -- */
+
+/** One row of the "All Class Lists" table on the Settings page. */
+export interface ClassStudentCount {
+  /** Class name exactly as stored in `CLASSES` (e.g. "5", "Nursery", "UKG"). */
+  className: string;
+  /**
+   * Students enrolled in that class for the selected academic session.
+   * Records marked `isDeleted` (recycle bin) are not counted.
+   */
+  totalStudents: number;
+}
+
+/** What the class row delete action does with the students of a class. */
+export type ClassStudentsDeleteMode = "recycle" | "permanent";
+
+/** Outcome of `deleteClassStudents()` - how many documents were touched. */
+export interface ClassStudentsDeleteResult {
+  /** Enrollment records (the class/session rows) affected. */
+  enrollments: number;
+  /** Master `students` profiles recycled or removed. */
+  students: number;
+}
+
+/** Everything `useAllClassesLengthOfStudents()` returns. */
+export interface AllClassesLengthOfStudents {
+  /** One entry per class of `CLASSES`, in the same order. */
+  classes: ClassStudentCount[];
+  loading: boolean;
+  /** Message of the last failed load, or null when the counts are valid. */
+  error: string | null;
+  /** Re-runs the aggregation queries (call it after a delete/recycle). */
+  refresh: () => Promise<void>;
+}

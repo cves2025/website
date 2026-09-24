@@ -18,6 +18,14 @@ interface ModalProps {
   hideSubmit?: boolean;
   /** Extra Tailwind classes merged onto the Submit button. */
   submitClassName?: string;
+  /** Optional second action shown between Cancel and Submit (e.g. "Move to Recycle Bin"). */
+  secondaryText?: string;
+  /** Callback of the secondary action button. */
+  onSecondarySubmit?: () => void;
+  /** Extra Tailwind classes merged onto the secondary action button. */
+  secondaryClassName?: string;
+  /** Shows "Please wait..." on the secondary button and disables it. */
+  secondaryLoading?: boolean;
   /** Extra Tailwind classes for the dialog box (default "max-w-md"). */
   modalClassName?: string;
   /** When set, a "Change Exam" action button is shown in the footer. */
@@ -38,6 +46,10 @@ const Modal: React.FC<ModalProps> = ({
   submitDisabled = false,
   hideSubmit = false,
   submitClassName = "",
+  secondaryText,
+  onSecondarySubmit,
+  secondaryClassName = "",
+  secondaryLoading = false,
   modalClassName = "max-w-md",
   onChangeExam,
 }) => {
@@ -93,6 +105,17 @@ const Modal: React.FC<ModalProps> = ({
           >
             {cancelText}
           </button>
+
+          {secondaryText && (
+            <button
+              type="button"
+              onClick={() => onSecondarySubmit?.()}
+              disabled={loading || secondaryLoading}
+              className={`rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 ${secondaryClassName}`}
+            >
+              {secondaryLoading ? "Please wait..." : secondaryText}
+            </button>
+          )}
 
           {!hideSubmit && (
             <button

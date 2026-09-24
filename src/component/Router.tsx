@@ -34,6 +34,7 @@ import Student from './admin/Student';
 import ExamDashboard from './admin/ExamDashboard';
 import UnitTest_1 from './admin/UnitTest_1';
 import ExamSettings from './admin/ExamSettings'
+import Settings from './panel/settings/Settings'
 
 function Router() {
   return (
@@ -58,6 +59,7 @@ function Router() {
           <Route path="student/add" element={<AddStudent />} />
           <Route path="student/list" element={<StudentList />} />
           <Route path="student/subject" element={<Subject />} />
+          <Route path="settings" element={<Settings />} />
           <Route path="exam/list" element={<ExamList />} />
           <Route path="teacher/add" element={<AddTeacher />} />
           <Route path="teacher/list" element={<TeachersList />} />

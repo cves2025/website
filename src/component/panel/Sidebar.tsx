@@ -1,4 +1,10 @@
-import { useState, useContext, ReactElement } from "react";
+import {
+  useState,
+  useContext,
+  useEffect,
+  useRef,
+  ReactElement,
+} from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { myContext } from "../context/MyContextProvider";
 import {
@@ -14,6 +20,7 @@ import {
   FaClipboardList,
   FaSignOutAlt,
   FaAddressCard,
+  FaCog,
 } from "react-icons/fa";
 import schoolLogo from "../../assets/image/schoolLogo.jpg";
 
@@ -28,6 +35,9 @@ type MenuItem =
 
 /** The logo in the brand block always returns to the dashboard. */
 const DASHBOARD_PATH = "/welcome";
+
+/** Page opened by the "Settings" item of the account menu (mini sidebar). */
+const SETTINGS_PATH = "/welcome/settings";
 
 // The school's own four brand colors (see the login page wordmark), each
 // permanently assigned to one section so color carries meaning, not decoration.
@@ -103,6 +113,41 @@ function Sidebar({ open, onClose }: SidebarProps) {
   const location = useLocation();
   const [expanded, setExpanded] = useState(activeGroup(location.pathname));
   const [collapsed, setCollapsed] = useState(false);
+
+  // Mini sidebar ("account menu") shown when the user name at the bottom is
+  // clicked. It currently hosts the Settings entry.
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const accountMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Close the account menu on an outside click or on Escape.
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!accountMenuRef.current?.contains(event.target as Node)) {
+        setAccountMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAccountMenuOpen(false);
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [accountMenuOpen]);
+
+  /** Opens the Settings page from the account menu and closes the drawer. */
+  const handleOpenSettings = () => {
+    setAccountMenuOpen(false);
+    onClose();
+    navigate(SETTINGS_PATH);
+  };
+
+  const onSettingsPage = location.pathname.startsWith(SETTINGS_PATH);
 
   // When collapsed, clicking a group icon navigates straight to its first sub-link
   // instead of expanding (since there's no room to show sub-links while collapsed).
@@ -316,25 +361,82 @@ function Sidebar({ open, onClose }: SidebarProps) {
 
         {/* User + logout */}
         <div className="px-3 py-4 border-t border-white/5">
-          <div
-            className={`flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-white/[0.04] transition-colors ${
-              collapsed ? "md:justify-center" : ""
-            }`}
-          >
+          <div ref={accountMenuRef} className="relative">
+            {/* Account menu (mini sidebar) — opens upwards from the user block */}
             <div
-              className="w-10 h-10 shrink-0 rounded-full text-white flex items-center justify-center font-bold shadow-inner"
-              style={{
-                background: `linear-gradient(135deg, ${BRAND.blue}, ${BRAND.pink})`,
-              }}
+              id="sidebar-account-menu"
+              role="menu"
+              aria-label="Account menu"
+              className={`absolute bottom-full left-0 right-0 z-10 mb-2 min-w-[12rem] origin-bottom overflow-hidden rounded-xl border border-white/10 bg-[#1D2029] shadow-2xl transition-all duration-200 ease-out ${
+                accountMenuOpen
+                  ? "visible translate-y-0 opacity-100 pointer-events-auto"
+                  : "invisible translate-y-1 opacity-0 pointer-events-none"
+              }`}
             >
-              {initials}
-            </div>
-            <div className={`min-w-0 ${collapsed ? "md:hidden" : ""}`}>
-              <p className="text-sm font-semibold truncate text-white">
-                {user?.name || "Admin User"}
+              <p className="px-4 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-widest text-white/35">
+                Account
               </p>
-              <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={handleOpenSettings}
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-gray-300 transition-colors hover:bg-white/[0.06] hover:text-white"
+              >
+                <span
+                  className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-base"
+                  style={{
+                    backgroundColor: `${BRAND.blue}1A`,
+                    color: BRAND.blue,
+                  }}
+                >
+                  <FaCog />
+                </span>
+                Settings
+              </button>
             </div>
+
+            {/* Clicking the name (or the avatar while collapsed) opens the menu */}
+            <button
+              type="button"
+              onClick={() => setAccountMenuOpen((prev) => !prev)}
+              aria-haspopup="menu"
+              aria-expanded={accountMenuOpen}
+              aria-controls="sidebar-account-menu"
+              title={collapsed ? "Account menu" : undefined}
+              className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg transition-colors ${
+                collapsed ? "md:justify-center" : ""
+              } ${
+                accountMenuOpen || onSettingsPage
+                  ? "bg-white/[0.06]"
+                  : "hover:bg-white/[0.04]"
+              }`}
+            >
+              <span
+                className="w-10 h-10 shrink-0 rounded-full text-white flex items-center justify-center font-bold shadow-inner"
+                style={{
+                  background: `linear-gradient(135deg, ${BRAND.blue}, ${BRAND.pink})`,
+                }}
+              >
+                {initials}
+              </span>
+              <span
+                className={`min-w-0 flex-1 text-left ${
+                  collapsed ? "md:hidden" : ""
+                }`}
+              >
+                <span className="block truncate text-sm font-semibold text-white">
+                  {user?.name || "Admin User"}
+                </span>
+                <span className="block truncate text-xs text-gray-400">
+                  {user?.email}
+                </span>
+              </span>
+              {!collapsed && (
+                <span className="text-xs text-gray-400" aria-hidden="true">
+                  {accountMenuOpen ? <BsChevronDown /> : <BsChevronUp />}
+                </span>
+              )}
+            </button>
           </div>
           <button
             onClick={handleLogout}
