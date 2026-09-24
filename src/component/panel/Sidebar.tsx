@@ -354,6 +354,11 @@ function Sidebar({ open, onClose }: SidebarProps) {
           >
             <FaSignOutAlt /> <span className={collapsed ? "md:hidden" : ""}>Logout</span>
           </button>
+
+          {/* App version — bumped automatically on every deploy */}
+          <p className="mt-3 text-center text-[10px] tracking-wide text-white/25 select-none">
+            v{__APP_VERSION_LABEL__}
+          </p>
         </div>
       </aside>
     </>
