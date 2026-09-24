@@ -279,7 +279,7 @@ function AdmitCardCard({
         {writtenPapers.length > 0 && (
           <>
             <h4 className="mb-1 text-center font-bold text-gray-800">
-              Subject-wise Exam Schedule
+              Exam Schedule
             </h4>
             <AdmitScheduleTable papers={writtenPapers} />
           </>
