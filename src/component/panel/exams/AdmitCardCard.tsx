@@ -306,16 +306,14 @@ function AdmitCardCard({
               reporting time printed above.
             </li>
             <li>
-              Bring this admit card along with a recent passport size
-              photograph; entry is not allowed without it.
+              Please carry this admit card to the examination.
             </li>
             <li>
               Use only blue or black ink. Mobile phones and smart watches are
               strictly prohibited.
             </li>
             <li>
-              Read every question carefully and write the answers in your own
-              handwriting.
+              Read every question carefully and write the answers.
             </li>
             <li>
               The school is not responsible for any loss of personal belongings
