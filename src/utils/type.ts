@@ -169,3 +169,34 @@ export interface AllClassesLengthOfStudents {
   /** Re-runs the aggregation queries (call it after a delete/recycle). */
   refresh: () => Promise<void>;
 }
+
+/* --------------------------------------------------------------- teacher -- */
+
+export interface TeacherFormValues {
+  firstName: string;
+  lastName: string;
+  gender: string;
+  dateOfBirth: Date | null;
+  employeeId: string;
+  designation: string;
+  status: string;
+  email: string;
+  phone: string;
+  joiningDate: Date | null;
+  address: string;
+  photo: string;
+  qualification: string;
+  assignedClasses: string[];
+  isClassTeacher: boolean;
+  classTeacherOf: string;
+  password: string;
+  role: string;
+}
+
+export interface TeacherRecord extends Omit<TeacherFormValues, "password"> {
+  id: string;
+  uid: string;
+  isDeleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+}

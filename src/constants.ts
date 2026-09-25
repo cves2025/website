@@ -5,6 +5,7 @@ export const COLLECTION = {
   EXAMS: "exams",
   EXAM_SCHEDULES: "examSchedules",
   STAMP_SIGN: "stampSign",
+  USERS: "users",
 };
 
 /** Document id inside COLLECTION.STAMP_SIGN that stores the Principal's
@@ -33,7 +34,21 @@ export const CLASSES: string[] = [
   "8",
 ];
 
+export const CLASS_OPTIONS = CLASSES.map((className) => ({
+  value: className,
+  label: className,
+}));
+
 export const SECTIONS: string[] = ["A", "B", "C"];
+
+export const TEACHER_DESIGNATIONS: string[] = [
+  "Subject Teacher",
+  "Class Teacher",
+];
+
+export const TEACHER_STATUS: string[] = ["Active", "Inactive"];
+
+export const GENDER_OPTIONS: string[] = ["Male", "Female", "Other"];
 
 /**
  * Legacy list from the first Exams-module draft. The exam templates now use
