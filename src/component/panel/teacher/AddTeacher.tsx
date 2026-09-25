@@ -1,11 +1,6 @@
 import { useState, ChangeEvent, FormEvent } from "react";
 import { NavLink } from "react-router-dom";
 
-const SUBJECTS: string[] = [
-  "English", "Hindi", "Math", "Science", "Computer",
-  "Social Science", "Drawing", "Dance", "Karate", "Yoga",
-];
-
 interface TeacherInput {
   firstName: string;
   lastName: string;
@@ -109,13 +104,6 @@ function AddTeacher() {
             <input name="phone" value={teacher.phone} onChange={handleChange} placeholder="Mobile number" className={inputClass} />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Subject *</label>
-            <select name="subject" value={teacher.subject} onChange={handleChange} className={inputClass}>
-              <option value="">Select subject</option>
-              {SUBJECTS.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
           </div>
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">Qualification</label>
