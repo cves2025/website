@@ -12,6 +12,10 @@ import { COLLECTION } from "../constants";
 import { db } from "../firebase/config";
 import type { TeacherRecord } from "../utils/type";
 import { toDateOrNull } from "../utils/toDateOrNull";
+import {
+  sectionAssignmentsFromDoc,
+  toLegacyTeacherFields,
+} from "../utils/teacherSections";
 
 export interface UseTeachersResult {
   teachers: TeacherRecord[];
@@ -25,6 +29,9 @@ function toTeacherRecord(
   const data = snapshot.data();
   const stringField = (key: string) =>
     typeof data[key] === "string" ? data[key] : "";
+
+  const sectionAssignments = sectionAssignmentsFromDoc(data);
+  const legacyFields = toLegacyTeacherFields(sectionAssignments);
 
   return {
     id: snapshot.id,
@@ -43,11 +50,10 @@ function toTeacherRecord(
     address: stringField("address"),
     photo: stringField("photo"),
     qualification: stringField("qualification"),
-    assignedClasses: Array.isArray(data.assignedClasses)
-      ? data.assignedClasses.filter((item) => typeof item === "string")
-      : [],
-    isClassTeacher: data.isClassTeacher === true,
-    classTeacherOf: stringField("classTeacherOf"),
+    sectionAssignments,
+    assignedClasses: legacyFields.assignedClasses,
+    isClassTeacher: legacyFields.isClassTeacher,
+    classTeacherOf: legacyFields.classTeacherOf,
     isDeleted: data.isDeleted === true,
     createdAt: stringField("createdAt"),
     updatedAt: stringField("updatedAt"),

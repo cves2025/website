@@ -20,7 +20,6 @@ import { FaEdit, FaTrash } from "react-icons/fa";
 
 import { API_BASE_URL, authHeaders } from "../../context/api";
 import {
-  CLASS_OPTIONS,
   CLASSES,
   COLLECTION,
   EMAIL_PATTERN,
@@ -34,17 +33,43 @@ import CustomButton from "../../../custom-components/CustomButton";
 import CustomInput from "../../../custom-components/CustomInput";
 import CustomSelect from "../../../custom-components/CustomSelect";
 import CustomTextarea from "../../../custom-components/CustomTextarea";
-import CustomToggle from "../../../custom-components/CustomToggle";
 import FormMessage from "../../../custom-components/FormMessage";
 import Modal from "../../../custom-components/Modal";
 import PageHeader from "../../../custom-components/PageHeader";
 import PhotoUploadBox from "../../../custom-components/admission/PhotoUploadBox";
-import SearchableMultiSelect from "../../../custom-components/SearchableMultiSelect";
+import SearchableMultiSelect, {
+  SearchableOption,
+} from "../../../custom-components/SearchableMultiSelect";
 import { db } from "../../../firebase/config";
 import { uploadTeacherPhoto } from "../../../firebase/teacherPhotos";
+import { useClassSubjects } from "../../../hooks/useClassSubjects";
 import { useTeachers } from "../../../hooks/useTeachers";
-import type { TeacherFormValues, TeacherRecord } from "../../../utils/type";
+import type {
+  TeacherFormValues,
+  TeacherRecord,
+  TeacherSectionAssignment,
+  TeacherSubjectOption,
+} from "../../../utils/type";
 import { toDateOrNull } from "../../../utils/toDateOrNull";
+import {
+  TEACHER_SECTIONS,
+  createEmptySectionAssignment,
+  createEmptySectionAssignments,
+  formatClassSubjects,
+  formatSectionLabel,
+  formatSectionSummary,
+  mergeClassSubjects,
+  pruneSectionAssignments,
+  toClassLabel,
+  toEditableSectionAssignments,
+  toLegacyTeacherFields,
+  toSectionTabs,
+} from "../../../utils/teacherSections";
+
+const CLASS_CHOICES: SearchableOption[] = CLASSES.map((className) => ({
+  value: className,
+  label: toClassLabel(className),
+}));
 
 const EMPTY_TEACHER: TeacherFormValues = {
   firstName: "",
@@ -60,6 +85,7 @@ const EMPTY_TEACHER: TeacherFormValues = {
   address: "",
   photo: "",
   qualification: "",
+  sectionAssignments: createEmptySectionAssignments(),
   assignedClasses: [],
   isClassTeacher: false,
   classTeacherOf: "",
@@ -67,7 +93,10 @@ const EMPTY_TEACHER: TeacherFormValues = {
   role: "teacher",
 };
 
-function teacherDocToForm(data: DocumentData): TeacherFormValues {
+function teacherDocToForm(
+  data: DocumentData,
+  sectionAssignments: TeacherSectionAssignment[]
+): TeacherFormValues {
   const stringField = (key: string) =>
     typeof data[key] === "string" ? data[key] : "";
 
@@ -85,14 +114,31 @@ function teacherDocToForm(data: DocumentData): TeacherFormValues {
     address: stringField("address"),
     photo: stringField("photo"),
     qualification: stringField("qualification"),
-    assignedClasses: Array.isArray(data.assignedClasses)
-      ? data.assignedClasses.filter((item) => typeof item === "string")
-      : [],
-    isClassTeacher: data.isClassTeacher === true,
-    classTeacherOf: stringField("classTeacherOf"),
+    sectionAssignments,
+    assignedClasses: [],
+    isClassTeacher: false,
+    classTeacherOf: "",
     password: "",
     role: stringField("role") || "teacher",
   };
+}
+
+function toSubjectChoices(
+  subjects: TeacherSubjectOption[],
+  selected: string[]
+): SearchableOption[] {
+  const choices: SearchableOption[] = subjects.map((subject) => ({
+    value: subject.name,
+    label: subject.name,
+    hint: subject.type,
+  }));
+
+  selected.forEach((name) => {
+    if (choices.some((choice) => choice.value === name)) return;
+    choices.push({ value: name, label: name, hint: "Saved earlier" });
+  });
+
+  return choices;
 }
 
 function formatJoiningDate(value: Date | null): string {
@@ -182,6 +228,188 @@ function DateInput<T extends FieldValues = FieldValues>({
   );
 }
 
+interface SectionAssignmentCardProps {
+  section: string;
+  assignment: TeacherSectionAssignment;
+  subjectsOfClass: (className: string) => TeacherSubjectOption[];
+  loadingSubjects: boolean;
+  onToggleClassTeacher: (active: boolean) => void;
+  onClassTeacherClassChange: (className: string) => void;
+  onClassesChange: (classNames: string[]) => void;
+  onClassSubjectsChange: (className: string, subjects: string[]) => void;
+  onReset: () => void;
+}
+
+function SectionAssignmentCard({
+  section,
+  assignment,
+  subjectsOfClass,
+  loadingSubjects,
+  onToggleClassTeacher,
+  onClassTeacherClassChange,
+  onClassesChange,
+  onClassSubjectsChange,
+  onReset,
+}: SectionAssignmentCardProps) {
+  const selectedClasses = assignment.classes.map((entry) => entry.className);
+  const teachingCount = assignment.classes.reduce(
+    (total, entry) => total + entry.subjects.length,
+    0
+  );
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded bg-blue-600 px-2.5 py-1 text-xs font-bold text-white">
+            Section {section}
+          </span>
+          <span className="text-xs font-semibold text-gray-600">
+            {formatSectionSummary(assignment)}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={onReset}
+          className="rounded border border-gray-300 px-2.5 py-1 text-xs font-bold text-gray-600 transition-colors hover:bg-gray-100"
+        >
+          Clear section
+        </button>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="flex w-full flex-col gap-1.5">
+          <span className="block text-sm font-semibold text-gray-700">
+            Class Teacher of Section {section}
+          </span>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={assignment.isClassTeacher}
+              onClick={() => onToggleClassTeacher(!assignment.isClassTeacher)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                assignment.isClassTeacher ? "bg-blue-600" : "bg-gray-300"
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+                  assignment.isClassTeacher ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
+            <span
+              className={`text-sm font-semibold ${
+                assignment.isClassTeacher ? "text-green-700" : "text-gray-600"
+              }`}
+            >
+              {assignment.isClassTeacher ? "Yes" : "No"}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex w-full flex-col gap-1.5">
+          <label
+            htmlFor={`section-${section}-class-teacher-class`}
+            className="block text-sm font-semibold text-gray-700"
+          >
+            Class Teacher Class
+          </label>
+          <select
+            id={`section-${section}-class-teacher-class`}
+            value={assignment.classTeacherOf}
+            disabled={!assignment.isClassTeacher}
+            onChange={(event) => onClassTeacherClassChange(event.target.value)}
+            className={`w-full rounded-md border bg-white px-3 py-2 text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-100 ${
+              assignment.isClassTeacher
+                ? "border-gray-300 text-gray-800 focus:border-blue-500 focus:ring-blue-500/50"
+                : "border-gray-300 text-gray-400"
+            }`}
+          >
+            <option value="">Select class</option>
+            {CLASSES.map((className) => (
+              <option key={className} value={className}>
+                {toClassLabel(className)}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <SearchableMultiSelect
+          id={`section-${section}-classes`}
+          options={CLASS_CHOICES}
+          values={selectedClasses}
+          onChange={onClassesChange}
+          label={`Classes Taught in Section ${section}`}
+          placeholder="Select classes"
+          searchPlaceholder="Type to search classes..."
+          emptyMessage="No matching class found"
+          helpText={`Select every class this teacher handles in Section ${section}, then pick the subjects for each class below.`}
+          maxChips={5}
+          wrapperClassName="sm:col-span-2"
+        />
+      </div>
+
+      {assignment.classes.length === 0 ? (
+        <p className="mt-4 rounded-md border border-dashed border-gray-300 bg-gray-50 px-3 py-4 text-center text-xs font-semibold text-gray-500">
+          No class selected for Section {section} yet.
+        </p>
+      ) : (
+        <div className="mt-4 flex flex-col gap-3">
+          <p className="text-xs font-semibold text-gray-500">
+            {assignment.classes.length} class(es) · {teachingCount} subject
+            {teachingCount === 1 ? "" : "s"} assigned in Section {section}
+          </p>
+          {assignment.classes.map((entry) => (
+            <div
+              key={entry.className}
+              className="rounded-md border border-gray-200 bg-gray-50 p-3"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="rounded bg-blue-100 px-2 py-1 text-xs font-bold text-blue-700">
+                  {toClassLabel(entry.className)}
+                </span>
+                <span
+                  className={`text-[11px] font-semibold ${
+                    entry.subjects.length > 0
+                      ? "text-gray-500"
+                      : "text-amber-600"
+                  }`}
+                >
+                  {entry.subjects.length > 0
+                    ? `${entry.subjects.length} subject(s) selected`
+                    : "No subject selected"}
+                </span>
+              </div>
+              <div className="mt-2">
+                <SearchableMultiSelect
+                  id={`section-${section}-class-${entry.className}-subjects`}
+                  options={toSubjectChoices(
+                    subjectsOfClass(entry.className),
+                    entry.subjects
+                  )}
+                  values={entry.subjects}
+                  onChange={(values) =>
+                    onClassSubjectsChange(entry.className, values)
+                  }
+                  placeholder="Select subjects"
+                  searchPlaceholder="Type to search subjects..."
+                  emptyMessage={`No subject added for ${toClassLabel(
+                    entry.className
+                  )} yet`}
+                  loading={loadingSubjects}
+                  loadingLabel="Loading subjects..."
+                  maxChips={4}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function firestoreErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) {
     return "Something went wrong while saving. Please try again.";
@@ -212,16 +440,21 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
   } = useForm<TeacherFormValues>({ defaultValues: EMPTY_TEACHER });
 
   const photoUrl = watch("photo");
-  const classTeacherFlag = watch("isClassTeacher");
-  const selectedClasses = watch("assignedClasses");
+  const [activeSection, setActiveSection] = useState(TEACHER_SECTIONS[0]);
+  const [sectionAssignments, setSectionAssignments] = useState<
+    TeacherSectionAssignment[]
+  >(createEmptySectionAssignments());
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoRemoved, setPhotoRemoved] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [movedFromLegacy, setMovedFromLegacy] = useState(false);
+  const { subjectsOfClass, loadingSubjects } = useClassSubjects();
 
-  const isClassTeacher = classTeacherFlag === true;
-  const assignedClasses = Array.isArray(selectedClasses)
-    ? selectedClasses
-    : [];
+  const isFormDirty = isDirty || photoFile !== null || photoRemoved;
+
+  const activeAssignment =
+    sectionAssignments.find((item) => item.section === activeSection) ??
+    createEmptySectionAssignment(activeSection);
 
   useEffect(() => {
     if (!initialEditId) return;
@@ -235,7 +468,12 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
         if (!snapshot.exists()) {
           throw new Error("Teacher record not found.");
         }
-        if (!cancelled) reset(teacherDocToForm(snapshot.data()));
+        if (cancelled) return;
+        const data = snapshot.data();
+        const restored = toEditableSectionAssignments(data);
+        reset(teacherDocToForm(data, restored.assignments));
+        setSectionAssignments(restored.assignments);
+        setMovedFromLegacy(restored.movedFromLegacy);
       } catch (loadError) {
         if (cancelled) return;
         console.error("Failed to load teacher:", loadError);
@@ -254,6 +492,63 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
     };
   }, [initialEditId]);
 
+  const assignmentOf = (section: string): TeacherSectionAssignment =>
+    sectionAssignments.find((item) => item.section === section) ??
+    createEmptySectionAssignment(section);
+
+  const applySections = (next: TeacherSectionAssignment[]) => {
+    setSectionAssignments(next);
+    setValue("sectionAssignments", next, { shouldDirty: true });
+  };
+
+  const updateSection = (
+    section: string,
+    patch: Partial<TeacherSectionAssignment>
+  ) =>
+    applySections(
+      sectionAssignments.map((item) =>
+        item.section === section ? { ...item, ...patch } : item
+      )
+    );
+
+  const handleToggleClassTeacher = (section: string, active: boolean) =>
+    updateSection(
+      section,
+      active
+        ? { isClassTeacher: true }
+        : { isClassTeacher: false, classTeacherOf: "" }
+    );
+
+  const handleClassTeacherClassChange = (
+    section: string,
+    className: string
+  ) => updateSection(section, { classTeacherOf: className });
+
+  const handleClassesChange = (section: string, classNames: string[]) =>
+    updateSection(section, {
+      classes: mergeClassSubjects(classNames, assignmentOf(section).classes),
+    });
+
+  const handleClassSubjectsChange = (
+    section: string,
+    className: string,
+    subjects: string[]
+  ) => {
+    const current = assignmentOf(section);
+    updateSection(section, {
+      classes: current.classes.map((entry) =>
+        entry.className === className ? { ...entry, subjects } : entry
+      ),
+    });
+  };
+
+  const handleResetSection = (section: string) =>
+    updateSection(section, {
+      isClassTeacher: false,
+      classTeacherOf: "",
+      classes: [],
+    });
+
   const handlePhotoSelected = (file: File | null) => {
     setPhotoFile(file);
     setPhotoRemoved(file === null);
@@ -261,13 +556,31 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
 
   const handleReset = () => {
     reset(EMPTY_TEACHER);
+    setSectionAssignments(createEmptySectionAssignments());
     setPhotoFile(null);
     setPhotoRemoved(false);
     setSubmitError("");
+    setMovedFromLegacy(false);
+    setActiveSection(TEACHER_SECTIONS[0]);
   };
 
   const onSubmit: SubmitHandler<TeacherFormValues> = async (data) => {
     setSubmitError("");
+
+    const sectionPayload = pruneSectionAssignments(toSectionTabs(sectionAssignments));
+    const incompleteSection = sectionPayload.find(
+      (item) => item.isClassTeacher && item.classTeacherOf === ""
+    );
+    if (incompleteSection) {
+      setActiveSection(incompleteSection.section);
+      setSubmitError(
+        `Select the class of the class teacher for Section ${incompleteSection.section}.`
+      );
+      return;
+    }
+
+    const legacyFields = toLegacyTeacherFields(sectionPayload);
+
     try {
       let photo = data.photo;
       if (photoRemoved) {
@@ -290,11 +603,10 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
         address: data.address.trim(),
         photo,
         qualification: data.qualification.trim(),
-        assignedClasses: Array.isArray(data.assignedClasses)
-          ? data.assignedClasses
-          : [],
-        isClassTeacher: data.isClassTeacher === true,
-        classTeacherOf: data.isClassTeacher === true ? data.classTeacherOf : "",
+        sectionAssignments: sectionPayload,
+        assignedClasses: legacyFields.assignedClasses,
+        isClassTeacher: legacyFields.isClassTeacher,
+        classTeacherOf: legacyFields.classTeacherOf,
         role: data.role || "teacher",
       };
 
@@ -305,7 +617,6 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
         });
         toast.success("Teacher updated successfully.");
       } else {
-        console.log(API_BASE_URL);
         const response = await fetch(`${API_BASE_URL}/api/add-teacher`, {
           method: "POST",
           headers: await authHeaders(),
@@ -331,6 +642,13 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
 
   return (
     <div>
+      {movedFromLegacy && (
+        <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-800">
+          This teacher was saved before section-wise assignments. The earlier
+          classes were placed in Section {TEACHER_SECTIONS[0]} - please review
+          them before saving.
+        </div>
+      )}
       {submitError && <FormMessage type="error">{submitError}</FormMessage>}
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
@@ -441,38 +759,79 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
             label="Qualification"
             placeholder="e.g. B.Ed, M.A."
           />
-          <CustomToggle
-            control={control}
-            name="isClassTeacher"
-            label="Class Teacher"
-            activeValue="true"
-            inactiveValue="false"
-            activeLabel="Yes"
-            inactiveLabel="No"
-            onChange={(value) => {
-              setValue("isClassTeacher", value === "true");
-              if (value !== "true") setValue("classTeacherOf", "");
-            }}
-          />
-          <CustomSelect
-            control={control}
-            name="classTeacherOf"
-            label="Class Teacher Of"
-            placeholder="Select class"
-            options={CLASSES}
-            disabled={!isClassTeacher}
-            className={isClassTeacher ? "" : "text-gray-400"}
-          />
-          <SearchableMultiSelect
-            options={CLASS_OPTIONS}
-            values={assignedClasses}
-            onChange={(values) => setValue("assignedClasses", values)}
-            label="Assigned Classes"
-            placeholder="Select classes"
-            helpText="Classes this teacher handles."
-            wrapperClassName="sm:col-span-2"
-            maxChips={3}
-          />
+          <div className="flex flex-col gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 sm:col-span-2">
+            <div>
+              <h3 className="text-sm font-bold text-gray-800">
+                Section-wise Assignment
+              </h3>
+              <p className="mt-1 text-xs text-gray-500">
+                The class teacher and the teaching subjects are saved separately
+                for every section. Switch the tab to fill what this teacher
+                handles in Section A and Section B.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {TEACHER_SECTIONS.map((section) => {
+                const assignment =
+                  sectionAssignments.find((item) => item.section === section) ??
+                  createEmptySectionAssignment(section);
+                const isActive = section === activeSection;
+                const classCount = assignment.classes.length;
+                const badge = [
+                  assignment.isClassTeacher ? "Class Teacher" : "",
+                  classCount > 0 ? `${classCount} class(es)` : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ");
+
+                return (
+                  <button
+                    key={section}
+                    type="button"
+                    onClick={() => setActiveSection(section)}
+                    className={`flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-bold transition-colors ${
+                      isActive
+                        ? "border-blue-600 bg-blue-600 text-white"
+                        : "border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    Section {section}
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-xs font-bold ${
+                        isActive
+                          ? "bg-white/25 text-white"
+                          : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      {badge || "Empty"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <SectionAssignmentCard
+              key={activeSection}
+              section={activeSection}
+              assignment={activeAssignment}
+              subjectsOfClass={subjectsOfClass}
+              loadingSubjects={loadingSubjects}
+              onToggleClassTeacher={(active) =>
+                handleToggleClassTeacher(activeSection, active)
+              }
+              onClassTeacherClassChange={(className) =>
+                handleClassTeacherClassChange(activeSection, className)
+              }
+              onClassesChange={(classNames) =>
+                handleClassesChange(activeSection, classNames)
+              }
+              onClassSubjectsChange={(className, subjects) =>
+                handleClassSubjectsChange(activeSection, className, subjects)
+              }
+              onReset={() => handleResetSection(activeSection)}
+            />
+          </div>
           <div className="flex flex-col items-center justify-center sm:col-span-2">
             <PhotoUploadBox
               label={"TEACHER'S\nPHOTO"}
@@ -491,7 +850,7 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
         </div>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <CustomButton type="submit" disabled={!isDirty || isSubmitting}>
+          <CustomButton type="submit" disabled={!isFormDirty || isSubmitting}>
             {isSubmitting
               ? "Saving..."
               : initialEditId
@@ -587,7 +946,7 @@ function AddTeacher() {
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
-          <table className="w-full text-sm min-w-[1100px]">
+          <table className="w-full text-sm min-w-[1300px]">
             <thead>
               <tr className="bg-gray-100 text-gray-700 text-left">
                 <th className="px-4 py-3">Photo</th>
@@ -600,6 +959,7 @@ function AddTeacher() {
                 <th className="px-4 py-3">Phone</th>
                 <th className="px-4 py-3">Joining Date</th>
                 <th className="px-4 py-3">Qualification</th>
+                <th className="px-4 py-3">Section-wise Assignment</th>
                 <th className="px-4 py-3 text-center">Actions</th>
               </tr>
             </thead>
@@ -624,11 +984,6 @@ function AddTeacher() {
                   </td>
                   <td className="px-4 py-3 font-semibold">
                     {teacher.firstName} {teacher.lastName}
-                    {teacher.isClassTeacher && (
-                      <span className="mt-0.5 block text-xs font-medium text-blue-600">
-                        Class Teacher · {teacher.classTeacherOf || "Not assigned"}
-                      </span>
-                    )}
                   </td>
                   <td className="px-4 py-3">{teacher.employeeId || "-"}</td>
                   <td className="px-4 py-3">{teacher.designation || "-"}</td>
@@ -650,6 +1005,45 @@ function AddTeacher() {
                     {formatJoiningDate(teacher.joiningDate)}
                   </td>
                   <td className="px-4 py-3">{teacher.qualification || "-"}</td>
+                  <td className="px-4 py-3 align-top">
+                    {teacher.sectionAssignments.length === 0 ? (
+                      <span className="text-xs text-gray-400">Not assigned</span>
+                    ) : (
+                      <div className="flex flex-col gap-1.5">
+                        {teacher.sectionAssignments.map((assignment) => {
+                          const teaching = formatClassSubjects(
+                            assignment.classes
+                          );
+                          return (
+                            <div
+                              key={assignment.section || "all"}
+                              className="flex flex-wrap items-center gap-1.5 text-xs"
+                            >
+                              <span className="rounded bg-gray-200 px-1.5 py-0.5 font-bold text-gray-700">
+                                {formatSectionLabel(assignment.section)}
+                              </span>
+                              {assignment.isClassTeacher && (
+                                <span className="rounded bg-purple-100 px-1.5 py-0.5 font-bold text-purple-700">
+                                  Class Teacher ·{" "}
+                                  {assignment.classTeacherOf
+                                    ? toClassLabel(assignment.classTeacherOf)
+                                    : "Not selected"}
+                                </span>
+                              )}
+                              {teaching && (
+                                <span
+                                  className="max-w-[20rem] truncate text-gray-600"
+                                  title={teaching}
+                                >
+                                  {teaching}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex justify-center gap-2">
                       <button
@@ -685,11 +1079,11 @@ function AddTeacher() {
           isOpen
           onClose={closeModal}
           title={editingTeacherId ? "Edit Teacher" : "Add Teacher"}
-          description="Fill in the teacher details below. Fields marked with * are required."
+          description="Fill in the teacher details below. Personal information is common and the class teacher / subjects are saved for every section separately. Fields marked with * are required."
           cancelText="Cancel"
           hideSubmit
           onSubmit={() => {}}
-          modalClassName="max-w-3xl"
+          modalClassName="max-w-5xl"
         >
           <TeacherForm initialEditId={editingTeacherId} onClose={closeModal} />
         </Modal>

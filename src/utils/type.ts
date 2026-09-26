@@ -172,6 +172,31 @@ export interface AllClassesLengthOfStudents {
 
 /* --------------------------------------------------------------- teacher -- */
 
+/** Classes a teacher handles inside one section, together with the subjects. */
+export interface TeacherClassSubjects {
+  className: string;
+  subjects: string[];
+}
+
+/**
+ * Everything a teacher handles in one section of the school: whether the
+ * teacher is the class teacher there and which subjects are taught in which
+ * class. A teacher can have one entry per section (e.g. class teacher of 3 in
+ * Section A and class teacher of 8 in Section B).
+ */
+export interface TeacherSectionAssignment {
+  section: string;
+  isClassTeacher: boolean;
+  classTeacherOf: string;
+  classes: TeacherClassSubjects[];
+}
+
+/** One subject of the Subjects page, used inside the class/subject picker. */
+export interface TeacherSubjectOption {
+  name: string;
+  type: string;
+}
+
 export interface TeacherFormValues {
   firstName: string;
   lastName: string;
@@ -186,6 +211,7 @@ export interface TeacherFormValues {
   address: string;
   photo: string;
   qualification: string;
+  sectionAssignments: TeacherSectionAssignment[];
   assignedClasses: string[];
   isClassTeacher: boolean;
   classTeacherOf: string;
