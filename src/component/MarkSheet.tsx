@@ -29,7 +29,7 @@ function MarkSheet() {
         `${API_BASE_URL}/api/result?enrollment=${enrollment}`,
         {
           method: "GET",
-          headers: authHeaders(),
+          headers: await authHeaders(),
           credentials: "include",
         }
       );

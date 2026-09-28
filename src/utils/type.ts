@@ -226,3 +226,31 @@ export interface TeacherRecord extends Omit<TeacherFormValues, "password"> {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface SubjectMarksRecord {
+  obtained: number | string;
+  maxMarks: number;
+}
+
+export interface MarksData {
+  studentUid: string;
+  admissionNumber: string;
+  session: string;
+  className: string;
+  section: string;
+  rollNumber: number;
+  examId: string;
+  examType: string;
+  examName: string;
+  subjectMarks: Record<string, SubjectMarksRecord>;
+  totalMarks: number;
+  totalMaxMarks: number;
+  percentage: number;
+  result: "pass" | "fail";
+}
+
+export interface MarksDoc extends MarksData {
+  id: string;
+  createdAt: unknown;
+  updatedAt: unknown;
+}

@@ -6,6 +6,7 @@ export const COLLECTION = {
   EXAM_SCHEDULES: "examSchedules",
   STAMP_SIGN: "stampSign",
   USERS: "users",
+  MARKS: "marks",
 };
 
 /** Document id inside COLLECTION.STAMP_SIGN that stores the Principal's

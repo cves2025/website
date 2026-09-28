@@ -88,6 +88,7 @@ const MENU: MenuItem[] = [
       // { label: "Exam Schedule", path: "/welcome/admit-card/schedule" },
       { label: "Admit Card", path: "/welcome/admit-card", end: true },
       // { label: "Generate Admit Card", path: "/welcome/admit-card/generate" },
+      { label: "Marks", path: "/welcome/marks" },
       { label: "Result", path: "/welcome/result" },
     ],
   },
@@ -99,6 +100,7 @@ function activeGroup(pathname: string): string {
   if (pathname.startsWith("/welcome/id-card")) return "ID Card";
   if (pathname.startsWith("/welcome/admit-card")) return "Exam";
   if (pathname.startsWith("/welcome/exam")) return "Exam";
+  if (pathname.startsWith("/welcome/marks")) return "Exam";
   return "";
 }
 

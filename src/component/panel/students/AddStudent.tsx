@@ -16,7 +16,6 @@ import {
   ADMISSION_SECTIONS,
   CLASSES,
   COLLECTION,
-  EMAIL_PATTERN,
   PHONE_PATTERN,
 } from "../../../constants";
 import {
@@ -1099,14 +1098,7 @@ function AddStudent() {
               control={control}
               name="email"
               prefix="MANDATORY E-MAIL ADDRESS"
-              maxLength={50}
-              rules={{
-                required: "E-mail address is required",
-                pattern: {
-                  value: EMAIL_PATTERN,
-                  message: "Enter a valid email address",
-                },
-              }}
+              maxLength={50}              
             />
           </div>
 

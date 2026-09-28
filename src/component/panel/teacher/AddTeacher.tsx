@@ -55,8 +55,6 @@ import {
   TEACHER_SECTIONS,
   createEmptySectionAssignment,
   createEmptySectionAssignments,
-  formatClassSubjects,
-  formatSectionLabel,
   formatSectionSummary,
   mergeClassSubjects,
   pruneSectionAssignments,
@@ -139,15 +137,6 @@ function toSubjectChoices(
   });
 
   return choices;
-}
-
-function formatJoiningDate(value: Date | null): string {
-  if (!value) return "-";
-  return value.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
 }
 
 function toDateInputValue(value: Date | null): string {
@@ -949,17 +938,15 @@ function AddTeacher() {
           <table className="w-full text-sm min-w-[1300px]">
             <thead>
               <tr className="bg-gray-100 text-gray-700 text-left">
+                <th className="px-4 py-3">Sr. No.</th>
                 <th className="px-4 py-3">Photo</th>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Employee ID</th>
                 <th className="px-4 py-3">Designation</th>
-                <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Gender</th>
                 <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3">Phone</th>
-                <th className="px-4 py-3">Joining Date</th>
-                <th className="px-4 py-3">Qualification</th>
-                <th className="px-4 py-3">Section-wise Assignment</th>
+                <th className="px-4 py-3">Phone</th>                
+                <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-center">Actions</th>
               </tr>
             </thead>
@@ -969,6 +956,7 @@ function AddTeacher() {
                   key={teacher.id}
                   className={index % 2 ? "bg-gray-50" : "bg-white"}
                 >
+                  <td className="px-4 py-3">{index+1}</td>
                   <td className="px-4 py-3">
                     {teacher.photo ? (
                       <img
@@ -987,6 +975,9 @@ function AddTeacher() {
                   </td>
                   <td className="px-4 py-3">{teacher.employeeId || "-"}</td>
                   <td className="px-4 py-3">{teacher.designation || "-"}</td>
+                  <td className="px-4 py-3">{teacher.gender || "-"}</td>
+                  <td className="px-4 py-3">{teacher.email}</td>
+                  <td className="px-4 py-3">{teacher.phone || "-"}</td>                                    
                   <td className="px-4 py-3">
                     <span
                       className={`rounded px-2 py-1 text-xs font-bold ${
@@ -997,52 +988,6 @@ function AddTeacher() {
                     >
                       {teacher.status || "Inactive"}
                     </span>
-                  </td>
-                  <td className="px-4 py-3">{teacher.gender || "-"}</td>
-                  <td className="px-4 py-3">{teacher.email}</td>
-                  <td className="px-4 py-3">{teacher.phone || "-"}</td>
-                  <td className="px-4 py-3">
-                    {formatJoiningDate(teacher.joiningDate)}
-                  </td>
-                  <td className="px-4 py-3">{teacher.qualification || "-"}</td>
-                  <td className="px-4 py-3 align-top">
-                    {teacher.sectionAssignments.length === 0 ? (
-                      <span className="text-xs text-gray-400">Not assigned</span>
-                    ) : (
-                      <div className="flex flex-col gap-1.5">
-                        {teacher.sectionAssignments.map((assignment) => {
-                          const teaching = formatClassSubjects(
-                            assignment.classes
-                          );
-                          return (
-                            <div
-                              key={assignment.section || "all"}
-                              className="flex flex-wrap items-center gap-1.5 text-xs"
-                            >
-                              <span className="rounded bg-gray-200 px-1.5 py-0.5 font-bold text-gray-700">
-                                {formatSectionLabel(assignment.section)}
-                              </span>
-                              {assignment.isClassTeacher && (
-                                <span className="rounded bg-purple-100 px-1.5 py-0.5 font-bold text-purple-700">
-                                  Class Teacher ·{" "}
-                                  {assignment.classTeacherOf
-                                    ? toClassLabel(assignment.classTeacherOf)
-                                    : "Not selected"}
-                                </span>
-                              )}
-                              {teaching && (
-                                <span
-                                  className="max-w-[20rem] truncate text-gray-600"
-                                  title={teaching}
-                                >
-                                  {teaching}
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex justify-center gap-2">

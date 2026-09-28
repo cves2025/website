@@ -17,6 +17,7 @@ import toast from "react-hot-toast";
 import Modal from "../../../custom-components/Modal";
 import CustomInput from "../../../custom-components/CustomInput";
 import CustomSelect from "../../../custom-components/CustomSelect";
+import CustomToggle from "../../../custom-components/CustomToggle";
 import SearchableMultiSelect, {
   SearchableOption,
 } from "../../../custom-components/SearchableMultiSelect";
@@ -54,6 +55,9 @@ interface SubjectDoc {
   type: SubjectType;
   order: number;
   className: string;
+  displayInAdmitCard?: boolean;
+  displayInMarksEntry?: boolean;
+  displayInReportCard?: boolean;
 }
 
 interface SubjectFormValues {
@@ -62,6 +66,9 @@ interface SubjectFormValues {
   order: string;
   /** Classes the subject is created for (batch write on add). */
   classes: string[];
+  displayInAdmitCard: string;
+  displayInMarksEntry: string;
+  displayInReportCard: string;
 }
 
 const DEFAULT_FORM: SubjectFormValues = {
@@ -69,6 +76,9 @@ const DEFAULT_FORM: SubjectFormValues = {
   type: "Theory",
   order: "",
   classes: [],
+  displayInAdmitCard: "true",
+  displayInMarksEntry: "true",
+  displayInReportCard: "true",
 };
 
 const CLASS_OPTIONS: SearchableOption[] = CLASSES.map((className) => ({
@@ -89,6 +99,9 @@ const toSubjectDoc = (
     order: typeof data.order === "number" ? data.order : 1,
     className:
       typeof data.className === "string" ? data.className : fallbackClass,
+    displayInAdmitCard: data.displayInAdmitCard === true,
+    displayInMarksEntry: data.displayInMarksEntry === true,
+    displayInReportCard: data.displayInReportCard === true,
   };
 };
 
@@ -102,6 +115,7 @@ function Subject() {
     control,
     handleSubmit,
     reset,
+    setValue,
     watch,
   } = useForm<SubjectFormValues>({
     defaultValues: DEFAULT_FORM,
@@ -157,6 +171,9 @@ function Subject() {
       type: "Theory",
       order: String(nextOrder),
       classes: [selectedClass],
+      displayInAdmitCard: "true",
+      displayInMarksEntry: "true",
+      displayInReportCard: "true",
     });
     setModalOpen(true);
   };
@@ -170,9 +187,18 @@ function Subject() {
       // Pre-select the class this subject row belongs to; the user can add
       // more classes before saving.
       classes: [subject.className],
+      displayInAdmitCard: subject.displayInAdmitCard === false ? "false" : "true",
+      displayInMarksEntry: subject.displayInMarksEntry === false ? "false" : "true",
+      displayInReportCard: subject.displayInReportCard === false ? "false" : "true",
     });
     setModalOpen(true);
   };
+
+  const handleDisplayToggle =
+    (name: "displayInAdmitCard" | "displayInMarksEntry" | "displayInReportCard") =>
+    (value: string) => {
+      setValue(name, value === "true" ? "true" : "false");
+    };
 
   const closeModal = () => {
     if (saving) return;
@@ -185,6 +211,10 @@ function Subject() {
 
     // Normalize to a positive integer so the Order column always has a value.
     const order = Math.max(1, Math.floor(Number(data.order) || 1));
+
+    const displayInAdmitCard = data.displayInAdmitCard === "true";
+    const displayInMarksEntry = data.displayInMarksEntry === "true";
+    const displayInReportCard = data.displayInReportCard === "true";
 
     setSaving(true);
     try {
@@ -204,6 +234,9 @@ function Subject() {
             type: data.type,
             order,
             className: originalClass,
+            displayInAdmitCard,
+            displayInMarksEntry,
+            displayInReportCard,
             updatedAt: serverTimestamp(),
           });
           for (const className of classes.filter(
@@ -214,6 +247,9 @@ function Subject() {
               type: data.type,
               order,
               className,
+              displayInAdmitCard,
+              displayInMarksEntry,
+              displayInReportCard,
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
             });
@@ -225,6 +261,9 @@ function Subject() {
             type: data.type,
             order,
             className: firstClass,
+            displayInAdmitCard,
+            displayInMarksEntry,
+            displayInReportCard,
             updatedAt: serverTimestamp(),
           });
           for (const className of restClasses) {
@@ -233,6 +272,9 @@ function Subject() {
               type: data.type,
               order,
               className,
+              displayInAdmitCard,
+              displayInMarksEntry,
+              displayInReportCard,
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
             });
@@ -260,6 +302,9 @@ function Subject() {
             type: data.type,
             order,
             className,
+            displayInAdmitCard,
+            displayInMarksEntry,
+            displayInReportCard,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });
@@ -512,6 +557,38 @@ function Subject() {
               </>
             )}
           />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <CustomToggle
+              control={control}
+              name="displayInAdmitCard"
+              label="Show in Admit Card"
+              activeValue="true"
+              inactiveValue="false"
+              activeLabel="Yes"
+              inactiveLabel="No"
+              onChange={handleDisplayToggle("displayInAdmitCard")}
+            />
+            <CustomToggle
+              control={control}
+              name="displayInMarksEntry"
+              label="Show in Marks Entry"
+              activeValue="true"
+              inactiveValue="false"
+              activeLabel="Yes"
+              inactiveLabel="No"
+              onChange={handleDisplayToggle("displayInMarksEntry")}
+            />
+            <CustomToggle
+              control={control}
+              name="displayInReportCard"
+              label="Show in Report Card"
+              activeValue="true"
+              inactiveValue="false"
+              activeLabel="Yes"
+              inactiveLabel="No"
+              onChange={handleDisplayToggle("displayInReportCard")}
+            />
+          </div>
         </div>
       </Modal>
 
