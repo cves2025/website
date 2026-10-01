@@ -16,6 +16,8 @@ export interface AuthUser {
   name?: string;
   role?: string;
   admin?: boolean;
+  /** Id of the last release announcement ("What's New" modal) this user saw. */
+  lastSeenReleaseId?: string;
 }
 
 /** Shape of the value provided by MyContextProvider. */
@@ -27,6 +29,12 @@ export interface AuthContextType {
    * otherwise a page refresh bounces the user to the login page.
    */
   authReady: boolean;
+  /**
+   * True once the logged-in user's Firestore profile (`users/{uid}`) has been
+   * read, so profile-dependent UI (e.g. the "What's New" modal) never flashes
+   * before the document has finished loading.
+   */
+  profileReady: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -37,6 +45,7 @@ export interface AuthContextType {
 const defaultContext: AuthContextType = {
   user: null,
   authReady: false,
+  profileReady: false,
   error: null,
   login: async () => false,
   logout: async () => {},
@@ -65,6 +74,7 @@ function friendlyAuthError(code: string): string {
 export function MyContextProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [profileReady, setProfileReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   /**
@@ -86,12 +96,18 @@ export function MyContextProvider({ children }: { children: ReactNode }) {
       const data = snapshot.data() as Record<string, unknown>;
       const role = typeof data.role === "string" ? data.role : undefined;
       const name = typeof data.name === "string" ? data.name : undefined;
+      const lastSeenReleaseId =
+        typeof data.lastSeenReleaseId === "string" &&
+        data.lastSeenReleaseId.trim() !== ""
+          ? data.lastSeenReleaseId
+          : undefined;
 
       return {
         ...base,
         name,
         role,
         admin: data.admin === true || role === "admin",
+        lastSeenReleaseId,
       };
     } catch (err) {
       // Firestore security rules may block direct reads - keep auth-only data.
@@ -112,6 +128,7 @@ export function MyContextProvider({ children }: { children: ReactNode }) {
       if (!firebaseUser) {
         setUser(null);
         setAuthReady(true);
+        setProfileReady(false);
         return;
       }
 
@@ -123,6 +140,7 @@ export function MyContextProvider({ children }: { children: ReactNode }) {
       };
       setUser(baseUser);
       setAuthReady(true);
+      setProfileReady(false);
 
       // ...then merge the Firestore profile (name/role/admin) when it loads.
       void buildUserFromFirebase(firebaseUser).then((fullUser) => {
@@ -131,6 +149,7 @@ export function MyContextProvider({ children }: { children: ReactNode }) {
         setUser((prev) =>
           prev && prev.uid === firebaseUser.uid ? fullUser : prev
         );
+        setProfileReady(true);
       });
     });
 
@@ -145,6 +164,7 @@ export function MyContextProvider({ children }: { children: ReactNode }) {
       const credential = await signInWithEmailAndPassword(auth, email, password);
       const fullUser = await buildUserFromFirebase(credential.user);
       setUser(fullUser);
+      setProfileReady(true);
       setError(null);
       return true;
     } catch (err) {
@@ -152,6 +172,7 @@ export function MyContextProvider({ children }: { children: ReactNode }) {
       const code = (err as { code?: string })?.code || "";
       setError(friendlyAuthError(code));
       setUser(null);
+      setProfileReady(false);
       setTimeout(() => {
         setError(null);
       }, 5000);
@@ -163,10 +184,11 @@ export function MyContextProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     await signOut(auth);
     setUser(null);
+    setProfileReady(false);
   };
 
   return (
-    <myContext.Provider value={{ user, authReady, login, error, logout }}>
+    <myContext.Provider value={{ user, authReady, profileReady, login, error, logout }}>
       {/* Until Firebase restores the session we don't know if the visitor is
           logged in, so show the loader instead of flashing the login page. */}
       {authReady ? children : <Loader label="Checking your session..." />}

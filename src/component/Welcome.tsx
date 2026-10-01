@@ -4,12 +4,15 @@ import Sidebar from "./panel/Sidebar";
 import { myContext } from "./context/MyContextProvider";
 import Loader from "../custom-components/Loader";
 import { BsList } from "react-icons/bs";
+import WhatsNewModal from "../features/whats-new/WhatsNewModal";
+import { useWhatsNew } from "../features/whats-new/useWhatsNew";
 
 function Welcome() {
   const { user, authReady } = useContext(myContext);
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const whatsNew = useWhatsNew();
 
   // Only redirect once Firebase has restored the session, and remember where
   // the user was so they land back on the same page after logging in.
@@ -60,6 +63,9 @@ function Welcome() {
           <Outlet />
         </main>
       </div>
+
+      {/* Globally mounted release announcement (once per user per release). */}
+      <WhatsNewModal open={whatsNew.open} onClose={whatsNew.onClose} />
     </div>
   );
 }
