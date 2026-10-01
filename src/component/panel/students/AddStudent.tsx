@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { AdmissionStudentFormValues } from "../../../utils/type";
 import BulkStudentImport from "../BulkStudentImport";
 import CustomButton from "../../../custom-components/CustomButton";
+import Modal from "../../../custom-components/Modal";
 import AdmissionBoxedInput from "../../../custom-components/admission/AdmissionBoxedInput";
 import AdmissionCheckboxGroup from "../../../custom-components/admission/AdmissionCheckboxGroup";
 import AdmissionDateOfBirth from "../../../custom-components/admission/AdmissionDateOfBirth";
@@ -455,6 +456,9 @@ function AddStudent() {
   const [pendingMotherPhoto, setPendingMotherPhoto] = useState<File | null>(
     null,
   );
+  const [nextStudentConfirmOpen, setNextStudentConfirmOpen] =
+    useState(false);
+  const [loadingNextStudent, setLoadingNextStudent] = useState(false);
 
   /* Copy-paste photo routing: which photo box receives an image pasted from
      the clipboard. A focused photo box wins, otherwise the last-focused box is
@@ -636,6 +640,59 @@ function AddStudent() {
     }
 
     setActiveTab("school");
+  };
+
+  /**
+   * "Next Student" (edit mode only): opens the next editable student without
+   * saving the current one - the next student of the same class, or the first
+   * student of the following class (`CLASSES` order), for the academic year
+   * currently set on the form. Unsaved edits must be confirmed first so an
+   * entry is never lost silently.
+   */
+  const handleNextStudent = async (ignoreUnsaved = false) => {
+    if (!editingStudentId || !editEnrollmentId) {
+      return;
+    }
+
+    const values = getValues();
+    const className = values.className.trim();
+    const academicYear = `20${values.sessionStart.trim()}-${values.sessionEnd.trim()}`;
+
+    if (isDirty && !ignoreUnsaved) {
+      setNextStudentConfirmOpen(true);
+      return;
+    }
+
+    setLoadingNextStudent(true);
+    try {
+      const nextStudent = await findNextStudentToEdit(
+        editEnrollmentId,
+        className,
+        academicYear,
+      );
+
+      setNextStudentConfirmOpen(false);
+
+      if (!nextStudent) {
+        toast("No more students to edit for this session.");
+        return;
+      }
+
+      activePhotoKey.current = "student";
+      setActiveTab("info");
+      setSearchParams({ edit: nextStudent.id }, { replace: true });
+
+      toast.success("Showing the next student.");
+    } catch (error) {
+      console.error("Find next student error:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to load the next student.",
+      );
+    } finally {
+      setLoadingNextStudent(false);
+    }
   };
 
   const onSubmit: SubmitHandler<AdmissionStudentFormValues> = async (data) => {
@@ -1226,6 +1283,17 @@ function AddStudent() {
             <CustomButton type="button" onClick={handleNext}>
               Next
             </CustomButton>
+
+            {editingStudentId && (
+              <CustomButton
+                type="button"
+                variant="outline"
+                loading={loadingNextStudent}
+                onClick={() => void handleNextStudent()}
+              >
+                Next Student
+              </CustomButton>
+            )}
           </div>
         </div>
       ) : (
@@ -1514,8 +1582,32 @@ function AddStudent() {
                   ? "Update Student"
                   : "Add Student"}
             </CustomButton>
+
+            {editingStudentId && (
+              <CustomButton
+                type="button"
+                variant="outline"
+                loading={loadingNextStudent}
+                onClick={() => void handleNextStudent()}
+              >
+                Next Student
+              </CustomButton>
+            )}
           </div>
         </form>
+      )}
+
+      {editingStudentId && (
+        <Modal
+          isOpen={nextStudentConfirmOpen}
+          onClose={() => setNextStudentConfirmOpen(false)}
+          title="Unsaved changes"
+          description="You have unsaved changes for the current student. Moving to the next student will discard them. Continue?"
+          cancelText="Stay"
+          submitText="Discard & Next"
+          loading={loadingNextStudent}
+          onSubmit={() => void handleNextStudent(true)}
+        />
       )}
     </div>
   );
