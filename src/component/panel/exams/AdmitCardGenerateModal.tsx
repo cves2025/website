@@ -28,6 +28,7 @@ function AdmitCardGenerateModal({ onClose }: AdmitCardGenerateModalProps) {
     if (gen.selectedExamId) params.set("exam", gen.selectedExamId);
     if (gen.selectedYear) params.set("year", gen.selectedYear);
     if (gen.selectedClass) params.set("class", gen.selectedClass);
+    if (gen.selectedSection) params.set("section", gen.selectedSection);
     if (gen.allStudents) {
       params.set("students", "all");
     } else if (gen.selectedEnrollments.length > 0) {

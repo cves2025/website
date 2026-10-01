@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import { marksSchemeBadge } from "../../../utils/examMarksScheme";
 import SearchableMultiSelect from "../../../custom-components/SearchableMultiSelect";
+import { SECTIONS } from "../../../constants";
 import {
   ADD_EXAM_PATH,
   EXAM_SCHEDULE_PATH,
@@ -161,6 +162,8 @@ function GenerateAdmitCardStep({ generator }: GenerateAdmitCardStepProps) {
     cardPapers,
     selectedClass,
     handleClassChange,
+    selectedSection,
+    handleSectionChange,
     scheduledClasses,
     loadingStudents,
     selectedEnrollments,
@@ -229,7 +232,30 @@ function GenerateAdmitCardStep({ generator }: GenerateAdmitCardStepProps) {
           )}
         </div>
 
-        <div className="lg:col-span-9">
+        <div className="lg:col-span-3">
+          <label
+            htmlFor="modalCardSection"
+            className="block text-sm font-semibold text-gray-700 mb-1"
+          >
+            Section
+          </label>
+          <select
+            id="modalCardSection"
+            value={selectedSection}
+            onChange={(event) => handleSectionChange(event.target.value)}
+            disabled={!selectedClass}
+            className={inputClass}
+          >
+            <option value="">All Sections</option>
+            {SECTIONS.map((section) => (
+              <option key={section} value={section}>
+                {section}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="lg:col-span-6">
           <SearchableMultiSelect
             id="modalCardStudent"
             label="Student"

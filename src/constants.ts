@@ -40,6 +40,15 @@ export const CLASS_OPTIONS = CLASSES.map((className) => ({
   label: className,
 }));
 
+/**
+ * After updating a student, the admission form automatically opens the next
+ * record in edit mode instead of going back to the Student List:
+ *   1. the next student of the same class (sorted by first / last name), then
+ *   2. the first student of the following class (in `CLASSES` order).
+ * Set to `false` to keep the default behaviour (clear the form after saving).
+ */
+export const AUTO_NEXT_STUDENT_AFTER_UPDATE = true;
+
 export const SECTIONS: string[] = ["A", "B", "C"];
 
 export const TEACHER_DESIGNATIONS: string[] = [

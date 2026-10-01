@@ -4,12 +4,10 @@ import {
   doc,
   DocumentData,
   getDocs,
-  limit,
-  orderBy,
   query,
   QueryDocumentSnapshot,
   serverTimestamp,
-  startAfter,
+  Timestamp,
   updateDoc,
   where,
 } from "firebase/firestore";
@@ -21,6 +19,7 @@ import {
   ADD_STUDENT_PATH,
   CLASSES,
   COLLECTION,
+  SECTIONS,
 } from "../../../constants";
 
 import { db } from "../../../firebase/config";
@@ -29,7 +28,7 @@ import Modal from "../../../custom-components/Modal";
 import PageHeader from "../../../custom-components/PageHeader";
 import Button from "../../../custom-components/Button";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 75, 100];
 const SEARCH_DELAY = 350;
 
 interface EnrollmentRecord {
@@ -46,7 +45,19 @@ interface EnrollmentRecord {
   phone?: string;
   status?: string;
   isDeleted?: boolean;
+  createdAt?: number;
 }
+
+type SortField =
+  | "enrollment"
+  | "studentName"
+  | "className"
+  | "section"
+  | "fatherName"
+  | "phone"
+  | "createdAt";
+
+type SortDirection = "asc" | "desc";
 
 export default function StudentList() {
   const navigate = useNavigate();
@@ -59,22 +70,20 @@ export default function StudentList() {
 
   const [search, setSearch] = useState("");
   const [selectedClass, setSelectedClass] = useState("");
+  const [selectedSection, setSelectedSection] = useState("");
   const [selectedYear, setSelectedYear] = useState(
     academicYears[0]?.value ?? ""
   );
 
-  const [hasNextPage, setHasNextPage] = useState(false);
+  const [sortField, setSortField] = useState<SortField>("createdAt");
+  const [sortDirection, setSortDirection] =
+    useState<SortDirection>("desc");
+  const [sortActive, setSortActive] = useState(false);
+
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
   const [page, setPage] = useState(1);
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
-
-  const cursorRef = useRef<
-    QueryDocumentSnapshot<DocumentData> | undefined
-  >(undefined);
-
-  const previousCursorsRef = useRef<
-    Array<QueryDocumentSnapshot<DocumentData> | undefined>
-  >([]);
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
@@ -99,141 +108,173 @@ export default function StudentList() {
       phone: data.phone ?? "",
       status: data.status ?? "active",
       isDeleted: data.isDeleted === true,
+      createdAt:
+        data.createdAt instanceof Timestamp
+          ? data.createdAt.seconds
+          : 0,
     };
   };
 
-  const loadStudents = useCallback(
-    async (
-      cursor?: QueryDocumentSnapshot<DocumentData>
-    ) => {
-      setLoading(true);
+  const loadStudents = useCallback(async () => {
+    setLoading(true);
 
-      try {
-        const searchValue = search.trim().toLowerCase();
+    try {
+      const searchValue = search.trim().toLowerCase();
 
-        const enrollmentCollection = collection(
-          db,
-          COLLECTION.ENROLLMENTS
+      const enrollmentCollection = collection(
+        db,
+        COLLECTION.ENROLLMENTS
+      );
+
+      /*
+       * -------------------------------------------------------
+       * Data source
+       * -------------------------------------------------------
+       *
+       * Enrollments are fetched for the selected academic year
+       * and then filtered / sorted / paginated on the client so
+       * the list can be sorted by any column without requiring
+       * extra Firestore composite indexes.
+       */
+
+      const snapshot = await getDocs(
+        query(
+          enrollmentCollection,
+          where("academicYear", "==", selectedYear)
+        )
+      );
+
+      let result = snapshot.docs
+        .map(convertStudent)
+        .filter((student) => !student.isDeleted);
+
+      if (selectedClass) {
+        result = result.filter(
+          (student) => student.className === selectedClass
         );
-
-        let studentQuery;
-
-        /*
-         * -------------------------------------------------------
-         * Search mode
-         * -------------------------------------------------------
-         *
-         * Name prefix search.
-         *
-         * Example:
-         * "rah" -> Rahul, Raghav, Rakesh...
-         */
-
-        if (searchValue) {
-          studentQuery = query(
-            enrollmentCollection,
-
-            where("academicYear", "==", selectedYear),
-
-            ...(selectedClass
-              ? [where("className", "==", selectedClass)]
-              : []),
-
-            where("firstNameLower", ">=", searchValue),
-            where(
-              "firstNameLower",
-              "<=",
-              `${searchValue}\uf8ff`
-            ),
-
-            orderBy("firstNameLower", "asc"),
-            limit(PAGE_SIZE)
-          );
-        }
-
-        /*
-         * -------------------------------------------------------
-         * Class selected
-         * -------------------------------------------------------
-         */
-
-        else if (selectedClass) {
-          studentQuery = query(
-            enrollmentCollection,
-
-            where("academicYear", "==", selectedYear),
-            where("className", "==", selectedClass),
-
-            orderBy("firstNameLower", "asc"),
-            orderBy("lastNameLower", "asc"),
-
-            limit(PAGE_SIZE)
-          );
-        }
-
-        /*
-         * -------------------------------------------------------
-         * Default
-         * -------------------------------------------------------
-         *
-         * No class + no search
-         *
-         * Show latest 10 enrollments.
-         */
-
-        else {
-          studentQuery = query(
-            enrollmentCollection,
-
-            where("academicYear", "==", selectedYear),
-
-            orderBy("createdAt", "desc"),
-
-            limit(PAGE_SIZE)
-          );
-        }
-
-        /*
-         * Cursor pagination
-         */
-
-        if (cursor) {
-          studentQuery = query(
-            studentQuery,
-            startAfter(cursor)
-          );
-        }
-
-        const snapshot = await getDocs(studentQuery);
-
-        const result = snapshot.docs
-          .map(convertStudent)
-          .filter((student) => !student.isDeleted);
-
-        setStudents(result);
-
-        setHasNextPage(snapshot.docs.length === PAGE_SIZE);
-
-        if (snapshot.docs.length > 0) {
-          cursorRef.current =
-            snapshot.docs[snapshot.docs.length - 1];
-        } else {
-          cursorRef.current = undefined;
-        }
-      } catch (error) {
-        console.error("Load students error:", error);
-
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "Failed to load students."
-        );
-      } finally {
-        setLoading(false);
       }
-    },
-    [search, selectedClass, selectedYear]
-  );
+
+      if (selectedSection) {
+        result = result.filter(
+          (student) => student.section === selectedSection
+        );
+      }
+
+      /*
+       * -------------------------------------------------------
+       * Search mode
+       * -------------------------------------------------------
+       *
+       * Name prefix search.
+       *
+       * Example:
+       * "rah" -> Rahul, Raghav, Rakesh...
+       */
+
+      if (searchValue) {
+        result = result.filter((student) =>
+          student.firstName.toLowerCase().startsWith(searchValue)
+        );
+      }
+
+      /*
+       * -------------------------------------------------------
+       * Column sorting
+       * -------------------------------------------------------
+       *
+       * Until the user clicks a column header the original
+       * server-side defaults are kept:
+       *   - search / class / section -> name ascending
+       *   - otherwise                -> newest first
+       */
+
+      let effectiveField = sortField;
+      let effectiveDirection = sortDirection;
+
+      if (!sortActive) {
+        effectiveField =
+          searchValue || selectedClass || selectedSection
+            ? "studentName"
+            : "createdAt";
+        effectiveDirection =
+          searchValue || selectedClass || selectedSection
+            ? "asc"
+            : "desc";
+      }
+
+      const directionMultiplier =
+        effectiveDirection === "asc" ? 1 : -1;
+
+      result.sort((a, b) => {
+        let comparison = 0;
+
+        if (effectiveField === "createdAt") {
+          const left = Number(a.createdAt);
+          const right = Number(b.createdAt);
+          comparison = left < right ? -1 : left > right ? 1 : 0;
+        } else {
+          let left: string;
+          let right: string;
+
+          if (effectiveField === "studentName") {
+            left = `${a.firstName} ${a.lastName}`.trim().toLowerCase();
+            right = `${b.firstName} ${b.lastName}`.trim().toLowerCase();
+          } else {
+            left = String(a[effectiveField] ?? "").toLowerCase();
+            right = String(b[effectiveField] ?? "").toLowerCase();
+          }
+
+          /*
+           * Enrollment / phone values are stored as text but are
+           * usually numeric (e.g. "1001"), so compare them as
+           * numbers whenever both sides are numeric.
+           */
+
+          const leftNumber =
+            left === "" ? NaN : Number(left);
+          const rightNumber =
+            right === "" ? NaN : Number(right);
+
+          if (!Number.isNaN(leftNumber) && !Number.isNaN(rightNumber)) {
+            comparison =
+              leftNumber < rightNumber
+                ? -1
+                : leftNumber > rightNumber
+                  ? 1
+                  : 0;
+          } else {
+            comparison = left < right ? -1 : left > right ? 1 : 0;
+          }
+        }
+
+        if (comparison === 0) {
+          comparison = a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+        }
+
+        return comparison * directionMultiplier;
+      });
+
+      setStudents(result);
+    } catch (error) {
+      console.error("Load students error:", error);
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to load students."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    search,
+    selectedClass,
+    selectedSection,
+    selectedYear,
+    sortField,
+    sortDirection,
+    sortActive,
+  ]);
 
   /*
    * -----------------------------------------------------------
@@ -249,9 +290,6 @@ export default function StudentList() {
     searchTimerRef.current = setTimeout(() => {
       setPage(1);
 
-      cursorRef.current = undefined;
-      previousCursorsRef.current = [];
-
       loadStudents();
     }, search ? SEARCH_DELAY : 0);
 
@@ -263,9 +301,39 @@ export default function StudentList() {
   }, [
     search,
     selectedClass,
+    selectedSection,
     selectedYear,
     loadStudents,
   ]);
+
+  /*
+   * -----------------------------------------------------------
+   * Column sorting
+   * -----------------------------------------------------------
+   */
+
+  const handleSort = (field: SortField) => {
+    if (field === sortField) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+
+    setSortActive(true);
+    setPage(1);
+  };
+
+  /*
+   * -----------------------------------------------------------
+   * Records per page
+   * -----------------------------------------------------------
+   */
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setPage(1);
+  };
 
   /*
    * -----------------------------------------------------------
@@ -273,16 +341,12 @@ export default function StudentList() {
    * -----------------------------------------------------------
    */
 
-  const handleNext = async () => {
-    if (!hasNextPage || !cursorRef.current) {
+  const handleNext = () => {
+    if (!hasNextPage || loading) {
       return;
     }
 
-    previousCursorsRef.current.push(cursorRef.current);
-
-    setPage((current) => current + 1);
-
-    await loadStudents(cursorRef.current);
+    setPage(currentPage + 1);
   };
 
   /*
@@ -291,28 +355,12 @@ export default function StudentList() {
    * -----------------------------------------------------------
    */
 
-  const handlePrevious = async () => {
-    if (page <= 1) {
+  const handlePrevious = () => {
+    if (currentPage <= 1) {
       return;
     }
 
-    previousCursorsRef.current.pop();
-
-    const previousCursor =
-      previousCursorsRef.current[
-        previousCursorsRef.current.length - 1
-      ];
-
-    setPage((current) => Math.max(1, current - 1));
-
-    /*
-     * Previous page needs to start from the cursor
-     * before the previous page.
-     *
-     * For page 1, cursor must be undefined.
-     */
-
-    await loadStudents(previousCursor);
+    setPage(currentPage - 1);
   };
 
   /*
@@ -347,8 +395,6 @@ export default function StudentList() {
       setIsDeleteModalOpen(false);
       setStudentToDelete(null);
 
-      cursorRef.current = undefined;
-      previousCursorsRef.current = [];
       setPage(1);
 
       await loadStudents();
@@ -364,6 +410,37 @@ export default function StudentList() {
       setDeletingId(null);
     }
   };
+
+  /*
+   * -----------------------------------------------------------
+   * Pagination
+   * -----------------------------------------------------------
+   */
+
+  const totalPages = Math.max(1, Math.ceil(students.length / pageSize));
+  const currentPage = Math.max(1, Math.min(page, totalPages));
+  const startIndex = (currentPage - 1) * pageSize;
+  const visibleStudents = students.slice(startIndex, startIndex + pageSize);
+  const hasNextPage = currentPage < totalPages;
+
+  const sortIndicator = (field: SortField) => {
+    if (!sortActive || field !== sortField) {
+      return null;
+    }
+
+    return sortDirection === "asc" ? " ▲" : " ▼";
+  };
+
+  const sortableHeader = (label: string, field: SortField) => (
+    <th
+      className="px-4 py-3 cursor-pointer select-none"
+      onClick={() => handleSort(field)}
+      title={`Sort by ${label}`}
+    >
+      {label}
+      {sortIndicator(field)}
+    </th>
+  );
 
   return (
     <div className="flex flex-col gap-2">
@@ -385,7 +462,7 @@ export default function StudentList() {
 
       {/* Filters */}
 
-      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3 bg-white rounded-lg py-2 px-4">
+      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4 bg-white rounded-lg py-2 px-4">
         {/* Search */}
 
         <div>
@@ -449,6 +526,30 @@ export default function StudentList() {
             ))}
           </select>
         </div>
+
+        {/* Section */}
+
+        <div>
+          <label className="mb-1 block text-sm font-medium">
+            Section
+          </label>
+
+          <select
+            value={selectedSection}
+            onChange={(event) =>
+              setSelectedSection(event.target.value)
+            }
+            className="w-full rounded-md border px-3 py-2"
+          >
+            <option value="">All Sections</option>
+
+            {SECTIONS.map((section) => (
+              <option key={section} value={section}>
+                {section}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Table */}
@@ -460,29 +561,18 @@ export default function StudentList() {
               <th className="px-4 py-3">
                 Sr. No.
               </th>
-              <th className="px-4 py-3">
-                Enrollment
-              </th>
 
-              <th className="px-4 py-3">
-                Name
-              </th>
+              {sortableHeader("Enrollment", "enrollment")}
 
-              <th className="px-4 py-3">
-                Class
-              </th>
+              {sortableHeader("Name", "studentName")}
 
-              <th className="px-4 py-3">
-                Section
-              </th>
+              {sortableHeader("Class", "className")}
 
-              <th className="px-4 py-3">
-                Father's Name
-              </th>
+              {sortableHeader("Section", "section")}
 
-              <th className="px-4 py-3">
-                Phone
-              </th>
+              {sortableHeader("Father's Name", "fatherName")}
+
+              {sortableHeader("Phone", "phone")}
 
               <th className="px-4 py-3">
                 Actions
@@ -510,13 +600,13 @@ export default function StudentList() {
                 </td>
               </tr>
             ) : (
-              students.map((student, index) => (
+              visibleStudents.map((student, index) => (
                 <tr
                   key={student.id}
                   className="border-b last:border-b-0"
                 >
                   <td className="px-4 py-3">
-                    {index+1}
+                    {startIndex + index + 1}
                   </td>
                   <td className="px-4 py-3">
                     {student.enrollment}
@@ -582,15 +672,35 @@ export default function StudentList() {
 
       {/* Pagination */}
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <span>Show</span>
+
+          <select
+            value={pageSize}
+            onChange={(event) =>
+              handlePageSizeChange(Number(event.target.value))
+            }
+            className="rounded-md border px-2 py-1"
+          >
+            {PAGE_SIZE_OPTIONS.map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </select>
+
+          <span>per page</span>
+        </div>
+
         <span className="text-sm text-gray-500">
-          Page {page}
+          Page {currentPage} of {totalPages}
         </span>
 
         <div className="flex gap-2">
           <button
             type="button"
-            disabled={page === 1 || loading}
+            disabled={currentPage === 1 || loading}
             onClick={handlePrevious}
             className="rounded border px-4 py-2 disabled:opacity-50"
           >

@@ -40,6 +40,8 @@ interface UseAdmitCardGeneratorOptions {
   initialExamId?: string;
   /** Class selected from the URL (?class=<name>). */
   initialClass?: string;
+  /** Section selected from the URL (?section=A). */
+  initialSection?: string;
   /** Enrollments selected from the URL (?students=a,b,c). */
   initialEnrollments?: string[];
   /** Start with "all students of the class" selected (?students=all). */
@@ -73,6 +75,9 @@ export function useAdmitCardGenerator(
 
   const [selectedClass, setSelectedClass] = useState(
     options.initialClass || "",
+  );
+  const [selectedSection, setSelectedSection] = useState(
+    options.initialSection || "",
   );
   const [classStudents, setClassStudents] = useState<CardStudent[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
@@ -111,6 +116,7 @@ export function useAdmitCardGenerator(
     if (previousClass !== null && previousClass !== selectedClass) {
       setSelectedEnrollments([]);
       setAllStudents(false);
+      setSelectedSection("");
     }
     setCards([]);
     setGenerateError("");
@@ -282,9 +288,17 @@ export function useAdmitCardGenerator(
     (student) => !matchesSelectedSession(student),
   );
 
+  /* Students of the chosen section. When no section is picked every section is
+     kept; students without a saved section only match "All Sections". */
+  const matchesSelectedSection = (student: CardStudent) =>
+    !selectedSection || student.section === selectedSection;
+
   const visibleStudents = showOtherSessions
-    ? classStudents
-    : classStudents.filter(matchesSelectedSession);
+    ? classStudents.filter(matchesSelectedSection)
+    : classStudents.filter(
+        (student) =>
+          matchesSelectedSession(student) && matchesSelectedSection(student),
+      );
 
   /* Options of the searchable student box: name, father's name, section and
      enrollment are all searchable. */
@@ -316,6 +330,7 @@ export function useAdmitCardGenerator(
     setSelectedYear(value);
     setSelectedExamId("");
     setSelectedClass("");
+    setSelectedSection("");
     setSelectedEnrollments([]);
     setAllStudents(false);
     setCards([]);
@@ -325,6 +340,7 @@ export function useAdmitCardGenerator(
   const handleExamChange = (value: string) => {
     setSelectedExamId(value);
     setSelectedClass("");
+    setSelectedSection("");
     setSelectedEnrollments([]);
     setAllStudents(false);
     setCards([]);
@@ -333,6 +349,14 @@ export function useAdmitCardGenerator(
 
   const handleClassChange = (value: string) => {
     setSelectedClass(value);
+  };
+
+  const handleSectionChange = (value: string) => {
+    setSelectedSection(value);
+    setSelectedEnrollments([]);
+    setAllStudents(false);
+    setCards([]);
+    setGenerateError("");
   };
 
   const handleSelectAllStudents = (checked: boolean) => {
@@ -361,7 +385,8 @@ export function useAdmitCardGenerator(
       const selectedStudents = allStudents
         ? visibleStudents
         : classStudents.filter((student) =>
-            selectedEnrollments.includes(student.enrollment),
+            selectedEnrollments.includes(student.enrollment) &&
+            matchesSelectedSection(student),
           );
       if (selectedStudents.length === 0) {
         setGenerateError(
@@ -481,6 +506,8 @@ export function useAdmitCardGenerator(
     scheduledClasses,
     selectedClass,
     handleClassChange,
+    selectedSection,
+    handleSectionChange,
     classStudents,
     loadingStudents,
     selectedEnrollments,

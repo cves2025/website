@@ -1,6 +1,11 @@
+import { useMemo } from "react";
 import { NavLink, useSearchParams } from "react-router-dom";
 import { FaPrint } from "react-icons/fa";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
+import {
+  compareStudentsByName,
+  generateRollNumber,
+} from "../../../utils/rollNumber";
 import { useAdmitCardGenerator } from "./useAdmitCardGenerator";
 import AdmitCardCard from "./AdmitCardCard";
 import { ADMIT_CARD_PATH } from "./examScheduleShared";
@@ -20,6 +25,7 @@ function GeneratedAdmitCards() {
   const examId = searchParams.get("exam") ?? "";
   const year = searchParams.get("year") ?? "";
   const className = searchParams.get("class") ?? "";
+  const section = searchParams.get("section") ?? "";
   const studentsRaw = searchParams.get("students") ?? "";
 
   const allStudents = studentsRaw === "all";
@@ -34,10 +40,18 @@ function GeneratedAdmitCards() {
     initialExamId: examId,
     initialYear: year,
     initialClass: className,
+    initialSection: section,
     initialEnrollments: enrollments,
     allStudentsInitially: allStudents,
     autoGenerate: true,
   });
+
+  /* Cards are printed alphabetically by student name, and the roll number
+     printed on a card follows that same alphabetical order. */
+  const cards = useMemo(
+    () => [...gen.cards].sort(compareStudentsByName),
+    [gen.cards],
+  );
 
   const missingSelection =
     !examId || !className || (!allStudents && enrollments.length === 0);
@@ -85,6 +99,7 @@ function GeneratedAdmitCards() {
           <p>
             {selectedExam ? selectedExam.examName : "Loading exam..."}
             {gen.selectedClass ? ` · ${toOrdinalLabel(gen.selectedClass)}` : ""}
+            {gen.selectedSection ? ` · Section ${gen.selectedSection}` : ""}
             {gen.cards.length > 0 ? ` · ${gen.cards.length} student(s)` : ""}
           </p>
         }
@@ -107,15 +122,20 @@ function GeneratedAdmitCards() {
 
       {/* The cards */}
       {selectedExam &&
-        gen.cards.map((card) => (
-          <AdmitCardCard
-            key={card.id}
-            card={card}
-            exam={selectedExam}
-            writtenPapers={gen.writtenPapers}
-            practicalPapers={gen.practicalPapers}
-          />
-        ))}
+        cards.map((card) => {
+          const rollNo = generateRollNumber(cards, card.id);
+
+          return (
+            <AdmitCardCard
+              key={card.id}
+              card={card}
+              rollNo={rollNo}
+              exam={selectedExam}
+              writtenPapers={gen.writtenPapers}
+              practicalPapers={gen.practicalPapers}
+            />
+          );
+        })}
 
       {/* Bottom bar */}
       <div className="mt-8 flex flex-wrap items-center justify-end gap-2 print:hidden">

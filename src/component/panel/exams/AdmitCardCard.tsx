@@ -148,6 +148,8 @@ function AdmitScheduleTable({ papers }: { papers: CardPaper[] }) {
 interface AdmitCardCardProps {
   /** Student the card is printed for. */
   card: CardStudent;
+  /** Frontend-only roll number, printed after the enrollment number. */
+  rollNo: number;
   /** Exam the card belongs to. */
   exam: ExamDoc;
   /** Written papers of the class (rendered in the first table). */
@@ -169,6 +171,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 /** One printed admit card. */
 function AdmitCardCard({
   card,
+  rollNo,
   exam,
   writtenPapers,
   practicalPapers,
@@ -256,6 +259,10 @@ function AdmitCardCard({
       <div className="grid grid-cols-1 items-start gap-6 border-b border-gray-200 px-4 py-1 sm:grid-cols-[minmax(0,1fr)_auto] md:px-6 print:grid-cols-[minmax(0,1fr)_auto] print:px-6">
         <div className="grid min-w-0 grid-cols-1 content-start gap-x-4 gap-y-1.5 text-sm">
           <DetailRow label="Enrollment No." value={card.enrollment || "-"} />
+          <DetailRow
+            label="Roll No."
+            value={rollNo > 0 ? String(rollNo) : "-"}
+          />
           <DetailRow label="Student Name" value={studentName} />
           <DetailRow label="Father's Name" value={card.fatherName || "-"} />
           <DetailRow label="Mother's Name" value={card.motherName || "-"} />
