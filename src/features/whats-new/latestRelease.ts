@@ -14,11 +14,12 @@ export interface LatestRelease {
 }
 
 export const latestRelease: LatestRelease = {
-  id: "2026-10-student-photo-column",
-  title: "Student & Exam Center Updates",
+  id: "2026-10-photo-drag-drop",
+  title: "Photo Upload & Student Updates",
   description:
-    "This release brings a faster student list and a smoother admit card workflow.",
+    "This release adds drag & drop photo upload to the admission form, alongside the faster student list and smoother admit card workflow.",
   highlights: [
+    "Admission Form - drag & drop a photo directly onto the Student / Father / Mother photo boxes to attach it faster; click-to-choose and copy-paste still work exactly as before.",
     "Student List - each student now shows their photo in a new Photo column so you can identify records at a glance.",
     "Student List - show 25 / 50 / 75 / 100 records per page, sort by any column, and filter by class or section.",
     "Edit mode - after updating a student the form automatically opens the next student, and a new \"Next Student\" button is available on both pages.",
