@@ -3,6 +3,7 @@ import {
   collection,
   doc,
   DocumentData,
+  getDoc,
   getDocs,
   query,
   QueryDocumentSnapshot,
@@ -84,6 +85,7 @@ export default function StudentList() {
   const [page, setPage] = useState(1);
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [studentPhotos, setStudentPhotos] = useState<Record<string, string>>({});
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
@@ -423,6 +425,75 @@ export default function StudentList() {
   const visibleStudents = students.slice(startIndex, startIndex + pageSize);
   const hasNextPage = currentPage < totalPages;
 
+  /*
+   * -----------------------------------------------------------
+   * Student photos
+   * -----------------------------------------------------------
+   *
+   * Photos live on the students document (students/{studentId}),
+   * not on the enrollment row, so they are fetched lazily for the
+   * visible page and cached - turning pages does not refetch.
+   */
+
+  const visibleStudentIds = visibleStudents
+    .map((student) => student.studentId)
+    .filter((id) => id !== "");
+  const visibleIdsKey = visibleStudentIds.join(",");
+
+  useEffect(() => {
+    if (loading || visibleIdsKey === "") {
+      return;
+    }
+
+    const missingIds = visibleStudentIds.filter(
+      (id) => !(id in studentPhotos)
+    );
+    if (missingIds.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadPhotos = async () => {
+      const entries = await Promise.all(
+        missingIds.map(async (studentId) => {
+          try {
+            const snapshot = await getDoc(
+              doc(db, COLLECTION.STUDENTS, studentId)
+            );
+            const data = snapshot.data();
+            return {
+              id: studentId,
+              photo:
+                typeof data?.studentPhoto === "string"
+                  ? data.studentPhoto
+                  : "",
+            };
+          } catch (error) {
+            console.warn("Could not load student photo:", error);
+            return { id: studentId, photo: "" };
+          }
+        })
+      );
+
+      if (cancelled) return;
+
+      setStudentPhotos((prev) => {
+        const next = { ...prev };
+        for (const entry of entries) {
+          next[entry.id] = entry.photo;
+        }
+        return next;
+      });
+    };
+
+    void loadPhotos();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, visibleIdsKey, studentPhotos]);
+
   const sortIndicator = (field: SortField) => {
     if (!sortActive || field !== sortField) {
       return null;
@@ -555,11 +626,15 @@ export default function StudentList() {
       {/* Table */}
 
       <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full min-w-[900px]">
+        <table className="w-full min-w-[1000px]">
           <thead>
             <tr className="border-b bg-gray-50 text-left">
               <th className="px-4 py-3">
                 Sr. No.
+              </th>
+
+              <th className="px-4 py-3">
+                Photo
               </th>
 
               {sortableHeader("Enrollment", "enrollment")}
@@ -584,7 +659,7 @@ export default function StudentList() {
             {loading ? (
               <tr>
                 <td
-                  colSpan={8}
+                  colSpan={9}
                   className="px-4 py-10 text-center"
                 >
                   Loading students...
@@ -593,7 +668,7 @@ export default function StudentList() {
             ) : students.length === 0 ? (
               <tr>
                 <td
-                  colSpan={8}
+                  colSpan={9}
                   className="px-4 py-10 text-center text-gray-500"
                 >
                   No students found.
@@ -607,6 +682,20 @@ export default function StudentList() {
                 >
                   <td className="px-4 py-3">
                     {startIndex + index + 1}
+                  </td>
+                  <td className="px-4 py-3">
+                    {studentPhotos[student.studentId] ? (
+                      <img
+                        src={studentPhotos[student.studentId]}
+                        alt={`Photo of ${student.studentName}`}
+                        className="h-10 w-10 rounded-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-xs text-gray-400">
+                        &mdash;
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     {student.enrollment}

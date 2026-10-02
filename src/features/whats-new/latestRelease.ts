@@ -14,11 +14,12 @@ export interface LatestRelease {
 }
 
 export const latestRelease: LatestRelease = {
-  id: "2026-10-student-exam-updates",
+  id: "2026-10-student-photo-column",
   title: "Student & Exam Center Updates",
   description:
     "This release brings a faster student list and a smoother admit card workflow.",
   highlights: [
+    "Student List - each student now shows their photo in a new Photo column so you can identify records at a glance.",
     "Student List - show 25 / 50 / 75 / 100 records per page, sort by any column, and filter by class or section.",
     "Edit mode - after updating a student the form automatically opens the next student, and a new \"Next Student\" button is available on both pages.",
     "Admit Cards - cards print alphabetically by student name with a roll number, and you can now generate them section-wise.",
