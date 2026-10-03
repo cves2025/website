@@ -24,8 +24,10 @@ import {
   buildExamSheetId,
   buildMarksDocId,
   calculateMarksSummary,
+  formatMarks,
   listLegacySubjectKeys,
   normalizeLegacyMarksDoc,
+  round2,
 } from "../../../utils/marks";
 import {
   ensureExamSheet,
@@ -267,18 +269,19 @@ function toMarkTokenOrRaw(value: string): string {
 
 /**
  * Parses what the teacher typed in one cell: empty, the "AB"/"EX" token, a
- * valid non-negative number within [0, max], or invalid (letters other than
+ * valid non-negative number (at most 2 decimal places, "." or "," accepted as
+ * the decimal separator) within [0, max], or invalid (letters other than
  * AB/EX, negative values, over-max values).
  */
 function resolveCell(value: string, max: number): ResolvedCell {
-  const trimmed = value.trim().toUpperCase();
+  const trimmed = value.trim().replace(",", ".").toUpperCase();
   if (trimmed === "") return { kind: "empty" };
   if (trimmed === "AB") return { kind: "status", status: "absent" };
   if (trimmed === "EX") return { kind: "status", status: "exempt" };
-  if (/^\d+(\.\d+)?$/.test(trimmed)) {
+  if (/^\d+(\.\d{1,2})?$/.test(trimmed)) {
     const numeric = Number(trimmed);
     if (Number.isFinite(numeric) && numeric >= 0 && numeric <= max) {
-      return { kind: "number", value: numeric };
+      return { kind: "number", value: round2(numeric) };
     }
   }
   return { kind: "invalid" };
@@ -352,7 +355,13 @@ function resolveSubject(
     }
   });
 
-  return { kind: "present", obtained, maxMarks, components, componentMax };
+  return {
+    kind: "present",
+    obtained: round2(obtained),
+    maxMarks,
+    components,
+    componentMax,
+  };
 }
 
 interface StudentDraftPlan {
@@ -1090,12 +1099,12 @@ function ExamMarks() {
                                     componentValue === null ||
                                     componentValue === undefined
                                       ? ""
-                                      : String(componentValue);
+                                      : formatMarks(componentValue);
                                 } else {
                                   value =
                                     saved.obtained === null
                                       ? ""
-                                      : String(saved.obtained);
+                                      : formatMarks(saved.obtained);
                                 }
                               } else {
                                 value = "";
@@ -1141,13 +1150,13 @@ function ExamMarks() {
                         );
                       })}
                       <td className="px-3 py-2 text-gray-700 text-center">
-                        {summary.totalMaxMarks}
+                        {formatMarks(summary.totalMaxMarks)}
                       </td>
                       <td className="px-3 py-2 font-semibold text-gray-800 text-center">
-                        {summary.totalMarks}
+                        {formatMarks(summary.totalMarks)}
                       </td>
                       <td className="px-3 py-2 font-semibold text-gray-800 text-center">
-                        {summary.percentage.toFixed(2)}%
+                        {formatMarks(summary.percentage)}%
                       </td>
                     </tr>
                   );

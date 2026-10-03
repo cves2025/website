@@ -18,6 +18,20 @@ import type {
 /** Minimum percentage of the total marks needed to pass an exam. */
 export const PASS_PERCENTAGE = 33;
 
+/** Rounds a number to exactly two decimal places (the only rounding used for marks). */
+export function round2(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+/**
+ * Marks text: at most two decimals, trailing zeros removed (22, 22.5, 22.25).
+ * Blank when the value is not a finite number.
+ */
+export function formatMarks(value: number | null | undefined): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "";
+  return String(round2(value));
+}
+
 const COMPONENT_NAMES: SubjectComponentName[] = [
   "notebook",
   "test",
@@ -96,12 +110,17 @@ export function calculateMarksSummary(
 
   const percentage =
     totalMaxMarks > 0
-      ? Number(((totalMarks / totalMaxMarks) * 100).toFixed(2))
+      ? round2((totalMarks / totalMaxMarks) * 100)
       : 0;
   const result: "pass" | "fail" =
     totalMaxMarks === 0 || percentage >= PASS_PERCENTAGE ? "pass" : "fail";
 
-  return { totalMarks, totalMaxMarks, percentage, result };
+  return {
+    totalMarks: round2(totalMarks),
+    totalMaxMarks: round2(totalMaxMarks),
+    percentage,
+    result,
+  };
 }
 
 function isComponentName(value: string): value is SubjectComponentName {
@@ -125,7 +144,7 @@ function readComponents(
       if (componentValue === null) {
         result[key] = null;
       } else if (typeof componentValue === "number" && Number.isFinite(componentValue)) {
-        result[key] = componentValue;
+        result[key] = round2(componentValue);
       }
     }
   );
@@ -148,14 +167,14 @@ function readComponentMax(
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
-/** Non-negative finite number, or null when the value cannot be represented. */
+/** Non-negative finite number rounded to 2 decimals, or null when not representable. */
 function toNonNegativeNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
-    return value;
+    return round2(value);
   }
   if (typeof value === "string" && value.trim() !== "") {
     const numeric = Number(value);
-    if (Number.isFinite(numeric) && numeric >= 0) return numeric;
+    if (Number.isFinite(numeric) && numeric >= 0) return round2(numeric);
   }
   // Legacy Scholastic grades ("A+") have no numeric equivalent.
   return null;
@@ -196,7 +215,7 @@ function normalizeSubjectRecord(value: unknown): SubjectMarksRecord | null {
     }
     const numeric = Number(trimmed);
     if (trimmed !== "" && Number.isFinite(numeric) && numeric >= 0) {
-      return { status: "present", obtained: numeric, maxMarks };
+      return { status: "present", obtained: round2(numeric), maxMarks };
     }
     // Any other non-empty string (e.g. a Scholastic grade) becomes `grade`.
     if (trimmed !== "") {
@@ -302,18 +321,19 @@ export interface RankableStudent {
  * receives a rank value; the UI decides how to display it (e.g. "-" for fail).
  */
 export function computeRanks(rows: RankableStudent[]): Record<string, number> {
-  const sorted = [...rows].sort((a, b) => b.totalMarks - a.totalMarks);
+  // Ties are decided on the rounded total, so 22.25 and 22.3 never split a rank.
+  const ranked = rows
+    .map((row) => ({ ...row, rounded: round2(row.totalMarks) }))
+    .sort((a, b) => b.rounded - a.rounded);
   const ranks: Record<string, number> = {};
-  sorted.forEach((row, index) => {
+  ranked.forEach((row, index) => {
     if (index === 0) {
       ranks[row.studentUid] = 1;
       return;
     }
-    const previous = sorted[index - 1];
+    const previous = ranked[index - 1];
     ranks[row.studentUid] =
-      previous.totalMarks === row.totalMarks
-        ? ranks[previous.studentUid]
-        : index + 1;
+      previous.rounded === row.rounded ? ranks[previous.studentUid] : index + 1;
   });
   return ranks;
 }

@@ -18,6 +18,7 @@ import {
   compareByClassSectionRoll,
   compareClassNames,
   computeRanks,
+  formatMarks,
   isMarksDocComplete,
   type SubjectColumnDefMap,
 } from "../../../utils/marks";
@@ -258,9 +259,9 @@ function subjectCellText(
   if (part === "grade") return "-";
   if (part === "theory" || part === "practical") {
     const value = record.components?.[part];
-    return value === null || value === undefined ? "-" : String(value);
+    return value === null || value === undefined ? "-" : formatMarks(value);
   }
-  return record.obtained === null ? "-" : String(record.obtained);
+  return record.obtained === null ? "-" : formatMarks(record.obtained);
 }
 
 function CrossList() {
@@ -938,14 +939,14 @@ function CrossListBlock({
                     );
                   })}
                   <td className="px-2 py-1.5 text-center">
-                    {row.doc ? row.doc.totalMarks : "-"}
+                    {row.doc ? formatMarks(row.doc.totalMarks) : "-"}
                   </td>
                   <td className="px-2 py-1.5 text-center">
-                    {row.doc ? row.doc.totalMaxMarks : "-"}
+                    {row.doc ? formatMarks(row.doc.totalMaxMarks) : "-"}
                   </td>
                   <td className="px-2 py-1.5 text-center whitespace-nowrap">
                     {row.doc ? (
-                      `${row.doc.percentage.toFixed(2)}%`
+                      `${formatMarks(row.doc.percentage)}%`
                     ) : (
                       <span className="font-semibold text-amber-700">
                         Marks not entered
