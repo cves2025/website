@@ -4,6 +4,7 @@ export const COLLECTION = {
   SUBJECTS: "subjects",
   EXAMS: "exams",
   EXAM_SCHEDULES: "examSchedules",
+  EXAM_SHEETS: "examSheets",
   STAMP_SIGN: "stampSign",
   USERS: "users",
   MARKS: "marks",

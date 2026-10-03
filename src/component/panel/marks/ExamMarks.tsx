@@ -1,14 +1,11 @@
-import { ChangeEvent, useEffect, useRef, useState } from "react";
+import { ChangeEvent, Fragment, useEffect, useRef, useState } from "react";
 import {
   collection,
-  doc,
   DocumentData,
   onSnapshot,
   orderBy,
   query,
   QueryDocumentSnapshot,
-  serverTimestamp,
-  setDoc,
   where,
 } from "firebase/firestore";
 import toast from "react-hot-toast";
@@ -19,23 +16,36 @@ import { toDateOrNull } from "../../../utils/toDateOrNull";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import {
   ExamCategory,
+  isSchemeClass,
   marksSchemeFromDoc,
   subjectMarksBreakdown,
 } from "../../../utils/examMarksScheme";
 import {
+  buildExamSheetId,
+  buildMarksDocId,
+  calculateMarksSummary,
+  listLegacySubjectKeys,
+  normalizeLegacyMarksDoc,
+} from "../../../utils/marks";
+import {
+  ensureExamSheet,
+  saveStudentMarks,
+  type ExamSheetSubjectInput,
+  type MarksRowSnapshot,
+} from "../../../utils/marksService";
+import {
   ExamDoc,
   MarksData,
   MarksDoc,
+  SubjectComponentName,
   SubjectMarksRecord,
 } from "../../../utils/type";
 import PageHeader from "../../../custom-components/PageHeader";
 import Modal from "../../../custom-components/Modal";
 import Button from "../../../custom-components/Button";
-import CrossList from "./CrossList";
 
 const academicYears = generateAcademicYears();
 
-const PASS_PERCENTAGE = 33;
 const AUTO_SAVE_DELAY = 600;
 
 const inputClass =
@@ -43,6 +53,23 @@ const inputClass =
 
 const marksInputClass =
   "w-20 rounded-md border border-gray-300 bg-white px-1.5 py-1.5 text-center text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500";
+
+/** Extra classes applied to a cell whose draft does not parse to a valid value. */
+const invalidInputClass =
+  "border-red-500 focus:ring-red-500/40 focus:border-red-500";
+
+const GRADE_OPTIONS = ["A+", "A", "B+", "B", "C+", "C", "D", "E", "F"];
+
+/** Draft keys: one per component input (or grade) of every subject cell. */
+const CELL_KEY = {
+  component: (
+    studentUid: string,
+    subjectId: string,
+    component: SubjectComponentName | null
+  ): string => `${studentUid}::${subjectId}::${component ?? "marks"}`,
+  grade: (studentUid: string, subjectId: string): string =>
+    `${studentUid}::${subjectId}::grade`,
+};
 
 interface MarksRowStudent {
   studentUid: string;
@@ -52,11 +79,54 @@ interface MarksRowStudent {
   section: string;
 }
 
+/** One input of a subject column: a single component, or the whole total. */
+interface MarksComponentInput {
+  /** Component name for scheme subjects; null for the single total input. */
+  component: SubjectComponentName | null;
+  /** Maximum marks of this component / total. */
+  max: number;
+  /** Header label shown above the input (e.g. "Notebook (5)"). */
+  label: string;
+}
+
 interface MarksSubjectColumn {
+  /** SubjectDoc id - the key used inside subjectMarks. */
+  id: string;
+  name: string;
+  type: string;
+  order: number;
+  /** Scholastic subjects keep one grade cell and no component inputs. */
+  isGrade: boolean;
+  inputs: MarksComponentInput[];
+}
+
+/** A subject as loaded from Firestore, before the scheme-based layout. */
+interface SubjectColumnBase {
+  id: string;
   name: string;
   type: string;
   order: number;
 }
+
+/** What one subject of one student will be written as (or not written). */
+type ResolvedSubject =
+  | { kind: "clear" }
+  | { kind: "invalid" }
+  | { kind: "status"; status: "absent" | "exempt" }
+  | {
+      kind: "present";
+      obtained: number;
+      maxMarks: number;
+      components: Partial<Record<SubjectComponentName, number | null>>;
+      componentMax: Partial<Record<SubjectComponentName, number>>;
+    };
+
+/** Parsed state of one cell's draft. */
+type ResolvedCell =
+  | { kind: "empty" }
+  | { kind: "status"; status: "absent" | "exempt" }
+  | { kind: "number"; value: number }
+  | { kind: "invalid" };
 
 function toExamCategory(value: unknown): ExamCategory {
   return value === "MAIN_EXAM" ? "MAIN_EXAM" : "UNIT_TEST";
@@ -123,10 +193,11 @@ function sortRowStudents(a: MarksRowStudent, b: MarksRowStudent): number {
 
 function toSubjectColumn(
   snapshot: QueryDocumentSnapshot<DocumentData>
-): MarksSubjectColumn | null {
+): SubjectColumnBase | null {
   const data = snapshot.data();
   if (data.displayInMarksEntry !== true) return null;
   return {
+    id: snapshot.id,
     name: typeof data.name === "string" ? data.name : "",
     type: typeof data.type === "string" ? data.type : "",
     order: typeof data.order === "number" ? data.order : 1,
@@ -134,85 +205,265 @@ function toSubjectColumn(
 }
 
 function sortSubjectColumns(
-  a: MarksSubjectColumn,
-  b: MarksSubjectColumn
+  a: SubjectColumnBase,
+  b: SubjectColumnBase
 ): number {
   return a.order - b.order || a.name.localeCompare(b.name);
 }
 
-function toSubjectMarksRecord(value: unknown): SubjectMarksRecord | null {
-  if (!value || typeof value !== "object") return null;
-  const record = value as Record<string, unknown>;
-  return {
-    obtained:
-      typeof record.obtained === "string"
-        ? record.obtained
-        : typeof record.obtained === "number"
-          ? record.obtained
-          : 0,
-    maxMarks: typeof record.maxMarks === "number" ? record.maxMarks : 0,
-  };
-}
-
-function toMarksDoc(snapshot: QueryDocumentSnapshot<DocumentData>): MarksDoc {
-  const data = snapshot.data();
-  const subjectMarks: Record<string, SubjectMarksRecord> = {};
-  if (data.subjectMarks && typeof data.subjectMarks === "object") {
-    Object.entries(data.subjectMarks).forEach(([key, value]) => {
-      const record = toSubjectMarksRecord(value);
-      if (record) subjectMarks[key] = record;
-    });
+/**
+ * Turns a loaded subject into the input layout of its marks cell. The exam
+ * scheme decides the split (Unit Test = notebook + test; Main Exam = theory,
+ * + practical for Science/Computer on classes 1-8). Scholastic subjects keep
+ * a single grade cell. Other classes get one "Marks" total input.
+ */
+function enrichSubjectColumn(
+  column: SubjectColumnBase,
+  exam: ExamDoc | null,
+  className: string
+): MarksSubjectColumn {
+  if (column.type === "Scholastic") {
+    return { ...column, isGrade: true, inputs: [] };
   }
-  return {
-    id: snapshot.id,
-    studentUid: typeof data.studentUid === "string" ? data.studentUid : "",
-    admissionNumber:
-      typeof data.admissionNumber === "string" ? data.admissionNumber : "",
-    session: typeof data.session === "string" ? data.session : "",
-    className: typeof data.className === "string" ? data.className : "",
-    section: typeof data.section === "string" ? data.section : "",
-    rollNumber: typeof data.rollNumber === "number" ? data.rollNumber : 0,
-    examId: typeof data.examId === "string" ? data.examId : "",
-    examType: typeof data.examType === "string" ? data.examType : "",
-    examName: typeof data.examName === "string" ? data.examName : "",
-    subjectMarks,
-    totalMarks: typeof data.totalMarks === "number" ? data.totalMarks : 0,
-    totalMaxMarks:
-      typeof data.totalMaxMarks === "number" ? data.totalMaxMarks : 0,
-    percentage: typeof data.percentage === "number" ? data.percentage : 0,
-    result: data.result === "fail" ? "fail" : "pass",
-    createdAt: data.createdAt,
-    updatedAt: data.updatedAt,
-  };
+  const inputs: MarksComponentInput[] = [];
+  if (exam && isSchemeClass(className)) {
+    const breakdown = subjectMarksBreakdown(
+      column.name,
+      exam.examCategory,
+      exam.marksScheme
+    );
+    if (exam.examCategory === "UNIT_TEST") {
+      inputs.push(
+        { component: "notebook", max: breakdown.notebook, label: "Notebook" },
+        { component: "test", max: breakdown.theory, label: "Test" }
+      );
+    } else if (breakdown.hasPractical) {
+      inputs.push(
+        { component: "theory", max: breakdown.theory, label: "Theory" },
+        { component: "practical", max: breakdown.practical, label: "Practical" }
+      );
+    } else {
+      inputs.push({
+        component: "theory",
+        max: breakdown.theory,
+        label: "Theory",
+      });
+    }
+  } else {
+    inputs.push({ component: null, max: exam?.maxMarks ?? 0, label: "Marks" });
+  }
+  return { ...column, isGrade: false, inputs };
 }
-
-function subjectKey(name: string): string {
-  return name.trim().toLowerCase();
-}
-
-function toMarksNumber(value: string): number {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
-}
-
-const GRADE_OPTIONS = ["A+", "A", "B+", "B", "C+", "C", "D", "E", "F"];
 
 function normalizeGrade(value: string): string {
   return value.toUpperCase().replace(/[^A-F0-9+\-]/g, "").slice(0, 3);
 }
 
-function clampMarksValue(value: string, maxMarks: number): string {
-  if (value === "") return value;
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return value;
-  if (numeric > maxMarks) return String(maxMarks);
-  if (numeric < 0) return "0";
-  return value;
+/** "AB"/"EX" (any case) are shown back in the cell as uppercase tokens. */
+function toMarkTokenOrRaw(value: string): string {
+  const upper = value.trim().toUpperCase();
+  return upper === "AB" || upper === "EX" ? upper : value;
+}
+
+/**
+ * Parses what the teacher typed in one cell: empty, the "AB"/"EX" token, a
+ * valid non-negative number within [0, max], or invalid (letters other than
+ * AB/EX, negative values, over-max values).
+ */
+function resolveCell(value: string, max: number): ResolvedCell {
+  const trimmed = value.trim().toUpperCase();
+  if (trimmed === "") return { kind: "empty" };
+  if (trimmed === "AB") return { kind: "status", status: "absent" };
+  if (trimmed === "EX") return { kind: "status", status: "exempt" };
+  if (/^\d+(\.\d+)?$/.test(trimmed)) {
+    const numeric = Number(trimmed);
+    if (Number.isFinite(numeric) && numeric >= 0 && numeric <= max) {
+      return { kind: "number", value: numeric };
+    }
+  }
+  return { kind: "invalid" };
+}
+
+/** "AB"/"EX" typed in any cell of a subject applies to the whole subject. */
+function subjectStatusToken(
+  drafts: Record<string, string>,
+  studentUid: string,
+  column: MarksSubjectColumn
+): "AB" | "EX" | null {
+  for (const input of column.inputs) {
+    const draft =
+      drafts[CELL_KEY.component(studentUid, column.id, input.component)];
+    if (!draft) continue;
+    const upper = draft.trim().toUpperCase();
+    if (upper === "AB" || upper === "EX") return upper;
+  }
+  return null;
+}
+
+/**
+ * The effective state of one subject from its cell drafts: absent/exempt when
+ * any cell holds "AB"/"EX", invalid when any cell holds something unusable,
+ * "clear" when every cell is empty, present otherwise. For present subjects,
+ * obtained is the sum of the entered components (empty components store null).
+ */
+function resolveSubject(
+  drafts: Record<string, string>,
+  studentUid: string,
+  column: MarksSubjectColumn
+): ResolvedSubject {
+  if (column.inputs.length === 0) return { kind: "clear" };
+
+  const cells = column.inputs.map((input) =>
+    resolveCell(
+      drafts[CELL_KEY.component(studentUid, column.id, input.component)] ?? "",
+      input.max
+    )
+  );
+
+  const statusCell = cells.find((cell) => cell.kind === "status");
+  if (statusCell && statusCell.kind === "status") {
+    return { kind: "status", status: statusCell.status };
+  }
+  if (cells.some((cell) => cell.kind === "invalid")) {
+    return { kind: "invalid" };
+  }
+  if (cells.every((cell) => cell.kind === "empty")) {
+    return { kind: "clear" };
+  }
+
+  const components: Partial<Record<SubjectComponentName, number | null>> = {};
+  const componentMax: Partial<Record<SubjectComponentName, number>> = {};
+  let obtained = 0;
+  let maxMarks = 0;
+  cells.forEach((cell, index) => {
+    const input = column.inputs[index];
+    maxMarks += input.max;
+    if (!input.component) {
+      // Single total input (classes outside the 1-8 scheme).
+      if (cell.kind === "number") obtained = cell.value;
+      return;
+    }
+    componentMax[input.component] = input.max;
+    if (cell.kind === "number") {
+      components[input.component] = cell.value;
+      obtained += cell.value;
+    } else {
+      components[input.component] = null;
+    }
+  });
+
+  return { kind: "present", obtained, maxMarks, components, componentMax };
+}
+
+interface StudentDraftPlan {
+  subjectMarks: Record<string, SubjectMarksRecord>;
+  clearedSubjectKeys: string[];
+}
+
+/**
+ * Builds the document-level plan of one student: the fresh subjectMarks map
+ * plus the keys that must be deleted. Invalid cells keep the last valid saved
+ * record untouched (neither rewritten nor deleted).
+ */
+function buildStudentDraft(
+  studentUid: string,
+  drafts: Record<string, string>,
+  savedBySubject: Record<string, SubjectMarksRecord> | undefined,
+  columns: MarksSubjectColumn[]
+): StudentDraftPlan {
+  const subjectMarks: Record<string, SubjectMarksRecord> = {};
+  const clearedSubjectKeys: string[] = [];
+
+  columns.forEach((column) => {
+    if (column.isGrade) {
+      const gradeKey = CELL_KEY.grade(studentUid, column.id);
+      if (drafts[gradeKey] === undefined) {
+        // Grade not being edited: keep the saved record (or nothing).
+        if (savedBySubject?.[column.id]) {
+          subjectMarks[column.id] = savedBySubject[column.id];
+        }
+        return;
+      }
+      const grade = normalizeGrade(drafts[gradeKey]);
+      if (grade === "") {
+        if (savedBySubject?.[column.id]) clearedSubjectKeys.push(column.id);
+      } else {
+        subjectMarks[column.id] = {
+          status: "present",
+          obtained: null,
+          maxMarks: 0,
+          grade,
+        };
+      }
+      return;
+    }
+
+    // A subject whose cells have no draft at all is not being edited: keep the
+    // last saved record untouched instead of treating it as "cleared".
+    const hasCellDraft = column.inputs.some(
+      (input) =>
+        drafts[CELL_KEY.component(studentUid, column.id, input.component)] !==
+        undefined
+    );
+    if (!hasCellDraft) {
+      if (savedBySubject?.[column.id]) {
+        subjectMarks[column.id] = savedBySubject[column.id];
+      }
+      return;
+    }
+
+    const resolved = resolveSubject(drafts, studentUid, column);
+    switch (resolved.kind) {
+      case "clear":
+        if (savedBySubject?.[column.id]) clearedSubjectKeys.push(column.id);
+        return;
+      case "invalid":
+        // Keep the last valid saved value: leave the existing key untouched.
+        if (savedBySubject?.[column.id]) {
+          subjectMarks[column.id] = savedBySubject[column.id];
+        }
+        return;
+      case "status":
+        subjectMarks[column.id] = {
+          status: resolved.status,
+          obtained: null,
+          maxMarks: column.inputs.reduce((sum, input) => sum + input.max, 0),
+        };
+        return;
+      case "present":
+        subjectMarks[column.id] = {
+          status: "present",
+          obtained: resolved.obtained,
+          maxMarks: resolved.maxMarks,
+          ...(Object.keys(resolved.components).length > 0
+            ? {
+                components: resolved.components,
+                componentMax: resolved.componentMax,
+              }
+            : {}),
+        };
+        return;
+    }
+  });
+
+  return { subjectMarks, clearedSubjectKeys };
+}
+
+/** A queued per-student autosave, with the full context needed to commit. */
+interface PendingMarkSave {
+  timer: ReturnType<typeof setTimeout>;
+  payload: MarksData;
+  clearedSubjectKeys: string[];
+  sheet: {
+    session: string;
+    exam: ExamDoc | null;
+    className: string;
+    subjects: ExamSheetSubjectInput[];
+  };
 }
 
 function ExamMarks() {
   const [exams, setExams] = useState<ExamDoc[]>([]);
-  const [loadingExams, setLoadingExams] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
 
   const [marksYear, setMarksYear] = useState(academicYears[0]?.value ?? "");
@@ -220,7 +471,9 @@ function ExamMarks() {
   const [marksClass, setMarksClass] = useState("");
 
   const [rowStudents, setRowStudents] = useState<MarksRowStudent[]>([]);
-  const [subjectColumns, setSubjectColumns] = useState<MarksSubjectColumn[]>([]);
+  const [subjectColumns, setSubjectColumns] = useState<MarksSubjectColumn[]>(
+    []
+  );
   const [marksMap, setMarksMap] = useState<Record<string, MarksDoc>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [loadingTable, setLoadingTable] = useState(false);
@@ -230,9 +483,13 @@ function ExamMarks() {
   const rowStudentsRef = useRef<MarksRowStudent[]>([]);
   const subjectColumnsRef = useRef<MarksSubjectColumn[]>([]);
   const knownDocIdsRef = useRef<Set<string>>(new Set());
-  const pendingWritesRef = useRef<
-    Record<string, { payload: MarksData; timer: ReturnType<typeof setTimeout> }>
-  >({});
+  const pendingWritesRef = useRef<Record<string, PendingMarkSave>>({});
+  /** Raw subjectMarks of the loaded docs, so legacy keys can be cleaned up. */
+  const rawSubjectMarksRef = useRef<Record<string, Record<string, unknown>>>(
+    {}
+  );
+  /** Exam sheet combinations already requested on this page (retry on failure). */
+  const examinedSheetsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const examsQuery = query(
@@ -243,140 +500,166 @@ function ExamMarks() {
       examsQuery,
       (snapshot) => {
         setExams(snapshot.docs.map(toExamDoc));
-        setLoadingExams(false);
       },
       (error) => {
         console.error("Failed to load exams:", error);
-        setLoadingExams(false);
       }
     );
     return unsubscribe;
   }, []);
 
   const yearExams = exams.filter(
-    (exam) =>
-      exam.status === "active" && exam.academicYear === marksYear
+    (exam) => exam.status === "active" && exam.academicYear === marksYear
   );
-  const selectedExam =
-    yearExams.find((exam) => exam.id === marksExamId) ?? null;
+  const selectedExam = yearExams.find((exam) => exam.id === marksExamId) ?? null;
   const tableReady = Boolean(
     modalOpen && marksYear && marksExamId && marksClass && selectedExam
   );
 
-  const maxMarksOf = (subjectName: string): number =>
-    selectedExam
-      ? subjectMarksBreakdown(
-          subjectName,
-          selectedExam.examCategory,
-          selectedExam.marksScheme
-        ).total
-      : 0;
+  const buildStudentDraftFor = (studentUid: string): StudentDraftPlan =>
+    buildStudentDraft(
+      studentUid,
+      draftsRef.current,
+      marksMapRef.current[studentUid]?.subjectMarks,
+      subjectColumnsRef.current
+    );
 
-  const buildMarksPayload = (student: MarksRowStudent): MarksData => {
-    const columns = subjectColumnsRef.current;
-    const currentDrafts = draftsRef.current;
-    const currentMarks = marksMapRef.current;
-    const subjectMarks: Record<string, SubjectMarksRecord> = {};
-    let totalMarks = 0;
-    let totalMaxMarks = 0;
-    columns.forEach((column) => {
-      const key = subjectKey(column.name);
-      const cellKey = `${student.studentUid}::${key}`;
-      const draft = currentDrafts[cellKey];
-      const saved = currentMarks[student.studentUid]?.subjectMarks[key];
-      if (column.type === "Scholastic") {
-        const grade =
-          draft !== undefined
-            ? normalizeGrade(draft)
-            : typeof saved?.obtained === "string"
-              ? saved.obtained
-              : "";
-        subjectMarks[key] = { obtained: grade, maxMarks: 0 };
-        return;
-      }
-      const obtained =
-        draft === undefined
-          ? typeof saved?.obtained === "number"
-            ? saved.obtained
-            : 0
-          : toMarksNumber(draft);
-      const maxMarks = maxMarksOf(column.name);
-      subjectMarks[key] = { obtained, maxMarks };
-      totalMarks += obtained;
-      totalMaxMarks += maxMarks;
-    });
-
-    const percentage = totalMaxMarks > 0 ? (totalMarks / totalMaxMarks) * 100 : 0;
-
-    return {
+  const buildStudentPayload = (
+    student: MarksRowStudent
+  ): { payload: MarksData; clearedSubjectKeys: string[] } => {
+    const { subjectMarks, clearedSubjectKeys } = buildStudentDraftFor(
+      student.studentUid
+    );
+    const summary = calculateMarksSummary(subjectMarks);
+    const payload: MarksData = {
       studentUid: student.studentUid,
       admissionNumber: student.admissionNumber,
+      studentName: student.studentName,
+      fatherName: student.fatherName,
       session: marksYear,
       className: marksClass,
       section: student.section,
       rollNumber: Math.max(rowStudentsRef.current.indexOf(student) + 1, 1),
       examId: marksExamId,
-      examType: selectedExam ? selectedExam.examCategory.toLowerCase() : "",
+      examType: selectedExam ? selectedExam.examCategory : "UNIT_TEST",
       examName: selectedExam ? selectedExam.examName : "",
       subjectMarks,
-      totalMarks,
-      totalMaxMarks,
-      percentage: Number(percentage.toFixed(2)),
-      result:
-        totalMaxMarks === 0
-          ? "pass"
-          : percentage >= PASS_PERCENTAGE
-            ? "pass"
-            : "fail",
+      ...summary,
     };
+    return { payload, clearedSubjectKeys };
   };
 
-  const commitMarksWrite = async (studentUid: string, payload: MarksData) => {
-    const docId = `${payload.session}_${payload.examId}_${studentUid}`;
-    const isNew = !knownDocIdsRef.current.has(docId);
+  /** Creates the frozen exam sheet once per (session, examId, class) combo. */
+  const maybeEnsureExamSheet = (sheet: {
+    session: string;
+    exam: ExamDoc | null;
+    className: string;
+    subjects: ExamSheetSubjectInput[];
+  }) => {
+    if (!sheet.exam) return;
+    const key = buildExamSheetId(sheet.session, sheet.exam.id, sheet.className);
+    if (examinedSheetsRef.current.has(key)) return;
+    examinedSheetsRef.current.add(key);
+    void ensureExamSheet(
+      sheet.session,
+      sheet.exam,
+      sheet.className,
+      sheet.subjects
+    ).then((ok) => {
+      // On failure allow the next successful save to retry.
+      if (!ok) examinedSheetsRef.current.delete(key);
+    });
+  };
+
+  const commitMarksWrite = async (studentUid: string) => {
+    const pending = pendingWritesRef.current[studentUid];
+    if (!pending) return;
+    delete pendingWritesRef.current[studentUid];
+
+    const { payload, clearedSubjectKeys, sheet } = pending;
+    const snapshot: MarksRowSnapshot = {
+      studentUid: payload.studentUid,
+      admissionNumber: payload.admissionNumber,
+      studentName: payload.studentName,
+      fatherName: payload.fatherName,
+      className: payload.className,
+      section: payload.section,
+      rollNumber: payload.rollNumber,
+    };
+    const marksDocId = buildMarksDocId(
+      payload.session,
+      payload.examId,
+      payload.studentUid
+    );
+    const existed = knownDocIdsRef.current.has(marksDocId);
+    // Leftover legacy keys of hybrid docs are deleted on this save so the
+    // document cleans itself; fully legacy docs are left untouched.
+    const rawSubjectMarks = rawSubjectMarksRef.current[payload.studentUid];
+    const legacySubjectKeysToDelete = rawSubjectMarks
+      ? listLegacySubjectKeys(
+          rawSubjectMarks,
+          subjectColumnsRef.current.map((column) => column.id)
+        )
+      : [];
+
     try {
-      await setDoc(
-        doc(db, COLLECTION.MARKS, docId),
-        {
-          ...payload,
-          ...(isNew ? { createdAt: serverTimestamp() } : {}),
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
-      if (isNew) knownDocIdsRef.current.add(docId);
+      await saveStudentMarks({
+        session: payload.session,
+        examId: payload.examId,
+        examName: payload.examName,
+        examType: payload.examType,
+        student: snapshot,
+        subjectMarks: payload.subjectMarks,
+        clearedSubjectKeys,
+        legacySubjectKeysToDelete,
+        existed,
+      });
+      knownDocIdsRef.current.add(marksDocId);
+      maybeEnsureExamSheet(sheet);
     } catch (error) {
       console.error("Failed to save marks:", error);
       toast.error("Failed to save marks. Please try again.");
     }
   };
 
-  const scheduleStudentWrite = (studentUid: string, payload: MarksData) => {
-    const pending = pendingWritesRef.current[studentUid];
+  const scheduleStudentWrite = (student: MarksRowStudent) => {
+    const pending = pendingWritesRef.current[student.studentUid];
     if (pending) clearTimeout(pending.timer);
+    const { payload, clearedSubjectKeys } = buildStudentPayload(student);
+    const sheet = {
+      session: marksYear,
+      exam: selectedExam,
+      className: marksClass,
+      subjects: subjectColumnsRef.current.map((column) => ({
+        id: column.id,
+        name: column.name,
+        type: column.type,
+        order: column.order,
+        displayInMarksEntry: true,
+      })),
+    };
     const timer = setTimeout(() => {
-      delete pendingWritesRef.current[studentUid];
-      void commitMarksWrite(studentUid, payload);
+      void commitMarksWrite(student.studentUid);
     }, AUTO_SAVE_DELAY);
-    pendingWritesRef.current[studentUid] = { payload, timer };
+    pendingWritesRef.current[student.studentUid] = {
+      timer,
+      payload,
+      clearedSubjectKeys,
+      sheet,
+    };
   };
 
   const flushStudentWrite = (studentUid: string) => {
     const pending = pendingWritesRef.current[studentUid];
     if (!pending) return;
     clearTimeout(pending.timer);
-    delete pendingWritesRef.current[studentUid];
-    void commitMarksWrite(studentUid, pending.payload);
+    void commitMarksWrite(studentUid);
   };
 
   const flushPendingWrites = () => {
-    Object.entries(pendingWritesRef.current).forEach(
-      ([studentUid, pending]) => {
-        clearTimeout(pending.timer);
-        void commitMarksWrite(studentUid, pending.payload);
-      }
-    );
-    pendingWritesRef.current = {};
+    Object.keys(pendingWritesRef.current).forEach((studentUid) => {
+      flushStudentWrite(studentUid);
+    });
   };
 
   useEffect(() => {
@@ -432,10 +715,13 @@ function ExamMarks() {
         const list = snapshot.docs
           .map(toSubjectColumn)
           .filter(
-            (column): column is MarksSubjectColumn =>
+            (column): column is SubjectColumnBase =>
               column !== null && Boolean(column.name)
           )
-          .sort(sortSubjectColumns);
+          .sort(sortSubjectColumns)
+          .map((column) =>
+            enrichSubjectColumn(column, selectedExam, marksClass)
+          );
         subjectColumnsRef.current = list;
         setSubjectColumns(list);
       },
@@ -446,82 +732,92 @@ function ExamMarks() {
       }
     );
     return unsubscribe;
-  }, [tableReady, marksClass]);
+  }, [tableReady, marksClass, selectedExam]);
 
   useEffect(() => {
     if (!tableReady) {
       marksMapRef.current = {};
       knownDocIdsRef.current = new Set();
+      rawSubjectMarksRef.current = {};
       setMarksMap({});
       return;
     }
     const marksQuery = query(
       collection(db, COLLECTION.MARKS),
-      where("examId", "==", marksExamId)
+      where("examId", "==", marksExamId),
+      where("session", "==", marksYear)
     );
     const unsubscribe = onSnapshot(
       marksQuery,
       (snapshot) => {
         const map: Record<string, MarksDoc> = {};
         const knownIds = new Set<string>();
-        snapshot.docs
-          .map(toMarksDoc)
-          .forEach((marks) => {
-            if (marks.session !== marksYear || marks.className !== marksClass) {
-              return;
-            }
-            map[marks.studentUid] = marks;
-            knownIds.add(marks.id);
-          });
+        const rawByStudent: Record<string, Record<string, unknown>> = {};
+        snapshot.docs.forEach((documentSnapshot) => {
+          const data = documentSnapshot.data();
+          const marks = normalizeLegacyMarksDoc(documentSnapshot.id, data);
+          if (marks.session !== marksYear || marks.className !== marksClass) {
+            return;
+          }
+          map[marks.studentUid] = marks;
+          knownIds.add(marks.id);
+          const raw = data.subjectMarks;
+          if (raw && typeof raw === "object") {
+            rawByStudent[marks.studentUid] = raw as Record<string, unknown>;
+          }
+        });
         knownDocIdsRef.current = knownIds;
         marksMapRef.current = map;
+        rawSubjectMarksRef.current = rawByStudent;
         setMarksMap(map);
       },
       (error) => {
         console.error("Failed to load marks:", error);
         marksMapRef.current = {};
+        rawSubjectMarksRef.current = {};
         setMarksMap({});
       }
     );
     return unsubscribe;
   }, [tableReady, marksExamId, marksYear, marksClass]);
 
-  const summaryOf = (studentUid: string) => {
-    let totalMarks = 0;
-    let totalMaxMarks = 0;
-    subjectColumns.forEach((column) => {
-      if (column.type === "Scholastic") return;
-      const key = subjectKey(column.name);
-      const cellKey = `${studentUid}::${key}`;
-      const draft = drafts[cellKey];
-      const saved = marksMap[studentUid]?.subjectMarks[key];
-      const obtained =
-        draft === undefined
-          ? typeof saved?.obtained === "number"
-            ? saved.obtained
-            : 0
-          : toMarksNumber(draft);
-      totalMarks += obtained;
-      totalMaxMarks += maxMarksOf(column.name);
-    });
-    const percentage = totalMaxMarks > 0 ? (totalMarks / totalMaxMarks) * 100 : 0;
-    return { totalMarks, totalMaxMarks, percentage };
+  /** Live totals: the same calculateMarksSummary call the save uses. */
+  const summaryOf = (studentUid: string) =>
+    calculateMarksSummary(buildStudentDraftFor(studentUid).subjectMarks);
+
+  const handleCellChange = (
+    student: MarksRowStudent,
+    column: MarksSubjectColumn,
+    input: MarksComponentInput,
+    value: string
+  ) => {
+    const cellKey = CELL_KEY.component(
+      student.studentUid,
+      column.id,
+      input.component
+    );
+    const nextDrafts = {
+      ...draftsRef.current,
+      [cellKey]: toMarkTokenOrRaw(value),
+    };
+    draftsRef.current = nextDrafts;
+    setDrafts(nextDrafts);
+    scheduleStudentWrite(student);
   };
 
-  const handleMarksChange = (
+  const handleGradeChange = (
     student: MarksRowStudent,
     column: MarksSubjectColumn,
     value: string
   ) => {
-    const cellKey = `${student.studentUid}::${subjectKey(column.name)}`;
-    const nextValue =
-      column.type === "Scholastic"
-        ? normalizeGrade(value)
-        : clampMarksValue(value, maxMarksOf(column.name));
-    const nextDrafts = { ...draftsRef.current, [cellKey]: nextValue };
+    const cellKey = CELL_KEY.grade(student.studentUid, column.id);
+    const nextDrafts = {
+      ...draftsRef.current,
+      [cellKey]: normalizeGrade(value),
+    };
     draftsRef.current = nextDrafts;
     setDrafts(nextDrafts);
-    scheduleStudentWrite(student.studentUid, buildMarksPayload(student));
+    scheduleStudentWrite(student);
   };
 
   const openModal = () => {
@@ -541,7 +837,7 @@ function ExamMarks() {
       <PageHeader
         title="Marks"
         titleStyle="text-primaryBlue"
-        description="Enter student marks for every exam. Marks are saved automatically as you type and the cross list is available below."
+        description="Enter student marks for every exam. Marks are saved automatically as you type."
         descriptionStyle="text-gray-500"
         button={
           <Button
@@ -553,8 +849,6 @@ function ExamMarks() {
           />
         }
       />
-
-      <CrossList exams={exams} loading={loadingExams} />
 
       <Modal
         isOpen={modalOpen}
@@ -652,19 +946,29 @@ function ExamMarks() {
           </div>
         ) : subjectColumns.length === 0 ? (
           <div className="mt-4 rounded-md border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
-            No subject is enabled for marks entry in this class. Enable "Show
-            in Marks Entry" on the Subjects page.
+            No subject is enabled for marks entry in this class. Enable \"Show
+            in Marks Entry\" on the Subjects page.
           </div>
         ) : (
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm min-w-[820px]">
               <thead>
                 <tr className="bg-gray-800 text-white text-left">
-                  <th className="px-3 py-2.5">#</th>
-                  <th className="px-3 py-2.5">Student Name</th>
-                  <th className="px-3 py-2.5">Father's Name</th>
+                  <th className="px-3 py-2.5" rowSpan={2}>
+                    #
+                  </th>
+                  <th className="px-3 py-2.5" rowSpan={2}>
+                    Student Name
+                  </th>
+                  <th className="px-3 py-2.5" rowSpan={2}>
+                    Father's Name
+                  </th>
                   {subjectColumns.map((column) => (
-                    <th key={column.name} className="px-2 py-2.5 text-center">
+                    <th
+                      key={column.id}
+                      colSpan={Math.max(column.inputs.length, 1)}
+                      className="px-2 py-2.5 text-center"
+                    >
                       <span className="whitespace-nowrap">{column.name}</span>
                       {column.type && (
                         <span className="block text-[10px] text-blue-200 whitespace-nowrap">
@@ -673,9 +977,36 @@ function ExamMarks() {
                       )}
                     </th>
                   ))}
-                  <th className="px-3 py-2.5 text-center">Total Marks</th>
-                  <th className="px-3 py-2.5 text-center">Marks Obtained</th>
-                  <th className="px-3 py-2.5 text-center">Percentage</th>
+                  <th className="px-3 py-2.5 text-center" rowSpan={2}>
+                    Total Marks
+                  </th>
+                  <th className="px-3 py-2.5 text-center" rowSpan={2}>
+                    Marks Obtained
+                  </th>
+                  <th className="px-3 py-2.5 text-center" rowSpan={2}>
+                    Percentage
+                  </th>
+                </tr>
+                <tr className="bg-gray-700 text-white">
+                  {subjectColumns.map((column) =>
+                    column.isGrade ? (
+                      <th
+                        key={`${column.id}-grade`}
+                        className="px-2 py-1.5 text-center text-[10px] font-semibold whitespace-nowrap"
+                      >
+                        Grade
+                      </th>
+                    ) : (
+                      column.inputs.map((input) => (
+                        <th
+                          key={`${column.id}-${input.component ?? "marks"}`}
+                          className="px-2 py-1.5 text-center text-[10px] font-semibold whitespace-nowrap"
+                        >
+                          {input.label} ({input.max})
+                        </th>
+                      ))
+                    )
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -694,55 +1025,119 @@ function ExamMarks() {
                         {student.fatherName}
                       </td>
                       {subjectColumns.map((column) => {
-                        const key = subjectKey(column.name);
-                        const cellKey = `${student.studentUid}::${key}`;
-                        return (
-                          <td key={column.name} className="px-2 py-2 text-center">
-                            {column.type === "Scholastic" ? (
+                        if (column.isGrade) {
+                          const cellKey = CELL_KEY.grade(
+                            student.studentUid,
+                            column.id
+                          );
+                          const savedGrade =
+                            marksMap[student.studentUid]?.subjectMarks[
+                              column.id
+                            ]?.grade ?? "";
+                          return (
+                            <td key={column.id} className="px-2 py-2 text-center">
                               <input
                                 type="text"
                                 list="marksSubjectGrades"
                                 maxLength={3}
-                                value={
-                                  drafts[cellKey] ??
-                                  String(
-                                    marksMap[student.studentUid]?.subjectMarks[
-                                      key
-                                    ]?.obtained ?? ""
-                                  )
-                                }
+                                value={drafts[cellKey] ?? savedGrade}
                                 onChange={(
                                   event: ChangeEvent<HTMLInputElement>
-                                ) => handleMarksChange(student, column, event.target.value)}
+                                ) =>
+                                  handleGradeChange(
+                                    student,
+                                    column,
+                                    event.target.value
+                                  )
+                                }
                                 onBlur={() =>
                                   flushStudentWrite(student.studentUid)
                                 }
                                 className={marksInputClass}
                               />
-                            ) : (
-                              <input
-                                type="number"
-                                min={0}
-                                max={maxMarksOf(column.name)}
-                                step="0.5"
-                                value={
-                                  drafts[cellKey] ??
-                                  String(
-                                    marksMap[student.studentUid]?.subjectMarks[
-                                      key
-                                    ]?.obtained ?? ""
-                                  )
+                            </td>
+                          );
+                        }
+                        const token = subjectStatusToken(
+                          drafts,
+                          student.studentUid,
+                          column
+                        );
+                        const saved = marksMap[student.studentUid]?.subjectMarks[
+                          column.id
+                        ];
+                        return (
+                          <Fragment key={column.id}>
+                            {column.inputs.map((input) => {
+                              const cellKey = CELL_KEY.component(
+                                student.studentUid,
+                                column.id,
+                                input.component
+                              );
+                              const draft = drafts[cellKey];
+                              let value: string;
+                              if (draft !== undefined) {
+                                value = draft;
+                              } else if (token) {
+                                value = token;
+                              } else if (saved) {
+                                if (saved.status === "absent") value = "AB";
+                                else if (saved.status === "exempt") value = "EX";
+                                else if (input.component) {
+                                  const componentValue =
+                                    saved.components?.[input.component];
+                                  value =
+                                    componentValue === null ||
+                                    componentValue === undefined
+                                      ? ""
+                                      : String(componentValue);
+                                } else {
+                                  value =
+                                    saved.obtained === null
+                                      ? ""
+                                      : String(saved.obtained);
                                 }
-                                onChange={(
-                                  event: ChangeEvent<HTMLInputElement>
-                                ) => handleMarksChange(student, column, event.target.value)}
-                                onBlur={() =>
-                                  flushStudentWrite(student.studentUid)
-                                }
-                                className={marksInputClass}
-                              />
-                            )}
-                          </td>
+                              } else {
+                                value = "";
+                              }
+                              const invalid =
+                                draft !== undefined &&
+                                resolveCell(value, input.max).kind ===
+                                  "invalid";
+                              return (
+                                <td
+                                  key={`${column.id}-${
+                                    input.component ?? "marks"
+                                  }`}
+                                  className="px-2 py-2 text-center"
+                                >
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    maxLength={6}
+                                    title={input.label}
+                                    value={value}
+                                    onChange={(
+                                      event: ChangeEvent<HTMLInputElement>
+                                    ) =>
+                                      handleCellChange(
+                                        student,
+                                        column,
+                                        input,
+                                        event.target.value
+                                      )
+                                    }
+                                    onBlur={() =>
+                                      flushStudentWrite(student.studentUid)
+                                    }
+                                    className={`${marksInputClass}${
+                                      invalid ? ` ${invalidInputClass}` : ""
+                                    }`}
+                                  />
+                                </td>
+                              );
+                            })}
+                          </Fragment>
                         );
                       })}
                       <td className="px-3 py-2 text-gray-700 text-center">
@@ -760,11 +1155,14 @@ function ExamMarks() {
               </tbody>
             </table>
             <p className="mt-2 text-xs text-gray-500">
-              Marks are saved automatically for every subject as you type.
+              Marks are saved automatically as you type. You can type AB
+              (absent) or EX (exempt) in any subject cell.
             </p>
             <datalist id="marksSubjectGrades">
               {GRADE_OPTIONS.map((grade) => (
-                <option key={grade} value={grade}>{grade}</option>
+                <option key={grade} value={grade}>
+                  {grade}
+                </option>
               ))}
             </datalist>
           </div>

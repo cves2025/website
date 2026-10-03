@@ -25,6 +25,7 @@ import ExamSchedule from './panel/exams/ExamSchedule'
 import GeneratedAdmitCards from './panel/exams/GeneratedAdmitCards'
 import ResultPanel from './panel/exams/result/ResultPanel'
 import ExamMarks from './panel/marks/ExamMarks'
+import CrossList from './panel/marks/CrossList'
 import IdCardStudents from './panel/IdCardStudents'
 import IdCardTeachers from './panel/IdCardTeachers'
 import IdCardStaff from './panel/IdCardStaff'
@@ -67,6 +68,7 @@ function Router() {
           <Route path="admit-card/generated" element={<GeneratedAdmitCards />} />
           <Route path="result" element={<ResultPanel />} />
           <Route path="marks" element={<ExamMarks />} />
+          <Route path="cross-list" element={<CrossList />} />
           <Route path="id-card/students" element={<IdCardStudents />} />
           <Route path="id-card/teachers" element={<IdCardTeachers />} />
           <Route path="id-card/staff" element={<IdCardStaff />} />

@@ -227,20 +227,39 @@ export interface TeacherRecord extends Omit<TeacherFormValues, "password"> {
   updatedAt: string;
 }
 
+/* ---------------------------------------------------------------- marks -- */
+
+/** Status of a student in one subject of an exam. */
+export type SubjectMarkStatus = "present" | "absent" | "exempt";
+
+/** Mark components that make up a subject total, mirroring the exam scheme. */
+export type SubjectComponentName = "notebook" | "test" | "theory" | "practical";
+
 export interface SubjectMarksRecord {
-  obtained: number | string;
+  status: SubjectMarkStatus;
+  /** Numeric marks obtained; null when the student was absent or exempt. */
+  obtained: number | null;
+  /** Maximum marks of the subject, copied from the exam scheme at save time. */
   maxMarks: number;
+  /** Component marks (notebook/test/theory/practical) entered with the mark. */
+  components?: Partial<Record<SubjectComponentName, number | null>>;
+  /** Maximum marks of every component, copied from the exam scheme. */
+  componentMax?: Partial<Record<SubjectComponentName, number>>;
+  /** Scholastic grade ("A+", "B", ...). Grade records never count in totals. */
+  grade?: string;
 }
 
 export interface MarksData {
   studentUid: string;
   admissionNumber: string;
+  studentName: string;
+  fatherName: string;
   session: string;
   className: string;
   section: string;
   rollNumber: number;
   examId: string;
-  examType: string;
+  examType: ExamCategory;
   examName: string;
   subjectMarks: Record<string, SubjectMarksRecord>;
   totalMarks: number;
@@ -253,4 +272,36 @@ export interface MarksDoc extends MarksData {
   id: string;
   createdAt: unknown;
   updatedAt: unknown;
+}
+
+/** Result of calculateMarksSummary() - the single source of totals. */
+export interface MarksSummary {
+  totalMarks: number;
+  totalMaxMarks: number;
+  percentage: number;
+  result: "pass" | "fail";
+}
+
+/** One subject column of the frozen examSheet snapshot. */
+export interface ExamSheetSubjectColumn {
+  /** SubjectDoc id - the key used inside MarksData.subjectMarks. */
+  id: string;
+  name: string;
+  type: string;
+  order: number;
+  maxMarks: number;
+  componentMax?: Partial<Record<SubjectComponentName, number>>;
+  /** True for Scholastic subjects whose marks are grades, not numbers. */
+  isGrade: boolean;
+}
+
+/** Immutable snapshot of the subject columns of one exam + class. */
+export interface ExamSheetDoc {
+  id: string;
+  session: string;
+  examId: string;
+  examName: string;
+  className: string;
+  createdAt: unknown;
+  subjects: ExamSheetSubjectColumn[];
 }
