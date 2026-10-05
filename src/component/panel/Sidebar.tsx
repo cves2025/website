@@ -3,7 +3,7 @@ import {
   useContext,
   useEffect,
   useRef,
-  ReactElement,
+  useMemo,
 } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { myContext } from "../context/MyContextProvider";
@@ -15,96 +15,17 @@ import {
   BsChevronRight,
 } from "react-icons/bs";
 import {
-  FaUserGraduate,
-  FaChalkboardTeacher,
-  FaClipboardList,
   FaSignOutAlt,
-  FaAddressCard,
   FaCog,
 } from "react-icons/fa";
 import schoolLogo from "../../assets/image/schoolLogo.jpg";
-
-type MenuItem =
-  | {
-      label: string;
-      icon: ReactElement;
-      accent: string;
-      subLinks: { label: string; path: string; end?: boolean }[];
-    }
-  | { label: string; icon: ReactElement; accent: string; path: string; end?: boolean };
+import { BRAND, MENU, filterMenu, groupOfPath, type MenuItem } from "../../config/navigation";
 
 /** The logo in the brand block always returns to the dashboard. */
 const DASHBOARD_PATH = "/welcome";
 
 /** Page opened by the "Settings" item of the account menu (mini sidebar). */
 const SETTINGS_PATH = "/welcome/settings";
-
-// The school's own four brand colors (see the login page wordmark), each
-// permanently assigned to one section so color carries meaning, not decoration.
-const BRAND = {
-  green: "#1E9E5C",
-  blue: "#3763E0",
-  red: "#DC3D42",
-  pink: "#D6408F",
-};
-
-const MENU: MenuItem[] = [
-  {
-    label: "Student",
-    icon: <FaUserGraduate />,
-    accent: BRAND.green,
-    subLinks: [
-      { label: "Add Student", path: "/welcome/student/add" },
-      { label: "Student List", path: "/welcome/student/list" },
-      { label: "Subject", path: "/welcome/student/subject" },
-    ],
-  },
-  {
-    label: "Teacher",
-    icon: <FaChalkboardTeacher />,
-    accent: BRAND.blue,
-    subLinks: [
-      { label: "Add Teacher", path: "/welcome/teacher/add" },
-      { label: "Teachers List", path: "/welcome/teacher/list" },
-    ],
-  },
-  {
-    label: "ID Card",
-    icon: <FaAddressCard />,
-    accent: BRAND.pink,
-    subLinks: [
-      { label: "Students", path: "/welcome/id-card/students" },
-      { label: "Teachers", path: "/welcome/id-card/teachers" },
-      { label: "Staff", path: "/welcome/id-card/staff" },
-      { label: "Admin", path: "/welcome/id-card/admin" },
-    ],
-  },
-  {
-    label: "Exam",
-    icon: <FaClipboardList />,
-    accent: BRAND.red,
-    subLinks: [
-      { label: "Exam", path: "/welcome/exam/list" },
-      // { label: "Exam Schedule", path: "/welcome/admit-card/schedule" },
-      { label: "Admit Card", path: "/welcome/admit-card", end: true },
-      // { label: "Generate Admit Card", path: "/welcome/admit-card/generate" },
-      { label: "Marks", path: "/welcome/marks" },
-      { label: "Cross List", path: "/welcome/cross-list" },
-      { label: "Result", path: "/welcome/result" },
-    ],
-  },
-];
-
-function activeGroup(pathname: string): string {
-  if (pathname.startsWith("/welcome/student")) return "Student";
-  if (pathname.startsWith("/welcome/teacher")) return "Teacher";
-  if (pathname.startsWith("/welcome/id-card")) return "ID Card";
-  if (pathname.startsWith("/welcome/admit-card")) return "Exam";
-  if (pathname.startsWith("/welcome/exam")) return "Exam";
-  if (pathname.startsWith("/welcome/marks")) return "Exam";
-  if (pathname.startsWith("/welcome/cross-list")) return "Exam";
-  return "";
-}
 
 interface SidebarProps {
   open: boolean;
@@ -115,8 +36,13 @@ function Sidebar({ open, onClose }: SidebarProps) {
   const { user, logout } = useContext(myContext);
   const navigate = useNavigate();
   const location = useLocation();
-  const [expanded, setExpanded] = useState(activeGroup(location.pathname));
-  const [collapsed, setCollapsed] = useState(false);
+
+  const menu = useMemo(
+  () => filterMenu(MENU, user?.permissions ?? []),
+  [user?.permissions]
+);
+const [expanded, setExpanded] = useState(groupOfPath(menu, location.pathname));
+const [collapsed, setCollapsed] = useState(false);
 
   // Mini sidebar ("account menu") shown when the user name at the bottom is
   // clicked. It currently hosts the Settings entry.
@@ -254,7 +180,7 @@ function Sidebar({ open, onClose }: SidebarProps) {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-          {MENU.map((item) =>
+          {menu.map((item) =>
             "subLinks" in item ? (
               <div key={item.label}>
                 <button
@@ -429,7 +355,7 @@ function Sidebar({ open, onClose }: SidebarProps) {
                 }`}
               >
                 <span className="block truncate text-sm font-semibold text-white">
-                  {user?.name || "Admin User"}
+                  {user?.name || user?.email || "User"}
                 </span>
                 <span className="block truncate text-xs text-gray-400">
                   {user?.email}

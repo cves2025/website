@@ -30,12 +30,9 @@ import IdCardStudents from './panel/IdCardStudents'
 import IdCardTeachers from './panel/IdCardTeachers'
 import IdCardStaff from './panel/IdCardStaff'
 import IdCardAdmin from './panel/IdCardAdmin'
-import Dashboard from './admin/Dashboard'
-import Student from './admin/Student';
-import ExamDashboard from './admin/ExamDashboard';
-import UnitTest_1 from './admin/UnitTest_1';
-import ExamSettings from './admin/ExamSettings'
 import Settings from './panel/settings/Settings'
+import RequireAccess from '../routes/RequireAccess'
+import RequireRoutePermission from '../routes/RequireRoutePermission'
 
 function Router() {
   return (
@@ -54,7 +51,9 @@ function Router() {
         <Route path="/facilities/sports" element={<Sports />} />
         <Route path="/download/result" element={<Result />} />
         <Route path="/login" element={<Login />} />
+        <Route element={<RequireAccess />}>
         <Route path="/welcome" element={<Welcome />}>
+        <Route element={<RequireRoutePermission />}>
           <Route index element={<PanelHome />} />
           <Route path="student/add" element={<AddStudent />} />
           <Route path="student/list" element={<StudentList />} />
@@ -74,11 +73,8 @@ function Router() {
           <Route path="id-card/staff" element={<IdCardStaff />} />
           <Route path="id-card/admin" element={<IdCardAdmin />} />
         </Route>
-        <Route path='/dashboard' element={<Dashboard />}/>
-        <Route path='/student' element={<Student />}/>
-        <Route path='/examDashboard' element={<ExamDashboard />} />
-        <Route path='/unitTest_1' element={<UnitTest_1 />} />
-        <Route path='/examDashboard/examSettings' element={<ExamSettings />} />
+        </Route>
+        </Route>
       </Routes>
     </>
   )

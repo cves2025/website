@@ -8,40 +8,42 @@ import {
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../../firebase/config";
 import Loader from "../../custom-components/Loader";
+import {
+  Permission,
+  PermissionOverrides,
+  Role,
+  isRole,
+  resolvePermissions,
+} from "../../permissions";
 
-/** Local app user shape, built from Firebase's auth user + Firestore profile. */
+export type AccessState =
+  | "ok"
+  | "no-profile"
+  | "invalid-role"
+  | "inactive"
+  | "profile-error";
+
 export interface AuthUser {
   uid: string;
   email: string | null;
   name?: string;
-  role?: string;
-  admin?: boolean;
-  /** Id of the last release announcement ("What's New" modal) this user saw. */
+  role?: Role;
+  permissions: Permission[];
+  accessState: AccessState;
   lastSeenReleaseId?: string;
 }
 
-/** Shape of the value provided by MyContextProvider. */
 export interface AuthContextType {
   user: AuthUser | null;
-  /**
-   * false until Firebase has finished restoring the persisted session.
-   * Protected routes must wait for this before redirecting to /login,
-   * otherwise a page refresh bounces the user to the login page.
-   */
   authReady: boolean;
-  /**
-   * True once the logged-in user's Firestore profile (`users/{uid}`) has been
-   * read, so profile-dependent UI (e.g. the "What's New" modal) never flashes
-   * before the document has finished loading.
-   */
   profileReady: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
+  /** true agar current user ke paas yeh permission hai. */
+  can: (permission: Permission) => boolean;
 }
 
-// Default value used when a component reads the context outside the provider.
-// The provider always supplies the real value, so these are graceful no-ops.
 const defaultContext: AuthContextType = {
   user: null,
   authReady: false,
@@ -49,11 +51,11 @@ const defaultContext: AuthContextType = {
   error: null,
   login: async () => false,
   logout: async () => {},
+  can: () => false,
 };
 
 export const myContext = createContext<AuthContextType>(defaultContext);
 
-/** Human-readable messages for common Firebase Auth error codes. */
 function friendlyAuthError(code: string): string {
   switch (code) {
     case "auth/invalid-email":
@@ -71,22 +73,30 @@ function friendlyAuthError(code: string): string {
   }
 }
 
+function readIsClassTeacher(data: Record<string, unknown>): boolean {
+  const sections = data.sectionAssignments;
+  if (Array.isArray(sections)) {
+    return sections.some(
+      (s) => (s as { isClassTeacher?: unknown } | null)?.isClassTeacher === true
+    );
+  }
+  return data.isClassTeacher === true;
+}
+
 export function MyContextProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [profileReady, setProfileReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  /**
-   * Load the Firestore `users/{uid}` document (name, role, admin) and merge
-   * it into the global user so every component reads the same profile info.
-   */
   const buildUserFromFirebase = async (
     firebaseUser: FirebaseUser
   ): Promise<AuthUser> => {
     const base: AuthUser = {
       uid: firebaseUser.uid,
       email: firebaseUser.email,
+      permissions: [],
+      accessState: "no-profile",
     };
 
     try {
@@ -94,7 +104,6 @@ export function MyContextProvider({ children }: { children: ReactNode }) {
       if (!snapshot.exists()) return base;
 
       const data = snapshot.data() as Record<string, unknown>;
-      const role = typeof data.role === "string" ? data.role : undefined;
       const name = typeof data.name === "string" ? data.name : undefined;
       const lastSeenReleaseId =
         typeof data.lastSeenReleaseId === "string" &&
@@ -102,23 +111,36 @@ export function MyContextProvider({ children }: { children: ReactNode }) {
           ? data.lastSeenReleaseId
           : undefined;
 
+      if (!isRole(data.role)) {
+        return { ...base, name, accessState: "invalid-role" };
+      }
+      const role = data.role;
+
+      const status = typeof data.status === "string" ? data.status : "";
+      const inactive =
+        data.isDeleted === true || (status !== "" && status !== "Active");
+      if (inactive) {
+        return { ...base, name, role, accessState: "inactive" };
+      }
+
       return {
         ...base,
         name,
         role,
-        admin: data.admin === true || role === "admin",
         lastSeenReleaseId,
+        accessState: "ok",
+        permissions: resolvePermissions(
+          role,
+          data.permissionOverrides as PermissionOverrides | undefined,
+          readIsClassTeacher(data)
+        ),
       };
     } catch (err) {
-      // Firestore security rules may block direct reads - keep auth-only data.
       console.error("Could not load Firestore user profile:", err);
-      return base;
+      return { ...base, accessState: "profile-error" };
     }
   };
 
-  // Keeps user state in sync with Firebase's own persisted session, so a page
-  // refresh automatically restores the logged-in user. `authReady` stays false
-  // until the first callback, which is what gates the app behind the loader.
   useEffect(() => {
     let active = true;
 
@@ -132,20 +154,17 @@ export function MyContextProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Restore immediately with the auth-only info (uid/email) so the app can
-      // render without waiting for the Firestore profile round-trip...
-      const baseUser: AuthUser = {
+      setUser({
         uid: firebaseUser.uid,
         email: firebaseUser.email,
-      };
-      setUser(baseUser);
+        permissions: [],
+        accessState: "no-profile",
+      });
       setAuthReady(true);
       setProfileReady(false);
 
-      // ...then merge the Firestore profile (name/role/admin) when it loads.
       void buildUserFromFirebase(firebaseUser).then((fullUser) => {
         if (!active) return;
-        // Only apply if the same user is still logged in (guards logout races).
         setUser((prev) =>
           prev && prev.uid === firebaseUser.uid ? fullUser : prev
         );
@@ -173,24 +192,24 @@ export function MyContextProvider({ children }: { children: ReactNode }) {
       setError(friendlyAuthError(code));
       setUser(null);
       setProfileReady(false);
-      setTimeout(() => {
-        setError(null);
-      }, 5000);
+      setTimeout(() => setError(null), 5000);
       return false;
     }
   };
 
-  // Logout handler
   const logout = async () => {
     await signOut(auth);
     setUser(null);
     setProfileReady(false);
   };
 
+  const can = (permission: Permission) =>
+    user?.accessState === "ok" && user.permissions.includes(permission);
+
   return (
-    <myContext.Provider value={{ user, authReady, profileReady, login, error, logout }}>
-      {/* Until Firebase restores the session we don't know if the visitor is
-          logged in, so show the loader instead of flashing the login page. */}
+    <myContext.Provider
+      value={{ user, authReady, profileReady, login, error, logout, can }}
+    >
       {authReady ? children : <Loader label="Checking your session..." />}
     </myContext.Provider>
   );
