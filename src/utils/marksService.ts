@@ -26,6 +26,7 @@ import {
 } from "firebase/firestore";
 import { COLLECTION } from "../constants";
 import { db } from "../firebase/config";
+import { DEFAULT_EXAM_RULES, type ExamRules } from "./examRules";
 import {
   isSchemeClass,
   subjectMarksBreakdown,
@@ -101,6 +102,12 @@ export interface SaveStudentMarksParams {
    * controls whether createdAt is sent (it is only written for new documents).
    */
   existed: boolean;
+  /**
+   * The exam rules active at save time. The stored `result` is calculated with
+   * these rules, so a document saved under the "subject" pass mode keeps that
+   * result even when the settings change later.
+   */
+  rules: ExamRules;
 }
 
 /**
@@ -123,9 +130,10 @@ export async function saveStudentMarks(
     clearedSubjectKeys,
     legacySubjectKeysToDelete,
     existed,
+    rules,
   } = params;
   const marksDocId = buildMarksDocId(session, examId, student.studentUid);
-  const summary = calculateMarksSummary(subjectMarks);
+  const summary = calculateMarksSummary(subjectMarks, rules);
 
   // deleteField() removes the cleared keys inside the nested subjectMarks map
   // (setDoc({ merge: true }) merges nested maps, so an explicit delete is the
@@ -340,7 +348,8 @@ export async function loadMarksForExam(
   session: string,
   examId: string,
   className?: string,
-  section?: string
+  section?: string,
+  rules: ExamRules = DEFAULT_EXAM_RULES
 ): Promise<MarksDoc[]> {
   const constraints: QueryConstraint[] = [
     where("session", "==", session),
@@ -355,7 +364,11 @@ export async function loadMarksForExam(
 
   return snapshot.docs
     .map((documentSnapshot) =>
-      normalizeLegacyMarksDoc(documentSnapshot.id, documentSnapshot.data())
+      normalizeLegacyMarksDoc(
+        documentSnapshot.id,
+        documentSnapshot.data(),
+        rules
+      )
     )
     .sort(compareByClassSectionRoll);
 }
@@ -365,7 +378,8 @@ export async function loadMarksForSectionExam(
   session: string,
   examId: string,
   className: string,
-  section: string
+  section: string,
+  rules: ExamRules = DEFAULT_EXAM_RULES
 ): Promise<MarksDoc[]> {
-  return loadMarksForExam(session, examId, className, section);
+  return loadMarksForExam(session, examId, className, section, rules);
 }

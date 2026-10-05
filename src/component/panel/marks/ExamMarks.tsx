@@ -12,6 +12,7 @@ import toast from "react-hot-toast";
 import { CLASSES, COLLECTION } from "../../../constants";
 import { db } from "../../../firebase/config";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
+import { compareRollStudents, deriveRollNumbers } from "../../../utils/rollNumber";
 import { toDateOrNull } from "../../../utils/toDateOrNull";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import {
@@ -20,6 +21,8 @@ import {
   marksSchemeFromDoc,
   subjectMarksBreakdown,
 } from "../../../utils/examMarksScheme";
+import { useExamRules } from "../../../hooks/useExamRules";
+import type { ExamRules } from "../../../utils/examRules";
 import {
   buildExamSheetId,
   buildMarksDocId,
@@ -185,12 +188,7 @@ function toRowStudent(
 }
 
 function sortRowStudents(a: MarksRowStudent, b: MarksRowStudent): number {
-  return (
-    a.section.localeCompare(b.section) ||
-    a.admissionNumber.localeCompare(b.admissionNumber, undefined, {
-      numeric: true,
-    })
-  );
+  return compareRollStudents(a, b);
 }
 
 function toSubjectColumn(
@@ -472,6 +470,23 @@ interface PendingMarkSave {
 }
 
 function ExamMarks() {
+  const {
+    rules,
+    loading: rulesLoading,
+    error: rulesError,
+    reload: reloadRules,
+  } = useExamRules();
+  /**
+   * Latest rules + "are saves allowed?" flags, kept in refs so the debounced
+   * autosave (setTimeout callback) always reads the CURRENT values and never a
+   * stale render closure.
+   */
+  const rulesRef = useRef<ExamRules>(rules);
+  rulesRef.current = rules;
+  const rulesBlocked = rulesLoading || Boolean(rulesError);
+  const rulesBlockedRef = useRef(rulesBlocked);
+  rulesBlockedRef.current = rulesBlocked;
+
   const [exams, setExams] = useState<ExamDoc[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -490,6 +505,8 @@ function ExamMarks() {
   const draftsRef = useRef<Record<string, string>>({});
   const marksMapRef = useRef<Record<string, MarksDoc>>({});
   const rowStudentsRef = useRef<MarksRowStudent[]>([]);
+  /** Derived frontend rolls (studentUid -> roll) for the current class roster. */
+  const rollNumbersRef = useRef<Map<string, number>>(new Map());
   const subjectColumnsRef = useRef<MarksSubjectColumn[]>([]);
   const knownDocIdsRef = useRef<Set<string>>(new Set());
   const pendingWritesRef = useRef<Record<string, PendingMarkSave>>({});
@@ -539,7 +556,7 @@ function ExamMarks() {
     const { subjectMarks, clearedSubjectKeys } = buildStudentDraftFor(
       student.studentUid
     );
-    const summary = calculateMarksSummary(subjectMarks);
+    const summary = calculateMarksSummary(subjectMarks, rulesRef.current);
     const payload: MarksData = {
       studentUid: student.studentUid,
       admissionNumber: student.admissionNumber,
@@ -548,7 +565,9 @@ function ExamMarks() {
       session: marksYear,
       className: marksClass,
       section: student.section,
-      rollNumber: Math.max(rowStudentsRef.current.indexOf(student) + 1, 1),
+      rollNumber:
+        rollNumbersRef.current.get(student.studentUid) ??
+        Math.max(rowStudentsRef.current.indexOf(student) + 1, 1),
       examId: marksExamId,
       examType: selectedExam ? selectedExam.examCategory : "UNIT_TEST",
       examName: selectedExam ? selectedExam.examName : "",
@@ -581,6 +600,9 @@ function ExamMarks() {
   };
 
   const commitMarksWrite = async (studentUid: string) => {
+    // Never store a result under rules that are still loading or failed to
+    // load; the pending write stays queued so it can commit after a reload.
+    if (rulesBlockedRef.current) return;
     const pending = pendingWritesRef.current[studentUid];
     if (!pending) return;
     delete pendingWritesRef.current[studentUid];
@@ -622,6 +644,7 @@ function ExamMarks() {
         clearedSubjectKeys,
         legacySubjectKeysToDelete,
         existed,
+        rules: rulesRef.current,
       });
       knownDocIdsRef.current.add(marksDocId);
       maybeEnsureExamSheet(sheet);
@@ -665,6 +688,17 @@ function ExamMarks() {
     void commitMarksWrite(studentUid);
   };
 
+  // Flush writes that were queued while the rules were still loading/failed as
+  // soon as the rules become available, so typed marks are never lost - and the
+  // commit recomputes the totals/result against the now-active rules.
+  useEffect(() => {
+    if (rulesBlocked) return;
+    Object.keys(pendingWritesRef.current).forEach((studentUid) => {
+      void commitMarksWrite(studentUid);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rulesBlocked]);
+
   const flushPendingWrites = () => {
     Object.keys(pendingWritesRef.current).forEach((studentUid) => {
       flushStudentWrite(studentUid);
@@ -698,6 +732,11 @@ function ExamMarks() {
           .sort(sortRowStudents);
         rowStudentsRef.current = list;
         setRowStudents(list);
+        // Same pure derivation used by the Cross List, so both screens show
+        // identical roll numbers for the same roster.
+        rollNumbersRef.current = deriveRollNumbers(
+          list.map((student) => ({ ...student, className: marksClass }))
+        );
         setLoadingTable(false);
       },
       (error) => {
@@ -764,7 +803,11 @@ function ExamMarks() {
         const rawByStudent: Record<string, Record<string, unknown>> = {};
         snapshot.docs.forEach((documentSnapshot) => {
           const data = documentSnapshot.data();
-          const marks = normalizeLegacyMarksDoc(documentSnapshot.id, data);
+          const marks = normalizeLegacyMarksDoc(
+            documentSnapshot.id,
+            data,
+            rulesRef.current
+          );
           if (marks.session !== marksYear || marks.className !== marksClass) {
             return;
           }
@@ -792,7 +835,10 @@ function ExamMarks() {
 
   /** Live totals: the same calculateMarksSummary call the save uses. */
   const summaryOf = (studentUid: string) =>
-    calculateMarksSummary(buildStudentDraftFor(studentUid).subjectMarks);
+    calculateMarksSummary(
+      buildStudentDraftFor(studentUid).subjectMarks,
+      rulesRef.current
+    );
 
   const handleCellChange = (
     student: MarksRowStudent,
@@ -858,6 +904,21 @@ function ExamMarks() {
           />
         }
       />
+
+      {rulesError && (
+        <div
+          className="flex items-center justify-between gap-3 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
+          role="alert"
+        >
+          <span>{rulesError} Saves are disabled until the settings load.</span>
+          <Button
+            buttonName="Retry"
+            variant="outline"
+            size="sm"
+            onClick={reloadRules}
+          />
+        </div>
+      )}
 
       <Modal
         isOpen={modalOpen}
@@ -948,6 +1009,10 @@ function ExamMarks() {
         ) : loadingTable ? (
           <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-6 text-center text-sm font-semibold text-blue-700">
             Loading students...
+          </div>
+        ) : rulesLoading ? (
+          <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-6 text-center text-sm font-semibold text-blue-700">
+            Loading exam settings...
           </div>
         ) : rowStudents.length === 0 ? (
           <div className="mt-4 rounded-md border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">

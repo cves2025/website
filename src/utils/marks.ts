@@ -7,6 +7,7 @@
  * pass/fail summary calculation and the client-side sorting/ranking rules.
  */
 import { toMarksNumber, type ExamCategory } from "./examMarksScheme";
+import { DEFAULT_EXAM_RULES, type ExamRules } from "./examRules";
 import type {
   MarksDoc,
   MarksSummary,
@@ -15,8 +16,9 @@ import type {
   SubjectMarksRecord,
 } from "./type";
 
-/** Minimum percentage of the total marks needed to pass an exam. */
-export const PASS_PERCENTAGE = 33;
+// The pass constant lives in ./examRules (next to the exam-wide pass/rank
+// settings) and is re-exported here so existing consumers keep working.
+export { PASS_PERCENTAGE } from "./examRules";
 
 /** Rounds a number to exactly two decimal places (the only rounding used for marks). */
 export function round2(value: number): number {
@@ -89,12 +91,22 @@ export function normalizeExamType(value: unknown): ExamCategory {
  * absent subjects count 0 obtained but still count their max marks; exempt
  * subjects are excluded from both. A subject with no key in `subjectMarks`
  * (not applicable / never entered) is excluded from both as well.
+ *
+ * The `result` follows the active rules:
+ *  - passMode "total" (default): pass when totalMaxMarks is 0 or the total
+ *    percentage is >= rules.totalPassPercentage;
+ *  - passMode "subject": the student passes only if EVERY counted subject
+ *    (present or absent with maxMarks > 0) reaches
+ *    round2(maxMarks * subjectPassPercentage / 100). Absent subjects have 0
+ *    obtained and normally fail. No counted subjects at all means "pass".
  */
 export function calculateMarksSummary(
-  subjectMarks: Record<string, SubjectMarksRecord>
+  subjectMarks: Record<string, SubjectMarksRecord>,
+  rules: ExamRules = DEFAULT_EXAM_RULES
 ): MarksSummary {
   let totalMarks = 0;
   let totalMaxMarks = 0;
+  const countedSubjects: Array<{ obtained: number; maxMarks: number }> = [];
 
   Object.values(subjectMarks).forEach((record) => {
     if (record.status === "exempt") return;
@@ -104,16 +116,34 @@ export function calculateMarksSummary(
       record.status === "present" && typeof record.obtained === "number"
         ? Math.max(record.obtained, 0)
         : 0;
+    const maxMarks = Math.max(record.maxMarks, 0);
     totalMarks += obtained;
-    totalMaxMarks += Math.max(record.maxMarks, 0);
+    totalMaxMarks += maxMarks;
+    countedSubjects.push({ obtained, maxMarks });
   });
 
   const percentage =
-    totalMaxMarks > 0
-      ? round2((totalMarks / totalMaxMarks) * 100)
-      : 0;
-  const result: "pass" | "fail" =
-    totalMaxMarks === 0 || percentage >= PASS_PERCENTAGE ? "pass" : "fail";
+    totalMaxMarks > 0 ? round2((totalMarks / totalMaxMarks) * 100) : 0;
+
+  let result: "pass" | "fail";
+  if (rules.passMode === "subject") {
+    const counted = countedSubjects.filter((subject) => subject.maxMarks > 0);
+    if (counted.length === 0) {
+      result = "pass";
+    } else {
+      const passesEverySubject = counted.every(
+        (subject) =>
+          subject.obtained >=
+          round2((subject.maxMarks * rules.subjectPassPercentage) / 100)
+      );
+      result = passesEverySubject ? "pass" : "fail";
+    }
+  } else {
+    result =
+      totalMaxMarks === 0 || percentage >= rules.totalPassPercentage
+        ? "pass"
+        : "fail";
+  }
 
   return {
     totalMarks: round2(totalMarks),
@@ -237,7 +267,8 @@ function normalizeSubjectRecord(value: unknown): SubjectMarksRecord | null {
  */
 export function normalizeLegacyMarksDoc(
   docId: string,
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
+  rules: ExamRules = DEFAULT_EXAM_RULES
 ): MarksDoc {
   const subjectMarks: Record<string, SubjectMarksRecord> = {};
   const rawSubjectMarks = data.subjectMarks;
@@ -253,7 +284,7 @@ export function normalizeLegacyMarksDoc(
     });
   }
 
-  const summary = calculateMarksSummary(subjectMarks);
+  const summary = calculateMarksSummary(subjectMarks, rules);
 
   return {
     id: docId,
@@ -321,7 +352,10 @@ export interface RankableStudent {
  * receives a rank value; the UI decides how to display it (e.g. "-" for fail).
  */
 export function computeRanks(rows: RankableStudent[]): Record<string, number> {
-  // Ties are decided on the rounded total, so 22.25 and 22.3 never split a rank.
+  // Ties are decided on the ROUNDED total (round2): two students tie only when
+  // round2(totalA) === round2(totalB), e.g. 22.3 vs 22.30 or float artifacts
+  // like 0.1 + 0.2 vs 0.3. 22.25 and 22.3 remain distinct totals (22.3 ranks
+  // higher); the rounding only absorbs representation noise, never real values.
   const ranked = rows
     .map((row) => ({ ...row, rounded: round2(row.totalMarks) }))
     .sort((a, b) => b.rounded - a.rounded);

@@ -15,7 +15,6 @@ import { toDateOrNull } from "../../../utils/toDateOrNull";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import { ExamCategory, marksSchemeFromDoc } from "../../../utils/examMarksScheme";
 import {
-  compareByClassSectionRoll,
   compareClassNames,
   computeRanks,
   formatMarks,
@@ -23,6 +22,8 @@ import {
   type SubjectColumnDefMap,
 } from "../../../utils/marks";
 import { getExamSheet, loadMarksForExam } from "../../../utils/marksService";
+import { deriveRollNumbers } from "../../../utils/rollNumber";
+import { useExamRules } from "../../../hooks/useExamRules";
 import type {
   ExamDoc,
   ExamSheetDoc,
@@ -80,12 +81,13 @@ interface ClassSectionBlock {
   fallbackSubjects: ExamSheetSubjectColumn[];
 }
 
-/** Enrolled student snapshot used to add "Marks not entered" rows. */
+/** Active enrollment snapshot of the selected session (rolls + missing rows). */
 interface LoadedEnrollment {
   studentUid: string;
   admissionNumber: string;
   studentName: string;
   fatherName: string;
+  className: string;
   section: string;
 }
 
@@ -208,16 +210,16 @@ function compareClassSections(
   );
 }
 
-/** Existing students of a block: class -> section -> roll number -> name. */
+/** Rows of a block: displayed roll ascending, then student name. */
 function sortDocumentRows(rows: CrossListRow[]): CrossListRow[] {
   return [...rows].sort((a, b) => {
-    const docA = a.doc;
-    const docB = b.doc;
-    if (docA && docB) {
-      return compareByClassSectionRoll(docA, docB);
-    }
-    const left = a.studentName.localeCompare(b.studentName);
-    return left || a.studentUid.localeCompare(b.studentUid);
+    const rollA = a.rollNumber ?? Number.MAX_SAFE_INTEGER;
+    const rollB = b.rollNumber ?? Number.MAX_SAFE_INTEGER;
+    return (
+      rollA - rollB ||
+      a.studentName.localeCompare(b.studentName) ||
+      a.studentUid.localeCompare(b.studentUid)
+    );
   });
 }
 
@@ -265,6 +267,11 @@ function subjectCellText(
 }
 
 function CrossList() {
+  const { rules, loading: rulesLoading, error: rulesError, reload: reloadRules } =
+    useExamRules();
+  /** Rules change (from the Settings page) -> marks are re-fetched under them. */
+  const rulesKey = `${rules.rankScope}|${rules.passMode}|${rules.totalPassPercentage}|${rules.subjectPassPercentage}`;
+
   const [session, setSession] = useState("");
   const [examId, setExamId] = useState("");
   const [selectedClass, setSelectedClass] = useState("all");
@@ -288,8 +295,14 @@ function CrossList() {
   const [fallbackByClass, setFallbackByClass] = useState<
     Record<string, ExamSheetSubjectColumn[]>
   >({});
-  /** Enrolled students of the selected class, used for missing-student rows. */
-  const [enrollments, setEnrollments] = useState<LoadedEnrollment[] | null>(null);
+  /** Session enrollments cached per `${session}`; the Refresh button clears it. */
+  const [enrollmentsBySession, setEnrollmentsBySession] = useState<
+    Record<string, LoadedEnrollment[]>
+  >({});
+  /** Enrollments of the currently selected session (active students only). */
+  const [currentEnrollments, setCurrentEnrollments] = useState<
+    LoadedEnrollment[]
+  >([]);
 
   // Exams load once (whole collection, ordered by sequence like the other
   // exam pages - no composite index needed) and are filtered client-side.
@@ -322,15 +335,17 @@ function CrossList() {
 
   const readyToLoad = Boolean(session && examId);
 
-  // Marks load once per ${session}|${examId} and stay cached; the Refresh
-  // button drops the cache entry and bumps the nonce to force a refetch.
+  // Marks load once per ${session}|${examId}|${rules} and stay cached; the
+  // Refresh button drops the cache entry and bumps the nonce to force a
+  // refetch. A rules change also changes the cache key, so results are always
+  // re-normalized under the rules that are currently active.
   useEffect(() => {
     if (!readyToLoad) {
       setCurrentMarks([]);
       setLoadingMarks(false);
       return;
     }
-    const key = `${session}|${examId}`;
+    const key = `${session}|${examId}|${rulesKey}`;
     if (marksByExam[key]) {
       setCurrentMarks(marksByExam[key]);
       setLoadingMarks(false);
@@ -341,7 +356,7 @@ function CrossList() {
     setCurrentMarks([]);
     setLoadingMarks(true);
     setLoadError("");
-    loadMarksForExam(session, examId)
+    loadMarksForExam(session, examId, undefined, undefined, rules)
       .then((docs) => {
         if (cancelled) return;
         setMarksByExam((prev) => ({ ...prev, [key]: docs }));
@@ -357,14 +372,20 @@ function CrossList() {
     return () => {
       cancelled = true;
     };
-  }, [readyToLoad, session, examId, marksByExam, refreshNonce]);
+  }, [readyToLoad, session, examId, rulesKey, rules, marksByExam, refreshNonce]);
 
   const handleRefresh = () => {
     if (!readyToLoad) return;
-    const key = `${session}|${examId}`;
+    const key = `${session}|${examId}|${rulesKey}`;
     setMarksByExam((prev) => {
       const next = { ...prev };
       delete next[key];
+      return next;
+    });
+    // Rolls come from the session roster, so refresh it too.
+    setEnrollmentsBySession((prev) => {
+      const next = { ...prev };
+      delete next[session];
       return next;
     });
     setRefreshNonce((value) => value + 1);
@@ -438,22 +459,27 @@ function CrossList() {
     });
   }, [readyToLoad, blockClasses, sheetsByClass, fallbackByClass]);
 
-  // Enrolled students of the selected class, only when a class is picked
-  // (avoids the extra reads when "All Classes" is shown).
+  // Enrollments of the selected session load ONCE (equality filter on
+  // academicYear only) and are cached per session together with the exam data.
+  // They drive the live roll numbers of every row and the "Marks not entered"
+  // rows; the class/section filters are applied client-side below, so picking
+  // a class never triggers another enrollment query. Refresh clears the cache.
   useEffect(() => {
-    if (selectedClass === "all" || !readyToLoad) {
-      setEnrollments(null);
+    if (!readyToLoad) {
+      setCurrentEnrollments([]);
+      return;
+    }
+    if (enrollmentsBySession[session]) {
+      setCurrentEnrollments(enrollmentsBySession[session]);
       return;
     }
     let cancelled = false;
-    const constraints = [
-      where("className", "==", selectedClass),
-      where("academicYear", "==", session),
-    ];
-    if (selectedSection !== "all") {
-      constraints.push(where("section", "==", selectedSection));
-    }
-    getDocs(query(collection(db, COLLECTION.ENROLLMENTS), ...constraints))
+    getDocs(
+      query(
+        collection(db, COLLECTION.ENROLLMENTS),
+        where("academicYear", "==", session)
+      )
+    )
       .then((snapshot) => {
         if (cancelled) return;
         const rows = snapshot.docs
@@ -470,24 +496,35 @@ function CrossList() {
                 typeof data.studentName === "string" ? data.studentName : "",
               fatherName:
                 typeof data.fatherName === "string" ? data.fatherName : "",
+              className:
+                typeof data.className === "string" ? data.className : "",
               section: typeof data.section === "string" ? data.section : "",
             };
           })
           .filter((row): row is LoadedEnrollment => row !== null);
-        setEnrollments(rows);
+        setEnrollmentsBySession((prev) => ({ ...prev, [session]: rows }));
+        setCurrentEnrollments(rows);
       })
       .catch((error) => {
         console.error("Failed to load enrollments:", error);
-        if (!cancelled) setEnrollments([]);
+        if (!cancelled) setCurrentEnrollments([]);
       });
     return () => {
       cancelled = true;
     };
-  }, [readyToLoad, session, selectedClass, selectedSection]);
+  }, [readyToLoad, session, enrollmentsBySession, refreshNonce]);
+
+  // Live roll numbers derived from the session roster exactly like the marks
+  // entry screen (per class: section, then admission number).
+  const rollsByStudent = useMemo(
+    () => deriveRollNumbers(currentEnrollments),
+    [currentEnrollments]
+  );
 
   // Build the class-section blocks of the current view. Class order follows
   // the CLASSES constant, sections are alphabetical, rows sort by roll number
-  // then student name; students without a marks doc are appended.
+  // then student name; students without a marks doc are appended (only when a
+  // specific class is selected, still from the already loaded enrollment list).
   const blocks = useMemo<ClassSectionBlock[]>(() => {
     const byKey = new Map<
       string,
@@ -502,7 +539,9 @@ function CrossList() {
       };
       entry.rows.push({
         studentUid: marks.studentUid,
-        rollNumber: marks.rollNumber,
+        // Live roll from the roster; the stored rollNumber is only a fallback
+        // for students who left the class (deleted / no longer enrolled).
+        rollNumber: rollsByStudent.get(marks.studentUid) ?? marks.rollNumber,
         admissionNumber: marks.admissionNumber,
         studentName: marks.studentName,
         fatherName: marks.fatherName,
@@ -511,29 +550,35 @@ function CrossList() {
       byKey.set(key, entry);
     });
 
-    if (enrollments && selectedClass !== "all") {
-      enrollments.forEach((student) => {
-        const key = `${selectedClass}::${student.section}`;
-        const entry = byKey.get(key) ?? {
-          className: selectedClass,
-          section: student.section,
-          rows: [],
-        };
-        const exists = entry.rows.some(
-          (row) => row.studentUid === student.studentUid
-        );
-        if (!exists) {
-          entry.rows.push({
-            studentUid: student.studentUid,
-            rollNumber: null,
-            admissionNumber: student.admissionNumber,
-            studentName: student.studentName,
-            fatherName: student.fatherName,
-            doc: null,
-          });
-        }
-        byKey.set(key, entry);
-      });
+    if (selectedClass !== "all") {
+      currentEnrollments
+        .filter(
+          (student) =>
+            student.className === selectedClass &&
+            (selectedSection === "all" || student.section === selectedSection)
+        )
+        .forEach((student) => {
+          const key = `${selectedClass}::${student.section}`;
+          const entry = byKey.get(key) ?? {
+            className: selectedClass,
+            section: student.section,
+            rows: [],
+          };
+          const exists = entry.rows.some(
+            (row) => row.studentUid === student.studentUid
+          );
+          if (!exists) {
+            entry.rows.push({
+              studentUid: student.studentUid,
+              rollNumber: rollsByStudent.get(student.studentUid) ?? null,
+              admissionNumber: student.admissionNumber,
+              studentName: student.studentName,
+              fatherName: student.fatherName,
+              doc: null,
+            });
+          }
+          byKey.set(key, entry);
+        });
     }
 
     return Array.from(byKey.values())
@@ -547,13 +592,53 @@ function CrossList() {
         fallbackSubjects: fallbackByClass[entry.className] ?? [],
       }))
       .filter((block) => block.rows.length > 0);
-  }, [filteredMarks, enrollments, selectedClass, sheetsByClass, fallbackByClass]);
+  }, [
+    filteredMarks,
+    currentEnrollments,
+    rollsByStudent,
+    selectedClass,
+    selectedSection,
+    sheetsByClass,
+    fallbackByClass,
+  ]);
+
+  // Class-wide ranks, used when rankScope is "class". They are computed over
+  // ALL complete rows of the same class from the FULL loaded exam data (before
+  // the class/section filters), so filtering never changes anyone's rank.
+  const classWideRanks = useMemo<Record<string, number>>(() => {
+    const ranks: Record<string, number> = {};
+    const byClass = new Map<string, MarksDoc[]>();
+    currentMarks.forEach((marks) => {
+      const list = byClass.get(marks.className) ?? [];
+      list.push(marks);
+      byClass.set(marks.className, list);
+    });
+    byClass.forEach((docs, className) => {
+      const sheetSubjects =
+        sheetsByClass[className]?.subjects ?? fallbackByClass[className] ?? [];
+      const columnDefs = buildColumnDefs(sheetSubjects);
+      const completeRows = docs.filter((doc) =>
+        isMarksDocComplete(doc, columnDefs)
+      );
+      Object.assign(
+        ranks,
+        computeRanks(
+          completeRows.map((doc) => ({
+            studentUid: doc.studentUid,
+            totalMarks: doc.totalMarks,
+          }))
+        )
+      );
+    });
+    return ranks;
+  }, [currentMarks, sheetsByClass, fallbackByClass]);
 
   // Per-student ranks shared across every block of this view. Only COMPLETE
   // rows take part: incomplete rows (isMarksDocComplete false or a missing
   // marks doc) never receive a rank and always show "-" in the Rank column.
   // Failed students keep their computed rank but the column still shows "-".
   const ranksByStudent = useMemo(() => {
+    if (rules.rankScope === "class") return classWideRanks;
     const ranks: Record<string, number> = {};
     blocks.forEach((block) => {
       const sheetSubjects = block.sheet
@@ -575,7 +660,19 @@ function CrossList() {
       );
     });
     return ranks;
-  }, [blocks]);
+  }, [blocks, rules.rankScope, classWideRanks]);
+
+  // Rank column header and the small rules line shown under every block
+  // heading (visible on screen and in print).
+  const rankLabel =
+    rules.rankScope === "class" ? "Rank (Class)" : "Rank (Section)";
+  const rankRuleText =
+    rules.rankScope === "class" ? "Rank: Class-wise" : "Rank: Section-wise";
+  const passRuleText =
+    rules.passMode === "subject"
+      ? `Pass: each subject >= ${formatMarks(rules.subjectPassPercentage)}%`
+      : `Pass: Total >= ${formatMarks(rules.totalPassPercentage)}%`;
+  const rulesSummary = `${rankRuleText} | ${passRuleText}`;
 
   return (
     <div className="mx-auto flex w-full flex-col gap-4">
@@ -600,7 +697,12 @@ function CrossList() {
                 buttonName="Print"
                 variant="primary"
                 size="sm"
-                disabled={!readyToLoad || blocks.length === 0}
+                disabled={
+                  !readyToLoad ||
+                  blocks.length === 0 ||
+                  rulesLoading ||
+                  Boolean(rulesError)
+                }
                 onClick={() => window.print()}
               />
             </div>
@@ -705,9 +807,28 @@ function CrossList() {
         </div>
       </div>
 
+      {rulesError && (
+        <div
+          className="flex items-center justify-between gap-3 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 print:hidden"
+          role="alert"
+        >
+          <span>{rulesError}</span>
+          <Button
+            buttonName="Retry"
+            variant="outline"
+            size="sm"
+            onClick={reloadRules}
+          />
+        </div>
+      )}
+
       {!readyToLoad ? (
         <div className="rounded-md border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
           Select a session and an exam to load the cross list.
+        </div>
+      ) : rulesLoading ? (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-6 text-center text-sm font-semibold text-blue-700">
+          Loading exam settings...
         </div>
       ) : loadingMarks && currentMarks.length === 0 ? (
         <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-6 text-center text-sm font-semibold text-blue-700">
@@ -737,6 +858,8 @@ function CrossList() {
               session={session}
               examCategory={selectedExam?.examCategory ?? null}
               ranks={ranksByStudent}
+              rankLabel={rankLabel}
+              rulesSummary={rulesSummary}
             />
           ))}
         </div>
@@ -752,12 +875,16 @@ function CrossListBlock({
   session,
   examCategory,
   ranks,
+  rankLabel,
+  rulesSummary,
 }: {
   block: ClassSectionBlock;
   examName: string;
   session: string;
   examCategory: ExamCategory | null;
   ranks: Record<string, number>;
+  rankLabel: string;
+  rulesSummary: string;
 }) {
   const sheetSubjects = block.sheet ? block.sheet.subjects : block.fallbackSubjects;
   const groups = buildCrossListGroups(examCategory, sheetSubjects);
@@ -794,6 +921,9 @@ function CrossListBlock({
           {block.rows.length} student(s)
         </span>
       </div>
+      <p className="border-b border-gray-100 px-4 pb-2 text-[10px] text-gray-400">
+        {rulesSummary}
+      </p>
 
       {incompleteCount > 0 && (
         <div className="border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-xs font-semibold text-amber-800">
@@ -853,7 +983,7 @@ function CrossListBlock({
                 Result
               </th>
               <th className="px-2 py-2 text-center" rowSpan={2}>
-                Rank
+                {rankLabel}
               </th>
             </tr>
             <tr className="bg-gray-700 text-white">
@@ -954,9 +1084,11 @@ function CrossListBlock({
                     )}
                   </td>
                   <td className="px-2 py-1.5 text-center">
-                    {row.doc ? (
+                    {row.doc && !incomplete ? (
                       failed ? (
-                        <span className="font-semibold text-red-600">Fail</span>
+                        <span className="font-semibold text-red-600">
+                          Fail
+                        </span>
                       ) : (
                         <span className="font-semibold text-green-600">
                           Pass

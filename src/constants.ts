@@ -8,6 +8,7 @@ export const COLLECTION = {
   STAMP_SIGN: "stampSign",
   USERS: "users",
   MARKS: "marks",
+  PANEL_SETTINGS: "panelSettings",
 };
 
 /** Document id inside COLLECTION.STAMP_SIGN that stores the Principal's
