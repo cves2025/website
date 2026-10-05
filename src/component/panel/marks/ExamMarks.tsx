@@ -20,7 +20,6 @@ import { CLASSES, COLLECTION, SECTIONS } from "../../../constants";
 import { db } from "../../../firebase/config";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
 import {
-  compareRollStudents,
   deriveRollNumbers,
 } from "../../../utils/rollNumber";
 import { toDateOrNull } from "../../../utils/toDateOrNull";
@@ -210,7 +209,9 @@ function toRowStudent(
 }
 
 function sortRowStudents(a: MarksRowStudent, b: MarksRowStudent): number {
-  return compareRollStudents(a, b);
+  return a.studentName.localeCompare(b.studentName, undefined, {
+    sensitivity: "base",
+  });
 }
 
 function toSubjectColumn(
@@ -1162,10 +1163,10 @@ function ExamMarks() {
             <table className="w-full text-sm min-w-[820px]">
               <thead>
                 <tr className="bg-gray-800 text-white text-left">
-                  <th className="px-3 py-2.5" rowSpan={2}>
+                  <th className="sticky left-0 z-30 px-3 py-2.5" rowSpan={2}>
                     #
                   </th>
-                  <th className="px-3 py-2.5" rowSpan={2}>
+                  <th className="sticky left-[48px] z-30 px-3 py-2.5" rowSpan={2}>
                     Student Name
                   </th>
                   <th className="px-3 py-2.5" rowSpan={2}>
@@ -1229,8 +1230,8 @@ function ExamMarks() {
                       key={student.studentUid}
                       className={index % 2 ? "bg-gray-50" : "bg-white"}
                     >
-                      <td className="px-3 py-2 text-gray-500">{index + 1}</td>
-                      <td className="px-3 py-2 font-medium text-gray-800">
+                      <td className="sticky left-0 z-20 bg-white px-3 py-2 text-gray-500">{index + 1}</td>
+                      <td className="sticky left-[48px] z-20  md:bg-white px-3 py-2 font-normal text-gray-800">
                         {student.studentName}
                       </td>
                       <td className="px-3 py-2 text-gray-600">
