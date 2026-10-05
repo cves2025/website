@@ -20,6 +20,7 @@ import {
 } from "react-icons/fa";
 import schoolLogo from "../../assets/image/schoolLogo.jpg";
 import { BRAND, MENU, filterMenu, groupOfPath, type MenuItem } from "../../config/navigation";
+import { PERMISSIONS } from "../../permissions";
 
 /** The logo in the brand block always returns to the dashboard. */
 const DASHBOARD_PATH = "/welcome";
@@ -33,9 +34,11 @@ interface SidebarProps {
 }
 
 function Sidebar({ open, onClose }: SidebarProps) {
-  const { user, logout } = useContext(myContext);
+  const { user, logout, can } = useContext(myContext);
   const navigate = useNavigate();
   const location = useLocation();
+
+  const canOpenSettings = can(PERMISSIONS.SETTINGS_ACCESS);
 
   const menu = useMemo(
   () => filterMenu(MENU, user?.permissions ?? []),
@@ -101,7 +104,7 @@ const [collapsed, setCollapsed] = useState(false);
   };
 
   const initials =
-    (user?.name || user?.email || "U").trim()[0]?.toUpperCase() || "U";
+    (user?.fullName || user?.email || "U").trim()[0]?.toUpperCase() || "U";
 
   return (
     <>
@@ -293,7 +296,7 @@ const [collapsed, setCollapsed] = useState(false);
         <div className="px-3 py-4 border-t border-white/5">
           <div ref={accountMenuRef} className="relative">
             {/* Account menu (mini sidebar) — opens upwards from the user block */}
-            <div
+            {canOpenSettings && <div
               id="sidebar-account-menu"
               role="menu"
               aria-label="Account menu"
@@ -323,12 +326,12 @@ const [collapsed, setCollapsed] = useState(false);
                 </span>
                 Settings
               </button>
-            </div>
+            </div>}
 
             {/* Clicking the name (or the avatar while collapsed) opens the menu */}
             <button
               type="button"
-              onClick={() => setAccountMenuOpen((prev) => !prev)}
+              onClick={() => canOpenSettings && setAccountMenuOpen((prev) => !prev)}
               aria-haspopup="menu"
               aria-expanded={accountMenuOpen}
               aria-controls="sidebar-account-menu"
@@ -355,13 +358,13 @@ const [collapsed, setCollapsed] = useState(false);
                 }`}
               >
                 <span className="block truncate text-sm font-semibold text-white">
-                  {user?.name || user?.email || "User"}
+                  {user?.fullName || user?.email || "User"}
                 </span>
                 <span className="block truncate text-xs text-gray-400">
                   {user?.email}
                 </span>
               </span>
-              {!collapsed && (
+              {!collapsed && canOpenSettings && (
                 <span className="text-xs text-gray-400" aria-hidden="true">
                   {accountMenuOpen ? <BsChevronDown /> : <BsChevronUp />}
                 </span>

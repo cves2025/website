@@ -9,7 +9,7 @@ import {
   where,
 } from "firebase/firestore";
 import toast from "react-hot-toast";
-import { CLASSES, COLLECTION } from "../../../constants";
+import { CLASSES, COLLECTION, SECTIONS } from "../../../constants";
 import { db } from "../../../firebase/config";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
 import { compareRollStudents, deriveRollNumbers } from "../../../utils/rollNumber";
@@ -493,6 +493,7 @@ function ExamMarks() {
   const [marksYear, setMarksYear] = useState(academicYears[0]?.value ?? "");
   const [marksExamId, setMarksExamId] = useState("");
   const [marksClass, setMarksClass] = useState("");
+  const [section, setSection] = useState("");
 
   const [rowStudents, setRowStudents] = useState<MarksRowStudent[]>([]);
   const [subjectColumns, setSubjectColumns] = useState<MarksSubjectColumn[]>(
@@ -539,7 +540,7 @@ function ExamMarks() {
   );
   const selectedExam = yearExams.find((exam) => exam.id === marksExamId) ?? null;
   const tableReady = Boolean(
-    modalOpen && marksYear && marksExamId && marksClass && selectedExam
+    modalOpen && marksYear && marksExamId && marksClass && selectedExam && section
   );
 
   const buildStudentDraftFor = (studentUid: string): StudentDraftPlan =>
@@ -709,7 +710,7 @@ function ExamMarks() {
     flushPendingWrites();
     draftsRef.current = {};
     setDrafts({});
-  }, [marksYear, marksExamId, marksClass]);
+  }, [marksYear, marksExamId, marksClass, section]);
 
   useEffect(() => {
     if (!tableReady) {
@@ -718,10 +719,17 @@ function ExamMarks() {
       return;
     }
     setLoadingTable(true);
+    const studentsFilters = [
+      where("className", "==", marksClass),
+      where("academicYear", "==", marksYear),
+    ];
+    // Section-wise query: "all" loads every section, otherwise that section.
+    if (section !== "all") {
+      studentsFilters.push(where("section", "==", section));
+    }
     const studentsQuery = query(
       collection(db, COLLECTION.ENROLLMENTS),
-      where("className", "==", marksClass),
-      where("academicYear", "==", marksYear)
+      ...studentsFilters
     );
     const unsubscribe = onSnapshot(
       studentsQuery,
@@ -745,7 +753,7 @@ function ExamMarks() {
       }
     );
     return unsubscribe;
-  }, [tableReady, marksYear, marksClass]);
+  }, [tableReady, marksYear, marksClass, section]);
 
   useEffect(() => {
     if (!tableReady) {
@@ -790,10 +798,17 @@ function ExamMarks() {
       setMarksMap({});
       return;
     }
+    const marksFilters = [
+      where("examId", "==", marksExamId),
+      where("session", "==", marksYear),
+    ];
+    // Section-wise query: "all" loads every section, otherwise that section.
+    if (section !== "all") {
+      marksFilters.push(where("section", "==", section));
+    }
     const marksQuery = query(
       collection(db, COLLECTION.MARKS),
-      where("examId", "==", marksExamId),
-      where("session", "==", marksYear)
+      ...marksFilters
     );
     const unsubscribe = onSnapshot(
       marksQuery,
@@ -831,7 +846,7 @@ function ExamMarks() {
       }
     );
     return unsubscribe;
-  }, [tableReady, marksExamId, marksYear, marksClass]);
+  }, [tableReady, marksExamId, marksYear, marksClass, section]);
 
   /** Live totals: the same calculateMarksSummary call the save uses. */
   const summaryOf = (studentUid: string) =>
@@ -879,6 +894,7 @@ function ExamMarks() {
     setMarksYear(academicYears[0]?.value ?? "");
     setMarksExamId("");
     setMarksClass("");
+    setSection("");
     setModalOpen(true);
   };
 
@@ -930,7 +946,7 @@ function ExamMarks() {
         onSubmit={() => undefined}
         modalClassName="max-w-6xl"
       >
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-4 gap-4">
           <div>
             <label
               htmlFor="marksYear"
@@ -999,6 +1015,30 @@ function ExamMarks() {
               ))}
             </select>
           </div>
+          <div>
+            <label
+              htmlFor="marksClass"
+              className="block text-sm font-semibold text-gray-700 mb-1"
+            >
+              Section
+            </label>
+            <select
+              id="marksSection"
+              value={section}
+              onChange={(event: ChangeEvent<HTMLSelectElement>) =>
+                setSection(event.target.value)
+              }
+              className={inputClass}
+            >
+              <option value="">Select Section</option>
+              <option value="all">All Sections</option>
+              {SECTIONS.map((sec) => (
+                <option key={sec} value={sec}>
+                  {sec}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {!tableReady ? (
@@ -1016,7 +1056,9 @@ function ExamMarks() {
           </div>
         ) : rowStudents.length === 0 ? (
           <div className="mt-4 rounded-md border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
-            No students found for the selected class and academic year.
+            {section === "all"
+              ? "No students found for the selected class and academic year."
+              : `No students found in Section ${section} for the selected class and academic year.`}
           </div>
         ) : subjectColumns.length === 0 ? (
           <div className="mt-4 rounded-md border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">

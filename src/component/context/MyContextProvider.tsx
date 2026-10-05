@@ -26,7 +26,7 @@ export type AccessState =
 export interface AuthUser {
   uid: string;
   email: string | null;
-  name?: string;
+  fullName?: string;
   role?: Role;
   permissions: Permission[];
   accessState: AccessState;
@@ -104,7 +104,7 @@ export function MyContextProvider({ children }: { children: ReactNode }) {
       if (!snapshot.exists()) return base;
 
       const data = snapshot.data() as Record<string, unknown>;
-      const name = typeof data.name === "string" ? data.name : undefined;
+      const fullName = typeof data.fullName === "string" ? data.fullName : undefined;
       const lastSeenReleaseId =
         typeof data.lastSeenReleaseId === "string" &&
         data.lastSeenReleaseId.trim() !== ""
@@ -112,7 +112,7 @@ export function MyContextProvider({ children }: { children: ReactNode }) {
           : undefined;
 
       if (!isRole(data.role)) {
-        return { ...base, name, accessState: "invalid-role" };
+        return { ...base, fullName: fullName, accessState: "invalid-role" };
       }
       const role = data.role;
 
@@ -120,12 +120,12 @@ export function MyContextProvider({ children }: { children: ReactNode }) {
       const inactive =
         data.isDeleted === true || (status !== "" && status !== "Active");
       if (inactive) {
-        return { ...base, name, role, accessState: "inactive" };
+        return { ...base, fullName: fullName, role, accessState: "inactive" };
       }
 
       return {
         ...base,
-        name,
+        fullName: fullName,
         role,
         lastSeenReleaseId,
         accessState: "ok",

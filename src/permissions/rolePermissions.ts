@@ -7,7 +7,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     P.MARKS_ENTER,
     P.MARKS_VIEW,
     P.RESULT_VIEW,
-    P.SETTINGS_ACCESS,
   ],
   student: [P.ADMITCARD_VIEW, P.RESULT_VIEW, P.SETTINGS_ACCESS],
   parent: [P.ADMITCARD_VIEW, P.RESULT_VIEW, P.SETTINGS_ACCESS],
