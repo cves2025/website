@@ -1,4 +1,11 @@
-import { ChangeEvent, Fragment, useEffect, useRef, useState } from "react";
+import {
+  ChangeEvent,
+  Fragment,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   collection,
   DocumentData,
@@ -48,6 +55,15 @@ import {
 import PageHeader from "../../../custom-components/PageHeader";
 import Modal from "../../../custom-components/Modal";
 import Button from "../../../custom-components/Button";
+import { myContext } from "../../context/MyContextProvider";
+import {
+  NO_SCOPE,
+  PERMISSIONS,
+  scopedClasses,
+  scopedSections,
+  subjectAccess,
+  type SubjectAccess,
+} from "../../../permissions";
 
 const academicYears = generateAcademicYears();
 
@@ -58,6 +74,9 @@ const inputClass =
 
 const marksInputClass =
   "w-20 rounded-md border border-gray-300 bg-white px-1.5 py-1.5 text-center text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500";
+
+/** Read-only cells (subjects of other teachers, or no marks.enter permission). */
+const readOnlyInputClass = "!bg-gray-100 !text-gray-500 cursor-not-allowed";
 
 /** Extra classes applied to a cell whose draft does not parse to a valid value. */
 const invalidInputClass =
@@ -470,6 +489,12 @@ interface PendingMarkSave {
 }
 
 function ExamMarks() {
+  // Who is logged in, what they may do (permissions) and which classes,
+  // sections and subjects belong to them (scope).
+  const { user, can } = useContext(myContext);
+  const scope = user?.scope ?? NO_SCOPE;
+  const isAdmin = scope.kind === "all";
+
   const {
     rules,
     loading: rulesLoading,
@@ -539,8 +564,39 @@ function ExamMarks() {
     (exam) => exam.status === "active" && exam.academicYear === marksYear
   );
   const selectedExam = yearExams.find((exam) => exam.id === marksExamId) ?? null;
+
+  // ---- Teacher scope (RBAC) -------------------------------------------------
+  // Only what is SHOWN and EDITABLE is filtered. `subjectColumns` (the full
+  // list) keeps feeding the autosave and the totals, so a subject teacher's
+  // save never overwrites the student's overall result.
+  const allowedClasses = scopedClasses(scope, CLASSES);
+  const allowedSections = marksClass
+    ? scopedSections(scope, marksClass, SECTIONS)
+    : [];
+  const selectionAllowed =
+    allowedClasses.includes(marksClass) &&
+    (section === "all" ? isAdmin : allowedSections.includes(section));
+
+  /** edit = own subject, view = read-only, none = hidden. */
+  const accessOf = (column: MarksSubjectColumn): SubjectAccess => {
+    const access = subjectAccess(scope, marksClass, section, column.name);
+    // Scope allows editing, but without the marks.enter permission: view only.
+    return access === "edit" && !can(PERMISSIONS.MARKS_ENTER) ? "view" : access;
+  };
+  const visibleColumns = subjectColumns.filter(
+    (column) => accessOf(column) !== "none"
+  );
+  // Totals are shown only when the user can see every subject of the class.
+  const showTotals = visibleColumns.length === subjectColumns.length;
+
   const tableReady = Boolean(
-    modalOpen && marksYear && marksExamId && marksClass && selectedExam && section
+    modalOpen &&
+      marksYear &&
+      marksExamId &&
+      marksClass &&
+      selectedExam &&
+      section &&
+      selectionAllowed
   );
 
   const buildStudentDraftFor = (studentUid: string): StudentDraftPlan =>
@@ -861,6 +917,8 @@ function ExamMarks() {
     input: MarksComponentInput,
     value: string
   ) => {
+    // Defense in depth: read-only / hidden subjects never create a draft.
+    if (accessOf(column) !== "edit") return;
     const cellKey = CELL_KEY.component(
       student.studentUid,
       column.id,
@@ -880,6 +938,7 @@ function ExamMarks() {
     column: MarksSubjectColumn,
     value: string
   ) => {
+    if (accessOf(column) !== "edit") return;
     const cellKey = CELL_KEY.grade(student.studentUid, column.id);
     const nextDrafts = {
       ...draftsRef.current,
@@ -1002,13 +1061,15 @@ function ExamMarks() {
             <select
               id="marksClass"
               value={marksClass}
-              onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-                setMarksClass(event.target.value)
-              }
+              onChange={(event: ChangeEvent<HTMLSelectElement>) => {
+                setMarksClass(event.target.value);
+                // Sections differ per class for a teacher, so start over.
+                setSection("");
+              }}
               className={inputClass}
             >
               <option value="">Select Class</option>
-              {CLASSES.map((className) => (
+              {allowedClasses.map((className) => (
                 <option key={className} value={className}>
                   {toOrdinalLabel(className)}
                 </option>
@@ -1017,7 +1078,7 @@ function ExamMarks() {
           </div>
           <div>
             <label
-              htmlFor="marksClass"
+              htmlFor="marksSection"
               className="block text-sm font-semibold text-gray-700 mb-1"
             >
               Section
@@ -1025,14 +1086,15 @@ function ExamMarks() {
             <select
               id="marksSection"
               value={section}
+              disabled={!marksClass}
               onChange={(event: ChangeEvent<HTMLSelectElement>) =>
                 setSection(event.target.value)
               }
               className={inputClass}
             >
               <option value="">Select Section</option>
-              <option value="all">All Sections</option>
-              {SECTIONS.map((sec) => (
+              {isAdmin && <option value="all">All Sections</option>}
+              {allowedSections.map((sec) => (
                 <option key={sec} value={sec}>
                   {sec}
                 </option>
@@ -1062,8 +1124,12 @@ function ExamMarks() {
           </div>
         ) : subjectColumns.length === 0 ? (
           <div className="mt-4 rounded-md border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
-            No subject is enabled for marks entry in this class. Enable \"Show
-            in Marks Entry\" on the Subjects page.
+            No subject is enabled for marks entry in this class. Enable
+            &quot;Show in Marks Entry&quot; on the Subjects page.
+          </div>
+        ) : visibleColumns.length === 0 ? (
+          <div className="mt-4 rounded-md border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
+            No subject is assigned to you for this class and section.
           </div>
         ) : (
           <div className="mt-4 overflow-x-auto">
@@ -1079,7 +1145,7 @@ function ExamMarks() {
                   <th className="px-3 py-2.5" rowSpan={2}>
                     Father's Name
                   </th>
-                  {subjectColumns.map((column) => (
+                  {visibleColumns.map((column) => (
                     <th
                       key={column.id}
                       colSpan={Math.max(column.inputs.length, 1)}
@@ -1093,18 +1159,22 @@ function ExamMarks() {
                       )}
                     </th>
                   ))}
-                  <th className="px-3 py-2.5 text-center" rowSpan={2}>
-                    Total Marks
-                  </th>
-                  <th className="px-3 py-2.5 text-center" rowSpan={2}>
-                    Marks Obtained
-                  </th>
-                  <th className="px-3 py-2.5 text-center" rowSpan={2}>
-                    Percentage
-                  </th>
+                  {showTotals && (
+                    <>
+                      <th className="px-3 py-2.5 text-center" rowSpan={2}>
+                        Total Marks
+                      </th>
+                      <th className="px-3 py-2.5 text-center" rowSpan={2}>
+                        Marks Obtained
+                      </th>
+                      <th className="px-3 py-2.5 text-center" rowSpan={2}>
+                        Percentage
+                      </th>
+                    </>
+                  )}
                 </tr>
                 <tr className="bg-gray-700 text-white">
-                  {subjectColumns.map((column) =>
+                  {visibleColumns.map((column) =>
                     column.isGrade ? (
                       <th
                         key={`${column.id}-grade`}
@@ -1140,7 +1210,8 @@ function ExamMarks() {
                       <td className="px-3 py-2 text-gray-600">
                         {student.fatherName}
                       </td>
-                      {subjectColumns.map((column) => {
+                      {visibleColumns.map((column) => {
+                        const readOnly = accessOf(column) === "view";
                         if (column.isGrade) {
                           const cellKey = CELL_KEY.grade(
                             student.studentUid,
@@ -1157,6 +1228,7 @@ function ExamMarks() {
                                 list="marksSubjectGrades"
                                 maxLength={3}
                                 value={drafts[cellKey] ?? savedGrade}
+                                readOnly={readOnly}
                                 onChange={(
                                   event: ChangeEvent<HTMLInputElement>
                                 ) =>
@@ -1169,7 +1241,9 @@ function ExamMarks() {
                                 onBlur={() =>
                                   flushStudentWrite(student.studentUid)
                                 }
-                                className={marksInputClass}
+                                className={`${marksInputClass}${
+                                  readOnly ? ` ${readOnlyInputClass}` : ""
+                                }`}
                               />
                             </td>
                           );
@@ -1233,6 +1307,7 @@ function ExamMarks() {
                                     maxLength={6}
                                     title={input.label}
                                     value={value}
+                                    readOnly={readOnly}
                                     onChange={(
                                       event: ChangeEvent<HTMLInputElement>
                                     ) =>
@@ -1248,7 +1323,7 @@ function ExamMarks() {
                                     }
                                     className={`${marksInputClass}${
                                       invalid ? ` ${invalidInputClass}` : ""
-                                    }`}
+                                    }${readOnly ? ` ${readOnlyInputClass}` : ""}`}
                                   />
                                 </td>
                               );
@@ -1256,15 +1331,19 @@ function ExamMarks() {
                           </Fragment>
                         );
                       })}
-                      <td className="px-3 py-2 text-gray-700 text-center">
-                        {formatMarks(summary.totalMaxMarks)}
-                      </td>
-                      <td className="px-3 py-2 font-semibold text-gray-800 text-center">
-                        {formatMarks(summary.totalMarks)}
-                      </td>
-                      <td className="px-3 py-2 font-semibold text-gray-800 text-center">
-                        {formatMarks(summary.percentage)}%
-                      </td>
+                      {showTotals && (
+                        <>
+                          <td className="px-3 py-2 text-gray-700 text-center">
+                            {formatMarks(summary.totalMaxMarks)}
+                          </td>
+                          <td className="px-3 py-2 font-semibold text-gray-800 text-center">
+                            {formatMarks(summary.totalMarks)}
+                          </td>
+                          <td className="px-3 py-2 font-semibold text-gray-800 text-center">
+                            {formatMarks(summary.percentage)}%
+                          </td>
+                        </>
+                      )}
                     </tr>
                   );
                 })}
@@ -1274,6 +1353,11 @@ function ExamMarks() {
               Marks are saved automatically as you type. You can type AB
               (absent) or EX (exempt) in any subject cell.
             </p>
+            {visibleColumns.some((column) => accessOf(column) === "view") && (
+              <p className="mt-1 text-xs text-gray-500">
+                Grey columns are read-only for you.
+              </p>
+            )}
             <datalist id="marksSubjectGrades">
               {GRADE_OPTIONS.map((grade) => (
                 <option key={grade} value={grade}>

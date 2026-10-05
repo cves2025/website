@@ -14,7 +14,9 @@ import {
   Role,
   isRole,
   resolvePermissions,
+  ALL_SCOPE, NO_SCOPE, type AccessScope
 } from "../../permissions";
+import { toEditableSectionAssignments } from "../../utils/teacherSections";
 
 export type AccessState =
   | "ok"
@@ -31,6 +33,7 @@ export interface AuthUser {
   permissions: Permission[];
   accessState: AccessState;
   lastSeenReleaseId?: string;
+  scope: AccessScope;
 }
 
 export interface AuthContextType {
@@ -83,6 +86,17 @@ function readIsClassTeacher(data: Record<string, unknown>): boolean {
   return data.isClassTeacher === true;
 }
 
+function buildScope(role: Role, data: Record<string, unknown>): AccessScope {
+  if (role === "admin") return ALL_SCOPE;
+  if (role === "teacher") {
+    return {
+      kind: "assigned",
+      assignments: toEditableSectionAssignments(data).assignments,
+    };
+  }
+  return NO_SCOPE; // student / parent ka scope baad ke step mein
+}
+
 export function MyContextProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
@@ -97,6 +111,7 @@ export function MyContextProvider({ children }: { children: ReactNode }) {
       email: firebaseUser.email,
       permissions: [],
       accessState: "no-profile",
+      scope: NO_SCOPE,
     };
 
     try {
@@ -134,6 +149,7 @@ export function MyContextProvider({ children }: { children: ReactNode }) {
           data.permissionOverrides as PermissionOverrides | undefined,
           readIsClassTeacher(data)
         ),
+        scope: buildScope(role, data),
       };
     } catch (err) {
       console.error("Could not load Firestore user profile:", err);
@@ -159,6 +175,7 @@ export function MyContextProvider({ children }: { children: ReactNode }) {
         email: firebaseUser.email,
         permissions: [],
         accessState: "no-profile",
+        scope: NO_SCOPE,
       });
       setAuthReady(true);
       setProfileReady(false);

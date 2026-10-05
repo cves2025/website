@@ -7,7 +7,7 @@ import Unauthorized from "../component/panel/Unauthorized";
 function RequireRoutePermission() {
   const { user } = useContext(myContext);
   const { pathname } = useLocation();
-
+console.log(user?.scope)
   if (!user || !canAccessPath(pathname, user.permissions)) {
     return <Unauthorized />;
   }
