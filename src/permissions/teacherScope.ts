@@ -52,6 +52,7 @@ export function subjectAccess(
   subjectName: string
 ): SubjectAccess {
   if (scope.kind === "all") return "edit";
+  if (isClassTeacherOf(scope, className, section)) return "edit";
   if (scope.kind === "none") return "none";
 
   const assignment = scope.assignments.find((item) => item.section === section);
@@ -67,4 +68,18 @@ export function subjectAccess(
     return "view";
   }
   return "none";
+}
+
+export function isClassTeacherOf(
+  scope: AccessScope,
+  className: string,
+  section: string
+): boolean {
+  if (scope.kind !== "assigned") return false;
+  return scope.assignments.some(
+    (a) =>
+      a.isClassTeacher &&
+      a.section === section &&
+      String(a.classTeacherOf ?? "").trim() === String(className ?? "").trim()
+  );
 }

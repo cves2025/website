@@ -19,7 +19,10 @@ import toast from "react-hot-toast";
 import { CLASSES, COLLECTION, SECTIONS } from "../../../constants";
 import { db } from "../../../firebase/config";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
-import { compareRollStudents, deriveRollNumbers } from "../../../utils/rollNumber";
+import {
+  compareRollStudents,
+  deriveRollNumbers,
+} from "../../../utils/rollNumber";
 import { toDateOrNull } from "../../../utils/toDateOrNull";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import {
@@ -89,7 +92,7 @@ const CELL_KEY = {
   component: (
     studentUid: string,
     subjectId: string,
-    component: SubjectComponentName | null
+    component: SubjectComponentName | null,
   ): string => `${studentUid}::${subjectId}::${component ?? "marks"}`,
   grade: (studentUid: string, subjectId: string): string =>
     `${studentUid}::${subjectId}::grade`,
@@ -181,7 +184,7 @@ function toExamDoc(snapshot: QueryDocumentSnapshot<DocumentData>): ExamDoc {
     marksScheme: marksSchemeFromDoc(data, maxMarks || undefined),
     applicableClasses: Array.isArray(data.applicableClasses)
       ? data.applicableClasses.filter(
-          (cls): cls is string => typeof cls === "string"
+          (cls): cls is string => typeof cls === "string",
         )
       : [],
     examStartDate: toDateInputValue(data.examStartDate),
@@ -191,7 +194,7 @@ function toExamDoc(snapshot: QueryDocumentSnapshot<DocumentData>): ExamDoc {
 }
 
 function toRowStudent(
-  snapshot: QueryDocumentSnapshot<DocumentData>
+  snapshot: QueryDocumentSnapshot<DocumentData>,
 ): MarksRowStudent | null {
   const data = snapshot.data();
   if (data.isDeleted === true) return null;
@@ -211,7 +214,7 @@ function sortRowStudents(a: MarksRowStudent, b: MarksRowStudent): number {
 }
 
 function toSubjectColumn(
-  snapshot: QueryDocumentSnapshot<DocumentData>
+  snapshot: QueryDocumentSnapshot<DocumentData>,
 ): SubjectColumnBase | null {
   const data = snapshot.data();
   if (data.displayInMarksEntry !== true) return null;
@@ -225,7 +228,7 @@ function toSubjectColumn(
 
 function sortSubjectColumns(
   a: SubjectColumnBase,
-  b: SubjectColumnBase
+  b: SubjectColumnBase,
 ): number {
   return a.order - b.order || a.name.localeCompare(b.name);
 }
@@ -239,27 +242,33 @@ function sortSubjectColumns(
 function enrichSubjectColumn(
   column: SubjectColumnBase,
   exam: ExamDoc | null,
-  className: string
+  className: string,
+  hasPracticalSibling: boolean,
 ): MarksSubjectColumn {
   if (column.type === "Scholastic") {
     return { ...column, isGrade: true, inputs: [] };
   }
   const inputs: MarksComponentInput[] = [];
   if (exam && isSchemeClass(className)) {
+    const isPractical = column.type === "Practical";
     const breakdown = subjectMarksBreakdown(
-      column.name,
       exam.examCategory,
-      exam.marksScheme
+      exam.marksScheme,
+      isPractical || hasPracticalSibling,
     );
-    if (exam.examCategory === "UNIT_TEST") {
+    if (isPractical) {
+      // Practical papers exist only in Half Yearly / Annual.
+      if (exam.examCategory === "MAIN_EXAM" && breakdown.practical > 0) {
+        inputs.push({
+          component: "practical",
+          max: breakdown.practical,
+          label: "Practical",
+        });
+      }
+    } else if (exam.examCategory === "UNIT_TEST") {
       inputs.push(
         { component: "notebook", max: breakdown.notebook, label: "Notebook" },
-        { component: "test", max: breakdown.theory, label: "Test" }
-      );
-    } else if (breakdown.hasPractical) {
-      inputs.push(
-        { component: "theory", max: breakdown.theory, label: "Theory" },
-        { component: "practical", max: breakdown.practical, label: "Practical" }
+        { component: "test", max: breakdown.theory, label: "Test" },
       );
     } else {
       inputs.push({
@@ -275,7 +284,10 @@ function enrichSubjectColumn(
 }
 
 function normalizeGrade(value: string): string {
-  return value.toUpperCase().replace(/[^A-F0-9+\-]/g, "").slice(0, 3);
+  return value
+    .toUpperCase()
+    .replace(/[^A-F0-9+\-]/g, "")
+    .slice(0, 3);
 }
 
 /** "AB"/"EX" (any case) are shown back in the cell as uppercase tokens. */
@@ -308,7 +320,7 @@ function resolveCell(value: string, max: number): ResolvedCell {
 function subjectStatusToken(
   drafts: Record<string, string>,
   studentUid: string,
-  column: MarksSubjectColumn
+  column: MarksSubjectColumn,
 ): "AB" | "EX" | null {
   for (const input of column.inputs) {
     const draft =
@@ -329,15 +341,15 @@ function subjectStatusToken(
 function resolveSubject(
   drafts: Record<string, string>,
   studentUid: string,
-  column: MarksSubjectColumn
+  column: MarksSubjectColumn,
 ): ResolvedSubject {
   if (column.inputs.length === 0) return { kind: "clear" };
 
   const cells = column.inputs.map((input) =>
     resolveCell(
       drafts[CELL_KEY.component(studentUid, column.id, input.component)] ?? "",
-      input.max
-    )
+      input.max,
+    ),
   );
 
   const statusCell = cells.find((cell) => cell.kind === "status");
@@ -395,7 +407,7 @@ function buildStudentDraft(
   studentUid: string,
   drafts: Record<string, string>,
   savedBySubject: Record<string, SubjectMarksRecord> | undefined,
-  columns: MarksSubjectColumn[]
+  columns: MarksSubjectColumn[],
 ): StudentDraftPlan {
   const subjectMarks: Record<string, SubjectMarksRecord> = {};
   const clearedSubjectKeys: string[] = [];
@@ -429,7 +441,7 @@ function buildStudentDraft(
     const hasCellDraft = column.inputs.some(
       (input) =>
         drafts[CELL_KEY.component(studentUid, column.id, input.component)] !==
-        undefined
+        undefined,
     );
     if (!hasCellDraft) {
       if (savedBySubject?.[column.id]) {
@@ -522,7 +534,7 @@ function ExamMarks() {
 
   const [rowStudents, setRowStudents] = useState<MarksRowStudent[]>([]);
   const [subjectColumns, setSubjectColumns] = useState<MarksSubjectColumn[]>(
-    []
+    [],
   );
   const [marksMap, setMarksMap] = useState<Record<string, MarksDoc>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -538,7 +550,7 @@ function ExamMarks() {
   const pendingWritesRef = useRef<Record<string, PendingMarkSave>>({});
   /** Raw subjectMarks of the loaded docs, so legacy keys can be cleaned up. */
   const rawSubjectMarksRef = useRef<Record<string, Record<string, unknown>>>(
-    {}
+    {},
   );
   /** Exam sheet combinations already requested on this page (retry on failure). */
   const examinedSheetsRef = useRef<Set<string>>(new Set());
@@ -546,7 +558,7 @@ function ExamMarks() {
   useEffect(() => {
     const examsQuery = query(
       collection(db, COLLECTION.EXAMS),
-      orderBy("sequence", "asc")
+      orderBy("sequence", "asc"),
     );
     const unsubscribe = onSnapshot(
       examsQuery,
@@ -555,15 +567,16 @@ function ExamMarks() {
       },
       (error) => {
         console.error("Failed to load exams:", error);
-      }
+      },
     );
     return unsubscribe;
   }, []);
 
   const yearExams = exams.filter(
-    (exam) => exam.status === "active" && exam.academicYear === marksYear
+    (exam) => exam.status === "active" && exam.academicYear === marksYear,
   );
-  const selectedExam = yearExams.find((exam) => exam.id === marksExamId) ?? null;
+  const selectedExam =
+    yearExams.find((exam) => exam.id === marksExamId) ?? null;
 
   // ---- Teacher scope (RBAC) -------------------------------------------------
   // Only what is SHOWN and EDITABLE is filtered. `subjectColumns` (the full
@@ -584,19 +597,19 @@ function ExamMarks() {
     return access === "edit" && !can(PERMISSIONS.MARKS_ENTER) ? "view" : access;
   };
   const visibleColumns = subjectColumns.filter(
-    (column) => accessOf(column) !== "none"
+    (column) => accessOf(column) !== "none",
   );
   // Totals are shown only when the user can see every subject of the class.
   const showTotals = visibleColumns.length === subjectColumns.length;
 
   const tableReady = Boolean(
     modalOpen &&
-      marksYear &&
-      marksExamId &&
-      marksClass &&
-      selectedExam &&
-      section &&
-      selectionAllowed
+    marksYear &&
+    marksExamId &&
+    marksClass &&
+    selectedExam &&
+    section &&
+    selectionAllowed,
   );
 
   const buildStudentDraftFor = (studentUid: string): StudentDraftPlan =>
@@ -604,14 +617,14 @@ function ExamMarks() {
       studentUid,
       draftsRef.current,
       marksMapRef.current[studentUid]?.subjectMarks,
-      subjectColumnsRef.current
+      subjectColumnsRef.current,
     );
 
   const buildStudentPayload = (
-    student: MarksRowStudent
+    student: MarksRowStudent,
   ): { payload: MarksData; clearedSubjectKeys: string[] } => {
     const { subjectMarks, clearedSubjectKeys } = buildStudentDraftFor(
-      student.studentUid
+      student.studentUid,
     );
     const summary = calculateMarksSummary(subjectMarks, rulesRef.current);
     const payload: MarksData = {
@@ -649,7 +662,7 @@ function ExamMarks() {
       sheet.session,
       sheet.exam,
       sheet.className,
-      sheet.subjects
+      sheet.subjects,
     ).then((ok) => {
       // On failure allow the next successful save to retry.
       if (!ok) examinedSheetsRef.current.delete(key);
@@ -677,7 +690,7 @@ function ExamMarks() {
     const marksDocId = buildMarksDocId(
       payload.session,
       payload.examId,
-      payload.studentUid
+      payload.studentUid,
     );
     const existed = knownDocIdsRef.current.has(marksDocId);
     // Leftover legacy keys of hybrid docs are deleted on this save so the
@@ -686,7 +699,7 @@ function ExamMarks() {
     const legacySubjectKeysToDelete = rawSubjectMarks
       ? listLegacySubjectKeys(
           rawSubjectMarks,
-          subjectColumnsRef.current.map((column) => column.id)
+          subjectColumnsRef.current.map((column) => column.id),
         )
       : [];
 
@@ -785,7 +798,7 @@ function ExamMarks() {
     }
     const studentsQuery = query(
       collection(db, COLLECTION.ENROLLMENTS),
-      ...studentsFilters
+      ...studentsFilters,
     );
     const unsubscribe = onSnapshot(
       studentsQuery,
@@ -799,14 +812,14 @@ function ExamMarks() {
         // Same pure derivation used by the Cross List, so both screens show
         // identical roll numbers for the same roster.
         rollNumbersRef.current = deriveRollNumbers(
-          list.map((student) => ({ ...student, className: marksClass }))
+          list.map((student) => ({ ...student, className: marksClass })),
         );
         setLoadingTable(false);
       },
       (error) => {
         console.error("Failed to load students:", error);
         setLoadingTable(false);
-      }
+      },
     );
     return unsubscribe;
   }, [tableReady, marksYear, marksClass, section]);
@@ -819,20 +832,36 @@ function ExamMarks() {
     }
     const subjectsQuery = query(
       collection(db, COLLECTION.SUBJECTS),
-      where("className", "==", marksClass)
+      where("className", "==", marksClass),
     );
     const unsubscribe = onSnapshot(
       subjectsQuery,
       (snapshot) => {
+        const practicalNames = new Set(
+          snapshot.docs
+            .filter((d) => {
+              const data = d.data();
+              return (
+                data.type === "Practical" && data.displayInMarksEntry === true
+              );
+            })
+            .map((d) =>
+              String(d.data().name ?? "")
+                .trim()
+                .toLowerCase(),
+            ),
+        );
         const list = snapshot.docs
           .map(toSubjectColumn)
-          .filter(
-            (column): column is SubjectColumnBase =>
-              column !== null && Boolean(column.name)
-          )
+          .filter((c): c is SubjectColumnBase => c !== null && Boolean(c.name))
           .sort(sortSubjectColumns)
-          .map((column) =>
-            enrichSubjectColumn(column, selectedExam, marksClass)
+          .map((c) =>
+            enrichSubjectColumn(
+              c,
+              selectedExam,
+              marksClass,
+              practicalNames.has(c.name.trim().toLowerCase()),
+            ),
           );
         subjectColumnsRef.current = list;
         setSubjectColumns(list);
@@ -841,7 +870,7 @@ function ExamMarks() {
         console.error("Failed to load subjects:", error);
         subjectColumnsRef.current = [];
         setSubjectColumns([]);
-      }
+      },
     );
     return unsubscribe;
   }, [tableReady, marksClass, selectedExam]);
@@ -862,10 +891,7 @@ function ExamMarks() {
     if (section !== "all") {
       marksFilters.push(where("section", "==", section));
     }
-    const marksQuery = query(
-      collection(db, COLLECTION.MARKS),
-      ...marksFilters
-    );
+    const marksQuery = query(collection(db, COLLECTION.MARKS), ...marksFilters);
     const unsubscribe = onSnapshot(
       marksQuery,
       (snapshot) => {
@@ -877,7 +903,7 @@ function ExamMarks() {
           const marks = normalizeLegacyMarksDoc(
             documentSnapshot.id,
             data,
-            rulesRef.current
+            rulesRef.current,
           );
           if (marks.session !== marksYear || marks.className !== marksClass) {
             return;
@@ -899,7 +925,7 @@ function ExamMarks() {
         marksMapRef.current = {};
         rawSubjectMarksRef.current = {};
         setMarksMap({});
-      }
+      },
     );
     return unsubscribe;
   }, [tableReady, marksExamId, marksYear, marksClass, section]);
@@ -908,21 +934,21 @@ function ExamMarks() {
   const summaryOf = (studentUid: string) =>
     calculateMarksSummary(
       buildStudentDraftFor(studentUid).subjectMarks,
-      rulesRef.current
+      rulesRef.current,
     );
 
   const handleCellChange = (
     student: MarksRowStudent,
     column: MarksSubjectColumn,
     input: MarksComponentInput,
-    value: string
+    value: string,
   ) => {
     // Defense in depth: read-only / hidden subjects never create a draft.
     if (accessOf(column) !== "edit") return;
     const cellKey = CELL_KEY.component(
       student.studentUid,
       column.id,
-      input.component
+      input.component,
     );
     const nextDrafts = {
       ...draftsRef.current,
@@ -936,7 +962,7 @@ function ExamMarks() {
   const handleGradeChange = (
     student: MarksRowStudent,
     column: MarksSubjectColumn,
-    value: string
+    value: string,
   ) => {
     if (accessOf(column) !== "edit") return;
     const cellKey = CELL_KEY.grade(student.studentUid, column.id);
@@ -1191,7 +1217,7 @@ function ExamMarks() {
                           {input.label} ({input.max})
                         </th>
                       ))
-                    )
+                    ),
                   )}
                 </tr>
               </thead>
@@ -1215,14 +1241,17 @@ function ExamMarks() {
                         if (column.isGrade) {
                           const cellKey = CELL_KEY.grade(
                             student.studentUid,
-                            column.id
+                            column.id,
                           );
                           const savedGrade =
                             marksMap[student.studentUid]?.subjectMarks[
                               column.id
                             ]?.grade ?? "";
                           return (
-                            <td key={column.id} className="px-2 py-2 text-center">
+                            <td
+                              key={column.id}
+                              className="px-2 py-2 text-center"
+                            >
                               <input
                                 type="text"
                                 list="marksSubjectGrades"
@@ -1230,12 +1259,12 @@ function ExamMarks() {
                                 value={drafts[cellKey] ?? savedGrade}
                                 readOnly={readOnly}
                                 onChange={(
-                                  event: ChangeEvent<HTMLInputElement>
+                                  event: ChangeEvent<HTMLInputElement>,
                                 ) =>
                                   handleGradeChange(
                                     student,
                                     column,
-                                    event.target.value
+                                    event.target.value,
                                   )
                                 }
                                 onBlur={() =>
@@ -1251,18 +1280,17 @@ function ExamMarks() {
                         const token = subjectStatusToken(
                           drafts,
                           student.studentUid,
-                          column
+                          column,
                         );
-                        const saved = marksMap[student.studentUid]?.subjectMarks[
-                          column.id
-                        ];
+                        const saved =
+                          marksMap[student.studentUid]?.subjectMarks[column.id];
                         return (
                           <Fragment key={column.id}>
                             {column.inputs.map((input) => {
                               const cellKey = CELL_KEY.component(
                                 student.studentUid,
                                 column.id,
-                                input.component
+                                input.component,
                               );
                               const draft = drafts[cellKey];
                               let value: string;
@@ -1272,7 +1300,8 @@ function ExamMarks() {
                                 value = token;
                               } else if (saved) {
                                 if (saved.status === "absent") value = "AB";
-                                else if (saved.status === "exempt") value = "EX";
+                                else if (saved.status === "exempt")
+                                  value = "EX";
                                 else if (input.component) {
                                   const componentValue =
                                     saved.components?.[input.component];
@@ -1309,13 +1338,13 @@ function ExamMarks() {
                                     value={value}
                                     readOnly={readOnly}
                                     onChange={(
-                                      event: ChangeEvent<HTMLInputElement>
+                                      event: ChangeEvent<HTMLInputElement>,
                                     ) =>
                                       handleCellChange(
                                         student,
                                         column,
                                         input,
-                                        event.target.value
+                                        event.target.value,
                                       )
                                     }
                                     onBlur={() =>

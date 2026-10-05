@@ -162,11 +162,15 @@ export function marksSchemeFromDoc(
   };
 }
 
-/** Per-subject maximum marks for the selected exam category. */
+/**
+ * Per-subject maximum marks for the selected exam category.
+ * `hasPracticalSplit` is decided by the Subject setup (a Practical-type subject
+ * exists for this class), never by the subject name.
+ */
 export function subjectMarksBreakdown(
-  subject: string,
   category: ExamCategory,
-  scheme: MarksScheme
+  scheme: MarksScheme,
+  hasPracticalSplit: boolean
 ): SubjectMarksBreakdown {
   if (category === "UNIT_TEST") {
     return {
@@ -178,7 +182,7 @@ export function subjectMarksBreakdown(
     };
   }
 
-  if (isPracticalSubject(subject) && scheme.practicalMarks > 0) {
+  if (hasPracticalSplit && scheme.practicalMarks > 0) {
     return {
       notebook: 0,
       theory: scheme.practicalTheoryMarks,
