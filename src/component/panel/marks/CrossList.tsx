@@ -1,4 +1,4 @@
-import { ChangeEvent, Fragment, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import {
   collection,
   getDocs,
@@ -96,12 +96,15 @@ interface LoadedEnrollment {
  * how columns are presented:
  *  - Unit Test / PG-UKG            : one "total" column per subject,
  *  - Main Exam without practical   : one "total" column per subject,
- *  - Main Exam with practical      : Theory | Practical | Total sub-columns,
+ *  - Main Exam practical paper     : one "practical" column (the theory part
+ *                                    lives on the parent subject's column),
  *  - Scholastic (grade) subjects   : one grade column, after the numeric ones.
  */
 interface CrossListColumnGroup {
   subjectId: string;
   name: string;
+  /** Subject type (e.g. "Theory", "Written", "Practical") shown under the name. */
+  type: string;
   isGrade: boolean;
   split: boolean;
 }
@@ -117,6 +120,7 @@ function buildCrossListGroups(
       grades.push({
         subjectId: subject.id,
         name: subject.name,
+        type: subject.type,
         isGrade: true,
         split: false,
       });
@@ -125,6 +129,7 @@ function buildCrossListGroups(
     numeric.push({
       subjectId: subject.id,
       name: subject.name,
+      type: subject.type,
       isGrade: false,
       split:
         examCategory === "MAIN_EXAM" &&
@@ -272,7 +277,9 @@ function CrossList() {
   /** Rules change (from the Settings page) -> marks are re-fetched under them. */
   const rulesKey = `${rules.rankScope}|${rules.passMode}|${rules.totalPassPercentage}|${rules.subjectPassPercentage}`;
 
-  const [session, setSession] = useState("");
+  // Newest academic year first (e.g. 2026-27), so the current session is
+  // pre-selected by default.
+  const [session, setSession] = useState(academicYears[0]?.value ?? "");
   const [examId, setExamId] = useState("");
   const [selectedClass, setSelectedClass] = useState("all");
   const [selectedSection, setSelectedSection] = useState("all");
@@ -951,57 +958,24 @@ function CrossListBlock({
                 Student Name
               </th>
               <th className="min-w-[9rem] px-2 py-2 text-left">Father Name</th>
-              {groups.map((group) =>
-                group.split ? (
-                  <th
-                    key={group.subjectId}
-                    colSpan={3}
-                    className="px-2 py-2 text-center whitespace-nowrap"
-                  >
-                    {group.name}
-                  </th>
-                ) : (
-                  <th
-                    key={group.subjectId}
-                    rowSpan={2}
-                    className="px-2 py-2 text-center whitespace-nowrap"
-                  >
-                    {group.name}
-                  </th>
-                )
-              )}
-              <th className="px-2 py-2 text-center" rowSpan={2}>
-                Total
-              </th>
-              <th className="px-2 py-2 text-center" rowSpan={2}>
-                Max
-              </th>
-              <th className="px-2 py-2 text-center" rowSpan={2}>
-                Percentage
-              </th>
-              <th className="px-2 py-2 text-center" rowSpan={2}>
-                Result
-              </th>
-              <th className="px-2 py-2 text-center" rowSpan={2}>
-                {rankLabel}
-              </th>
-            </tr>
-            <tr className="bg-gray-700 text-white">
-              {groups
-                .filter((group) => group.split)
-                .map((group) => (
-                  <Fragment key={group.subjectId}>
-                    <th className="px-2 py-1 text-center text-[10px] font-semibold">
-                      Theory
-                    </th>
-                    <th className="px-2 py-1 text-center text-[10px] font-semibold">
-                      Practical
-                    </th>
-                    <th className="px-2 py-1 text-center text-[10px] font-semibold">
-                      Total
-                    </th>
-                  </Fragment>
-                ))}
+              {groups.map((group) => (
+                <th
+                  key={group.subjectId}
+                  className="px-2 py-2 text-center whitespace-nowrap"
+                >
+                  {group.name}
+                  {group.type && (
+                    <span className="block text-[10px] text-blue-200 whitespace-nowrap">
+                      {group.type}
+                    </span>
+                  )}
+                </th>
+              ))}
+              <th className="px-2 py-2 text-center">Total</th>
+              <th className="px-2 py-2 text-center">Max</th>
+              <th className="px-2 py-2 text-center">Percentage</th>
+              <th className="px-2 py-2 text-center">Result</th>
+              <th className="px-2 py-2 text-center">{rankLabel}</th>
             </tr>
           </thead>
           <tbody>
@@ -1040,31 +1014,21 @@ function CrossListBlock({
                   </td>
                   {groups.map((group) => {
                     const record = row.doc?.subjectMarks[group.subjectId];
-                    if (group.isGrade) {
-                      return (
-                        <td key={group.subjectId} className="px-2 py-1.5 text-center">
-                          {subjectCellText(record, "grade")}
-                        </td>
-                      );
-                    }
-                    if (group.split) {
-                      return (
-                        <Fragment key={group.subjectId}>
-                          <td className="px-2 py-1.5 text-center">
-                            {subjectCellText(record, "theory")}
-                          </td>
-                          <td className="px-2 py-1.5 text-center">
-                            {subjectCellText(record, "practical")}
-                          </td>
-                          <td className="px-2 py-1.5 text-center font-semibold">
-                            {subjectCellText(record, "total")}
-                          </td>
-                        </Fragment>
-                      );
-                    }
+                    // Practical-type subjects (classes 1-8 Main Exams) keep ONE
+                    // column showing only the practical marks; the theory part
+                    // lives on the parent subject's own column.
+                    const part: "total" | "practical" | "grade" =
+                      group.isGrade
+                        ? "grade"
+                        : group.split
+                          ? "practical"
+                          : "total";
                     return (
-                      <td key={group.subjectId} className="px-2 py-1.5 text-center">
-                        {subjectCellText(record, "total")}
+                      <td
+                        key={group.subjectId}
+                        className="px-2 py-1.5 text-center"
+                      >
+                        {subjectCellText(record, part)}
                       </td>
                     );
                   })}
