@@ -73,6 +73,13 @@ const AUTO_SAVE_DELAY = 600;
 
 const ORAL_MAX_MAIN_EXAM = 20;
 
+/**
+ * Unit Test written / oral split for classes outside the 1-8 scheme
+ * (PG, Nur, LKG, UKG): 20 written + 10 oral = exam maxMarks (30).
+ */
+const UNIT_TEST_WRITTEN_MAX = 20;
+const UNIT_TEST_ORAL_MAX = 10;
+
 const inputClass =
   "w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500";
 
@@ -239,8 +246,10 @@ function sortSubjectColumns(
 /**
  * Turns a loaded subject into the input layout of its marks cell. The exam
  * scheme decides the split (Unit Test = notebook + test; Main Exam = theory,
- * + practical for Science/Computer on classes 1-8). Scholastic subjects keep
- * a single grade cell. Other classes get one "Marks" total input.
+ * + practical for Science/Computer on classes 1-8). Classes outside the 1-8
+ * scheme (PG, Nur, LKG, UKG) split Unit Tests into Written + Oral (20 + 10)
+ * and Main Exams into Written + Oral (maxMarks - 20 / 20). Scholastic
+ * subjects keep a single grade cell. Other classes get one "Marks" input.
  */
 function enrichSubjectColumn(
   column: SubjectColumnBase,
@@ -304,6 +313,23 @@ function enrichSubjectColumn(
         label: "Theory",
       });
     }
+  } else if (exam && column.type === "Written + Oral") {
+    // Unit Tests of classes outside the 1-8 scheme (PG, Nur, LKG, UKG):
+    // one subject row holding both papers, 20 written + 10 oral = 30.
+    inputs.push(
+      { component: "written", max: UNIT_TEST_WRITTEN_MAX, label: "Written" },
+      { component: "oral", max: UNIT_TEST_ORAL_MAX, label: "Oral" },
+    );
+  } else if (exam && column.type === "Oral") {
+    // Separate Oral row (e.g. Conversation): only the oral paper marks.
+    inputs.push({ component: null, max: UNIT_TEST_ORAL_MAX, label: "Oral" });
+  } else if (exam && column.type === "Written" && hasOralSibling) {
+    // Separate Written row of a subject that also has an Oral row.
+    inputs.push({
+      component: null,
+      max: UNIT_TEST_WRITTEN_MAX,
+      label: "Written",
+    });
   } else {
     inputs.push({ component: null, max: exam?.maxMarks ?? 0, label: "Marks" });
   }
