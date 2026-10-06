@@ -233,7 +233,7 @@ export interface TeacherRecord extends Omit<TeacherFormValues, "password"> {
 export type SubjectMarkStatus = "present" | "absent" | "exempt";
 
 /** Mark components that make up a subject total, mirroring the exam scheme. */
-export type SubjectComponentName = "notebook" | "test" | "theory" | "practical";
+export type SubjectComponentName = "notebook" | "test" | "theory" | "practical" | "written" | "oral";
 
 export interface SubjectMarksRecord {
   status: SubjectMarkStatus;

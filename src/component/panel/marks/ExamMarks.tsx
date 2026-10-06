@@ -71,6 +71,8 @@ const academicYears = generateAcademicYears();
 
 const AUTO_SAVE_DELAY = 600;
 
+const ORAL_MAX_MAIN_EXAM = 20;
+
 const inputClass =
   "w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500";
 
@@ -140,12 +142,12 @@ type ResolvedSubject =
   | { kind: "invalid" }
   | { kind: "status"; status: "absent" | "exempt" }
   | {
-      kind: "present";
-      obtained: number;
-      maxMarks: number;
-      components: Partial<Record<SubjectComponentName, number | null>>;
-      componentMax: Partial<Record<SubjectComponentName, number>>;
-    };
+    kind: "present";
+    obtained: number;
+    maxMarks: number;
+    components: Partial<Record<SubjectComponentName, number | null>>;
+    componentMax: Partial<Record<SubjectComponentName, number>>;
+  };
 
 /** Parsed state of one cell's draft. */
 type ResolvedCell =
@@ -183,8 +185,8 @@ function toExamDoc(snapshot: QueryDocumentSnapshot<DocumentData>): ExamDoc {
     marksScheme: marksSchemeFromDoc(data, maxMarks || undefined),
     applicableClasses: Array.isArray(data.applicableClasses)
       ? data.applicableClasses.filter(
-          (cls): cls is string => typeof cls === "string",
-        )
+        (cls): cls is string => typeof cls === "string",
+      )
       : [],
     examStartDate: toDateInputValue(data.examStartDate),
     examEndDate: toDateInputValue(data.examEndDate),
@@ -245,12 +247,37 @@ function enrichSubjectColumn(
   exam: ExamDoc | null,
   className: string,
   hasPracticalSibling: boolean,
+  hasOralSibling: boolean,
 ): MarksSubjectColumn {
   if (column.type === "Scholastic") {
     return { ...column, isGrade: true, inputs: [] };
   }
   const inputs: MarksComponentInput[] = [];
-  if (exam && isSchemeClass(className)) {
+  const isMainExam = exam?.examCategory === "MAIN_EXAM";
+  const oralMax = exam ? Math.min(ORAL_MAX_MAIN_EXAM, exam.maxMarks) : 0;
+
+  if (exam && isMainExam && column.type === "Written + Oral") {
+    // One subject row holding both papers.
+    inputs.push(
+      { component: "written", max: exam.maxMarks - oralMax, label: "Written" },
+      { component: "oral", max: oralMax, label: "Oral" },
+    );
+  } else if (exam && isMainExam && column.type === "Oral") {
+    // Separate Oral row: only the oral paper marks.
+    inputs.push({ component: null, max: oralMax, label: "Oral" });
+  } else if (
+    exam &&
+    isMainExam &&
+    column.type === "Written" &&
+    hasOralSibling
+  ) {
+    // Separate Written row of a subject that also has an Oral row.
+    inputs.push({
+      component: null,
+      max: exam.maxMarks - oralMax,
+      label: "Written",
+    });
+  } else if (exam && isSchemeClass(className)) {
     const isPractical = column.type === "Practical";
     const breakdown = subjectMarksBreakdown(
       exam.examCategory,
@@ -258,7 +285,6 @@ function enrichSubjectColumn(
       isPractical || hasPracticalSibling,
     );
     if (isPractical) {
-      // Practical papers exist only in Half Yearly / Annual.
       if (exam.examCategory === "MAIN_EXAM" && breakdown.practical > 0) {
         inputs.push({
           component: "practical",
@@ -476,9 +502,9 @@ function buildStudentDraft(
           maxMarks: resolved.maxMarks,
           ...(Object.keys(resolved.components).length > 0
             ? {
-                components: resolved.components,
-                componentMax: resolved.componentMax,
-              }
+              components: resolved.components,
+              componentMax: resolved.componentMax,
+            }
             : {}),
         };
         return;
@@ -699,9 +725,9 @@ function ExamMarks() {
     const rawSubjectMarks = rawSubjectMarksRef.current[payload.studentUid];
     const legacySubjectKeysToDelete = rawSubjectMarks
       ? listLegacySubjectKeys(
-          rawSubjectMarks,
-          subjectColumnsRef.current.map((column) => column.id),
-        )
+        rawSubjectMarks,
+        subjectColumnsRef.current.map((column) => column.id),
+      )
       : [];
 
     try {
@@ -852,6 +878,20 @@ function ExamMarks() {
                 .toLowerCase(),
             ),
         );
+
+        const oralNames = new Set(
+          snapshot.docs
+            .filter((d) => {
+              const data = d.data();
+              return data.type === "Oral" && data.displayInMarksEntry === true;
+            })
+            .map((d) =>
+              String(d.data().name ?? "")
+                .trim()
+                .toLowerCase(),
+            ),
+        );
+
         const list = snapshot.docs
           .map(toSubjectColumn)
           .filter((c): c is SubjectColumnBase => c !== null && Boolean(c.name))
@@ -862,6 +902,7 @@ function ExamMarks() {
               selectedExam,
               marksClass,
               practicalNames.has(c.name.trim().toLowerCase()),
+              oralNames.has(c.name.trim().toLowerCase()),
             ),
           );
         subjectColumnsRef.current = list;
@@ -874,7 +915,7 @@ function ExamMarks() {
       },
     );
     return unsubscribe;
-  }, [tableReady, marksClass, selectedExam]);
+  }, [tableReady, marksClass, selectedExam]);;
 
   useEffect(() => {
     if (!tableReady) {
@@ -1271,9 +1312,8 @@ function ExamMarks() {
                                 onBlur={() =>
                                   flushStudentWrite(student.studentUid)
                                 }
-                                className={`${marksInputClass}${
-                                  readOnly ? ` ${readOnlyInputClass}` : ""
-                                }`}
+                                className={`${marksInputClass}${readOnly ? ` ${readOnlyInputClass}` : ""
+                                  }`}
                               />
                             </td>
                           );
@@ -1308,7 +1348,7 @@ function ExamMarks() {
                                     saved.components?.[input.component];
                                   value =
                                     componentValue === null ||
-                                    componentValue === undefined
+                                      componentValue === undefined
                                       ? ""
                                       : formatMarks(componentValue);
                                 } else {
@@ -1323,12 +1363,11 @@ function ExamMarks() {
                               const invalid =
                                 draft !== undefined &&
                                 resolveCell(value, input.max).kind ===
-                                  "invalid";
+                                "invalid";
                               return (
                                 <td
-                                  key={`${column.id}-${
-                                    input.component ?? "marks"
-                                  }`}
+                                  key={`${column.id}-${input.component ?? "marks"
+                                    }`}
                                   className="px-2 py-2 text-center"
                                 >
                                   <input
@@ -1351,9 +1390,8 @@ function ExamMarks() {
                                     onBlur={() =>
                                       flushStudentWrite(student.studentUid)
                                     }
-                                    className={`${marksInputClass}${
-                                      invalid ? ` ${invalidInputClass}` : ""
-                                    }${readOnly ? ` ${readOnlyInputClass}` : ""}`}
+                                    className={`${marksInputClass}${invalid ? ` ${invalidInputClass}` : ""
+                                      }${readOnly ? ` ${readOnlyInputClass}` : ""}`}
                                   />
                                 </td>
                               );
