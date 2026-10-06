@@ -64,6 +64,7 @@ export const MENU: MenuItem[] = [
       { label: "Marks", path: "/welcome/marks" },
       { label: "Cross List", path: "/welcome/cross-list" },
       { label: "Result", path: "/welcome/result" },
+      { label: "Exam Settings", path: "/welcome/exam-settings" },
     ],
   },
 ];

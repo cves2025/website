@@ -25,6 +25,7 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   "/welcome/marks": [P.MARKS_ENTER, P.MARKS_VIEW],
   "/welcome/cross-list": P.CROSSLIST_VIEW,
   "/welcome/result": P.RESULT_VIEW,
+  "/welcome/exam-settings": P.EXAM_SETTINGS,
 };
 
 const normalize = (path: string) =>
