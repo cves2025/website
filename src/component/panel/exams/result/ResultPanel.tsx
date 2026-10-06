@@ -17,6 +17,7 @@ import {
   MarksScheme,
   SubjectMarksBreakdown,
   defaultMarksScheme,
+  isPracticalSubject,
   isSchemeClass,
   marksCellLabel,
   marksSchemeBadge,
@@ -174,7 +175,11 @@ function ResultPanel() {
     usesMarksScheme ? class_1_to_8 : OTHER_CLASS_SUBJECTS
   ).map((subject) => ({
     subject,
-    breakdown: subjectMarksBreakdown(subject, examCategory, examScheme),
+    breakdown: subjectMarksBreakdown(
+      examCategory,
+      examScheme,
+      isPracticalSubject(subject)
+    ),
   }));
 
   const resultRows = selectedExam

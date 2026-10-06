@@ -206,7 +206,11 @@ function toSheetColumn(
   className: string
 ): ExamSheetSubjectColumn {
   const scheme = isSchemeClass(className)
-    ? subjectMarksBreakdown(subject.name, exam.examCategory, exam.marksScheme)
+    ? subjectMarksBreakdown(
+        exam.examCategory,
+        exam.marksScheme,
+        subject.type === "Practical"
+      )
     : null;
   const componentMax = scheme
     ? buildComponentMax(scheme, exam.examCategory)

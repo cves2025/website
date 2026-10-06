@@ -140,7 +140,7 @@ function ExamSettings() {
 
   useEffect(() => {
     if (user) {
-      !(user?.admin || user.role === "admin") ? navigate("/examDashboard") : "";
+      !(user?.role === "admin") ? navigate("/examDashboard") : "";
     } else {
       navigate("/login");
     }
