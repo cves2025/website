@@ -145,7 +145,7 @@ function AdmitScheduleTable({ papers }: { papers: CardPaper[] }) {
   );
 }
 
-interface AdmitCardCardProps {
+export interface AdmitCardCardProps {
   /** Student the card is printed for. */
   card: CardStudent;
   /** Frontend-only roll number, printed after the enrollment number. */

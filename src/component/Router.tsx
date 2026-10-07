@@ -26,6 +26,7 @@ import GeneratedAdmitCards from './panel/exams/GeneratedAdmitCards'
 import ResultPanel from './panel/exams/result/ResultPanel'
 import ExamSettings from './panel/exams/exam-settings/ExamSettings'
 import AdmitCardTemplate from './panel/exams/exam-settings/AdmitCardTemplate'
+import ResultTemplate from './panel/exams/exam-settings/ResultTemplate'
 
 import ExamMarks from './panel/marks/ExamMarks'
 import CrossList from './panel/marks/CrossList'
@@ -71,6 +72,7 @@ function Router() {
           <Route path="result" element={<ResultPanel />} />
           <Route path="exam-settings" element={<ExamSettings />} />
           <Route path="exam-settings/admit-card-template" element={<AdmitCardTemplate />} />
+          <Route path="exam-settings/result-template" element={<ResultTemplate />} />
           <Route path="marks" element={<ExamMarks />} />
           <Route path="cross-list" element={<CrossList />} />
           <Route path="id-card/students" element={<IdCardStudents />} />

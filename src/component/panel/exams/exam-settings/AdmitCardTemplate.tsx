@@ -1,9 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getAuth } from "firebase/auth";
 import { QRCodeCanvas } from "qrcode.react";
+import { useAdmitCardTemplate } from "../../../../hooks/useAdmitCardTemplate";
+import { saveAdmitCardTemplate } from "./admit-card-template/admitCardSettings";
 
 import schoolLogo from "../../../../assets/image/schoolLogo1.png";
+import Button from "../../../../custom-components/Button";
+import type { AdmitCardTemplateId } from "./admit-card-template/admitCardTemplates";
 
-type AdmitCardTemplateId = "template1";
+// type AdmitCardTemplateId = "template1";
 
 interface TemplateOption {
   id: AdmitCardTemplateId;
@@ -114,6 +119,11 @@ const TEMPLATES: TemplateOption[] = [
     name: "Current Admit Card",
     description: "Current school admit card design",
   },
+  {
+  id: "template2",
+  name: "Test Template 2",
+  description: "Temporary test template",
+},
 ];
 
 /*
@@ -174,11 +184,7 @@ function toOrdinalLabel(value: string): string {
  * --------------------------------------------------------------------------
  */
 
-function AdmitScheduleTable({
-  papers,
-}: {
-  papers: SchedulePaper[];
-}) {
+function AdmitScheduleTable({ papers }: { papers: SchedulePaper[] }) {
   return (
     <div className="overflow-x-auto print:overflow-visible">
       <table className="w-full table-fixed border border-gray-300 text-sm">
@@ -221,10 +227,7 @@ function AdmitScheduleTable({
 
         <tbody>
           {papers.map((paper) => (
-            <tr
-              key={paper.id}
-              className="print:break-inside-avoid"
-            >
+            <tr key={paper.id} className="print:break-inside-avoid">
               <td className="overflow-hidden border border-gray-300 px-2 py-1 font-semibold">
                 {paper.subject}
               </td>
@@ -262,22 +265,12 @@ function AdmitScheduleTable({
  * --------------------------------------------------------------------------
  */
 
-function DetailRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <p className="flex gap-1.5">
-      <span className="w-28 shrink-0 font-semibold text-gray-600">
-        {label}
-      </span>
+      <span className="w-28 shrink-0 font-semibold text-gray-600">{label}</span>
 
-      <span className="flex-1 truncate">
-        : {value}
-      </span>
+      <span className="flex-1 truncate">: {value}</span>
     </p>
   );
 }
@@ -295,27 +288,20 @@ function AdmitCardPreview() {
   return (
     <div className="mx-auto mt-2 max-w-4xl print:m-0 print:h-[296mm] print:w-[210mm] print:max-w-none print:overflow-hidden print:break-after-page print:box-border print:p-[10px] print:last:break-after-auto">
       <div className="flex h-full flex-col overflow-hidden rounded-xl border-4 border-double border-blue-800 bg-white shadow-lg print:rounded-none print:shadow-none">
-
         {/* ================================================================
             HEADER
         ================================================================ */}
 
         <div className="border-b-4 border-double border-blue-800 bg-white px-4 py-2 md:px-6">
-
           {/* School Code / Affiliation */}
           <div className="flex items-center justify-between gap-3 text-sm font-semibold text-black">
-            <span className="flex-1">
-              School Code: 09670911304
-            </span>
+            <span className="flex-1">School Code: 09670911304</span>
 
-            <span className="flex-1 text-right">
-              Affiliation No.: 14203-05
-            </span>
+            <span className="flex-1 text-right">Affiliation No.: 14203-05</span>
           </div>
 
           {/* School Logo + Name */}
           <div className="mt-1 flex items-start justify-center gap-3 sm:gap-4">
-
             {/* Logo */}
             <div className="h-24 w-24 shrink-0 overflow-hidden rounded sm:h-28 sm:w-28">
               <img
@@ -327,28 +313,20 @@ function AdmitCardPreview() {
 
             {/* School Information */}
             <div className="min-w-0 flex-1 text-left sm:text-center">
-
               <h3 className="text-lg font-extrabold leading-tight tracking-tight text-black sm:text-2xl">
                 CHILDREN&apos;S VALLEY ENGLISH SCHOOL
               </h3>
 
               <p className="mt-0.5 text-xs font-semibold italic text-black md:text-sm">
-                D 59/295 A, Mahmoorganj, Varanasi · 0542-2220107,
-                9336576690
+                D 59/295 A, Mahmoorganj, Varanasi · 0542-2220107, 9336576690
               </p>
 
               <div className="mt-1 text-xs font-bold text-black sm:text-sm">
-                <span className="mr-3">
-                  A Gov. Affiliated
-                </span>
+                <span className="mr-3">A Gov. Affiliated</span>
 
-                <span className="mr-3">
-                  C.B.S.E. Pattern
-                </span>
+                <span className="mr-3">C.B.S.E. Pattern</span>
 
-                <span>
-                  Co - Education
-                </span>
+                <span>Co - Education</span>
               </div>
 
               {/* Admit Card Badge */}
@@ -366,29 +344,19 @@ function AdmitCardPreview() {
         ================================================================ */}
 
         <div className="flex items-center justify-between gap-x-4 border-b-2 border-blue-800 bg-blue-50 px-4 py-1 text-sm md:px-6">
-
           <span className="flex-1">
-            <span className="font-semibold">
-              Session:
-            </span>{" "}
+            <span className="font-semibold">Session:</span>{" "}
             {student.academicYear}
           </span>
 
           <span className="flex-[2] text-center">
-            <span className="font-semibold">
-              Examination:
-            </span>{" "}
-            {exam.examName}
+            <span className="font-semibold">Examination:</span> {exam.examName}
           </span>
 
           <span className="flex-1 text-right">
-            <span className="font-semibold">
-              Class:
-            </span>{" "}
+            <span className="font-semibold">Class:</span>{" "}
             {toOrdinalLabel(student.className)}
-            {student.section
-              ? ` - ${student.section}`
-              : ""}
+            {student.section ? ` - ${student.section}` : ""}
           </span>
         </div>
 
@@ -397,39 +365,21 @@ function AdmitCardPreview() {
         ================================================================ */}
 
         <div className="grid grid-cols-1 items-start gap-6 border-b border-gray-200 px-4 py-2 sm:grid-cols-[minmax(0,1fr)_auto] md:px-6 print:grid-cols-[minmax(0,1fr)_auto] print:px-6">
-
           {/* Details */}
           <div className="grid min-w-0 grid-cols-1 content-start gap-y-1.5 text-sm">
+            <DetailRow label="Enrollment No." value={student.enrollment} />
 
-            <DetailRow
-              label="Enrollment No."
-              value={student.enrollment}
-            />
+            <DetailRow label="Roll No." value={String(student.rollNo)} />
 
-            <DetailRow
-              label="Roll No."
-              value={String(student.rollNo)}
-            />
+            <DetailRow label="Student Name" value={student.studentName} />
 
-            <DetailRow
-              label="Student Name"
-              value={student.studentName}
-            />
+            <DetailRow label="Father's Name" value={student.fatherName} />
 
-            <DetailRow
-              label="Father's Name"
-              value={student.fatherName}
-            />
-
-            <DetailRow
-              label="Mother's Name"
-              value={student.motherName}
-            />
+            <DetailRow label="Mother's Name" value={student.motherName} />
           </div>
 
           {/* Student Photo */}
           <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded border border-gray-400 bg-white text-center text-xs text-gray-400">
-
             {student.studentPhoto ? (
               <img
                 src={student.studentPhoto}
@@ -437,9 +387,7 @@ function AdmitCardPreview() {
                 className="h-full w-full object-contain"
               />
             ) : (
-              <span className="px-2">
-                Affix recent photograph
-              </span>
+              <span className="px-2">Affix recent photograph</span>
             )}
           </div>
         </div>
@@ -449,7 +397,6 @@ function AdmitCardPreview() {
         ================================================================ */}
 
         <div className="flex flex-1 flex-col p-2 md:p-1">
-
           {/* Written Exam */}
           {DUMMY_WRITTEN_PAPERS.length > 0 && (
             <>
@@ -457,9 +404,7 @@ function AdmitCardPreview() {
                 Exam Schedule
               </h4>
 
-              <AdmitScheduleTable
-                papers={DUMMY_WRITTEN_PAPERS}
-              />
+              <AdmitScheduleTable papers={DUMMY_WRITTEN_PAPERS} />
             </>
           )}
 
@@ -470,9 +415,7 @@ function AdmitCardPreview() {
                 Practical Exam Schedule
               </h4>
 
-              <AdmitScheduleTable
-                papers={DUMMY_PRACTICAL_PAPERS}
-              />
+              <AdmitScheduleTable papers={DUMMY_PRACTICAL_PAPERS} />
             </>
           )}
 
@@ -481,34 +424,28 @@ function AdmitCardPreview() {
           ============================================================== */}
 
           <div className="mt-4 rounded-md border border-blue-200 bg-blue-50/60 p-3">
-
             <h5 className="text-sm font-bold text-gray-800">
               Instructions to the candidate
             </h5>
 
             <ol className="mt-2 list-inside list-decimal space-y-1 text-xs text-gray-700">
-
               <li>
-                Reach the examination hall at least 15 minutes
-                before the reporting time printed above.
+                Reach the examination hall at least 15 minutes before the
+                reporting time printed above.
               </li>
 
-              <li>
-                Please carry this admit card to the examination.
-              </li>
+              <li>Please carry this admit card to the examination.</li>
 
               <li>
-                Use only blue or black ink. Mobile phones and
-                smart watches are strictly prohibited.
+                Use only blue or black ink. Mobile phones and smart watches are
+                strictly prohibited.
               </li>
 
-              <li>
-                Read every question carefully and write the answers.
-              </li>
+              <li>Read every question carefully and write the answers.</li>
 
               <li>
-                The school is not responsible for any loss of
-                personal belongings in the examination hall.
+                The school is not responsible for any loss of personal
+                belongings in the examination hall.
               </li>
             </ol>
           </div>
@@ -518,7 +455,6 @@ function AdmitCardPreview() {
           ================================================================ */}
 
           <div className="mt-auto flex flex-wrap items-end justify-between gap-6 pt-6 text-sm text-gray-700">
-
             {/* Class Teacher */}
             <div className="text-center">
               <p className="w-36 border-t-2 border-gray-400 pt-2">
@@ -528,10 +464,7 @@ function AdmitCardPreview() {
 
             {/* QR Code */}
             <div className="flex flex-col items-center gap-1">
-              <QRCodeCanvas
-                value="https://cves.in"
-                size={72}
-              />
+              <QRCodeCanvas value="https://cves.in" size={72} />
 
               <span className="text-xs font-semibold text-gray-600">
                 www.cves.in
@@ -544,9 +477,7 @@ function AdmitCardPreview() {
                 Principal Signature
               </div>
 
-              <p className="w-36 border-t-2 border-gray-400 pt-2">
-                Principal
-              </p>
+              <p className="w-36 border-t-2 border-gray-400 pt-2">Principal</p>
             </div>
           </div>
 
@@ -556,12 +487,9 @@ function AdmitCardPreview() {
 
           <div className="mt-3 text-xs text-gray-500">
             <p className="text-center">
-              This admit card is valid only for{" "}
-              {exam.examName}
-              {exam.academicYear
-                ? ` (${exam.academicYear})`
-                : ""}{" "}
-              and must be produced on every examination day.
+              This admit card is valid only for {exam.examName}
+              {exam.academicYear ? ` (${exam.academicYear})` : ""} and must be
+              produced on every examination day.
             </p>
           </div>
         </div>
@@ -577,12 +505,42 @@ function AdmitCardPreview() {
  */
 
 function AdmitCardTemplate() {
+  const { templateId: savedTemplate, loading } = useAdmitCardTemplate();
+
   const [selectedTemplate, setSelectedTemplate] =
-    useState<AdmitCardTemplateId>("template1");
+    useState<AdmitCardTemplateId>(savedTemplate);
+
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSelectedTemplate(savedTemplate);
+  }, [savedTemplate]);
+
+  const isDirty = selectedTemplate !== savedTemplate;
+
+  const handleSave = async () => {
+    const uid = getAuth().currentUser?.uid;
+    if (!uid) {
+      setMessage("Please login again.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setMessage(null);
+      await saveAdmitCardTemplate(selectedTemplate, uid);
+      setMessage("Template saved.");
+    } catch (error) {
+      console.error(error);
+      setMessage("Save failed. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="w-full space-y-6">
-
       {/* ================================================================
           PAGE TITLE
       ================================================================ */}
@@ -593,8 +551,7 @@ function AdmitCardTemplate() {
         </h1>
 
         <p className="mt-1 text-sm text-gray-500">
-          Select the template used for generating student
-          admit cards.
+          Select the template used for generating student admit cards.
         </p>
       </div>
 
@@ -603,16 +560,13 @@ function AdmitCardTemplate() {
       ================================================================ */}
 
       <section className="rounded-lg bg-white p-4 shadow-sm">
-
         <h2 className="mb-4 text-lg font-semibold text-gray-800">
           Select Template
         </h2>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-
           {TEMPLATES.map((template) => {
-            const isSelected =
-              selectedTemplate === template.id;
+            const isSelected = selectedTemplate === template.id;
 
             return (
               <label
@@ -629,17 +583,13 @@ function AdmitCardTemplate() {
                   name="admitCardTemplate"
                   value={template.id}
                   checked={isSelected}
-                  onChange={() =>
-                    setSelectedTemplate(template.id)
-                  }
+                  onChange={() => setSelectedTemplate(template.id)}
                   className="mt-1 h-4 w-4 accent-primaryBlue"
                 />
 
                 {/* Template Information */}
                 <div className="min-w-0">
-                  <p className="font-medium text-gray-800">
-                    {template.name}
-                  </p>
+                  <p className="font-medium text-gray-800">{template.name}</p>
 
                   <p className="mt-1 text-sm text-gray-500">
                     {template.description}
@@ -649,6 +599,17 @@ function AdmitCardTemplate() {
             );
           })}
         </div>
+        <div className="mt-4 flex items-center gap-3">
+          <Button
+            type="button"
+            onClick={handleSave}
+            disabled={!isDirty || saving || loading}
+          >
+            {saving ? "Saving..." : "Save"}
+          </Button>
+
+          {message && <span className="text-sm text-gray-600">{message}</span>}
+        </div>
       </section>
 
       {/* ================================================================
@@ -656,22 +617,18 @@ function AdmitCardTemplate() {
       ================================================================ */}
 
       <section className="rounded-lg bg-white p-4 shadow-sm">
-
         <div className="mb-4">
           <h2 className="text-lg font-semibold text-gray-800">
             Template Preview
           </h2>
 
           <p className="mt-1 text-sm text-gray-500">
-            This is a preview using sample student and
-            examination data.
+            This is a preview using sample student and examination data.
           </p>
         </div>
 
         {/* Current Template */}
-        {selectedTemplate === "template1" && (
-          <AdmitCardPreview />
-        )}
+        {selectedTemplate === "template1" && <AdmitCardPreview />}
       </section>
     </div>
   );

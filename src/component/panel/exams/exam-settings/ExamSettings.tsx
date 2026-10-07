@@ -28,7 +28,6 @@ function ExamSettings() {
               buttonStyle="w-full justify-start rounded-md bg-blue-600 hover:bg-blue-700"
               onClick={() => navigate("/welcome/exam-settings/result-template")}
             />
-            {/* Result Template page is not created yet. */}
           </div>
         }
       />

@@ -27,6 +27,7 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   "/welcome/result": P.RESULT_VIEW,
   "/welcome/exam-settings": P.EXAM_SETTINGS,
   "/welcome/exam-settings/admit-card-template": P.EXAM_SETTINGS,
+  "/welcome/exam-settings/result-template": P.EXAM_SETTINGS,
 };
 
 const normalize = (path: string) =>
