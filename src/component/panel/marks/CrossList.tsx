@@ -215,16 +215,14 @@ function compareClassSections(
   );
 }
 
-/** Rows of a block: displayed roll ascending, then student name. */
+/** Rows of a block: displayed student name ascending, then roll number. */
 function sortDocumentRows(rows: CrossListRow[]): CrossListRow[] {
   return [...rows].sort((a, b) => {
+    const nameCompare = a.studentName.localeCompare(b.studentName);
+    if (nameCompare !== 0) return nameCompare;
     const rollA = a.rollNumber ?? Number.MAX_SAFE_INTEGER;
     const rollB = b.rollNumber ?? Number.MAX_SAFE_INTEGER;
-    return (
-      rollA - rollB ||
-      a.studentName.localeCompare(b.studentName) ||
-      a.studentUid.localeCompare(b.studentUid)
-    );
+    return rollA - rollB || a.studentUid.localeCompare(b.studentUid);
   });
 }
 
@@ -529,8 +527,8 @@ function CrossList() {
   );
 
   // Build the class-section blocks of the current view. Class order follows
-  // the CLASSES constant, sections are alphabetical, rows sort by roll number
-  // then student name; students without a marks doc are appended (only when a
+  // the CLASSES constant, sections are alphabetical, rows sort by student
+  // name then roll number; students without a marks doc are appended (only when a
   // specific class is selected, still from the already loaded enrollment list).
   const blocks = useMemo<ClassSectionBlock[]>(() => {
     const byKey = new Map<

@@ -5,21 +5,18 @@ import {
   COLLECTION,
   STAMP_SIGN_FIELDS,
   STAMP_SIGN_PRINCIPLE_DOC,
-} from "../../../constants";
-import { db } from "../../../firebase/config";
-import { CardStudent, ExamDoc } from "../../../utils/type";
-import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
+} from "../../../../constants";
+import { db } from "../../../../firebase/config";
+import { CardStudent, ExamDoc } from "../../../../utils/type";
+import { toOrdinalLabel } from "../../../../utils/toOrdinalLabel";
 import {
   formatScheduleDate,
   formatScheduleTime,
-} from "./examScheduleShared";
-import type { CardPaper } from "./useAdmitCardGenerator";
+} from "./../examScheduleShared";
+import type { CardPaper } from "./../useAdmitCardGenerator";
 import schoolLogo from "../../../assets/image/schoolLogo1.png";
-import FitText from "../../../custom-components/FitText";
+import FitText from "../../../../custom-components/FitText";
 
-/** Principal's signed+stamped image URL, read ONCE from the
-    "stampSign"/"principle" document and cached for the whole session so every
-    printed card shares the same single fetch (no repeated Firestore reads). */
 let principalSignUrlPromise: Promise<string | null> | null = null;
 
 function loadPrincipalSignUrl(): Promise<string | null> {
@@ -39,14 +36,6 @@ function loadPrincipalSignUrl(): Promise<string | null> {
   return principalSignUrlPromise;
 }
 
-/**
- * Compares two schedule papers by exam date, so the printed table always
- * follows the calendar order of the examination. Papers of the same date are
- * ordered by their reporting time, then end time and subject.
- *
- * Dates are stored as "yyyy-MM-dd" and times as 24h "HH:mm", so both compare
- * chronologically as plain strings.
- */
 function comparePapersByDate(a: CardPaper, b: CardPaper): number {
   if (a.date && b.date) {
     const dateOrder = a.date.localeCompare(b.date);
@@ -70,14 +59,7 @@ function comparePapersByDate(a: CardPaper, b: CardPaper): number {
 
 const CELL = "border border-gray-300 px-2 py-0.5 overflow-hidden";
 
-/**
- * Prints one admit card schedule table. Shared by the written papers table and
- * the practical papers table shown below it.
- * Fixed column widths + single-line FitText cells keep every row on one line.
- */
 function AdmitScheduleTable({ papers }: { papers: CardPaper[] }) {
-  // Show the papers in the calendar order of the exam (date-wise). The input
-  // list is never mutated; the copy is sorted instead.
   const sortedPapers = [...papers].sort(comparePapersByDate);
   return (
     <div className="overflow-x-auto print:overflow-visible">
@@ -162,7 +144,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function AdmitCardCard({
+function ShowResult({
   card,
   rollNo,
   exam,
@@ -272,7 +254,6 @@ function AdmitCardCard({
           )}
         </div>
       </div>
-
       <div className="flex flex-1 flex-col p-2 md:p-1">
         {writtenPapers.length > 0 && (
           <>
@@ -357,4 +338,4 @@ function AdmitCardCard({
   );
 }
 
-export default AdmitCardCard;
+export default ShowResult;

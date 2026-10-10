@@ -1,22 +1,7 @@
-/**
- * Single source of truth for the marks split used by the Exams module.
- *
- * Classes 1 to 8:
- *  - Unit Test 1 / Unit Test 2 : Notebook 5 + Written Test 25 = 30
- *  - Half Yearly / Annual      : Theory 70 for every subject, except
- *    Science & Computer which are 50 Theory + 20 Practical = 70.
- *
- * Science & Computer therefore show a Practical column in the result; every
- * other subject shows "NA" in that column. Both the result table and the admit
- * card read the scheme from here so all pages stay in sync.
- */
-
 export type ExamCategory = "UNIT_TEST" | "MAIN_EXAM";
 
-/** Subjects that carry a separate practical paper (classes 1 to 8 only). */
 export const PRACTICAL_SUBJECTS: string[] = ["Science", "Computer"];
 
-/** Classes the notebook + practical marks scheme applies to (classes 1 to 8). */
 export const SCHEME_CLASSES: string[] = [
   "1",
   "2",
