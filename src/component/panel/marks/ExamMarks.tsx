@@ -130,6 +130,8 @@ interface MarksSubjectColumn {
   name: string;
   type: string;
   order: number;
+  /** Optional report card order (undefined = report card ke bottom mein). */
+  reportCardOrder?: number;
   /** Scholastic subjects keep one grade cell and no component inputs. */
   isGrade: boolean;
   inputs: MarksComponentInput[];
@@ -141,6 +143,7 @@ interface SubjectColumnBase {
   name: string;
   type: string;
   order: number;
+  reportCardOrder?: number;
 }
 
 /** What one subject of one student will be written as (or not written). */
@@ -233,6 +236,10 @@ function toSubjectColumn(
     name: typeof data.name === "string" ? data.name : "",
     type: typeof data.type === "string" ? data.type : "",
     order: typeof data.order === "number" ? data.order : 1,
+    reportCardOrder:
+      typeof data.reportCardOrder === "number" && data.reportCardOrder > 0
+        ? Math.floor(data.reportCardOrder)
+        : undefined,
   };
 }
 
@@ -790,6 +797,7 @@ function ExamMarks() {
         name: column.name,
         type: column.type,
         order: column.order,
+        reportCardOrder: column.reportCardOrder,
         displayInMarksEntry: true,
       })),
     };

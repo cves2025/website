@@ -289,6 +289,11 @@ export interface ExamSheetSubjectColumn {
   name: string;
   type: string;
   order: number;
+  /**
+   * Order of this subject inside the report card table. Missing / 0 = no
+   * fixed position, so the report card shows it after the ordered subjects.
+   */
+  reportCardOrder?: number;
   maxMarks: number;
   componentMax?: Partial<Record<SubjectComponentName, number>>;
   /** True for Scholastic subjects whose marks are grades, not numbers. */

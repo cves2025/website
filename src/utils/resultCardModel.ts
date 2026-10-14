@@ -1,7 +1,14 @@
 import type { ExamRules } from "./examRules";
-import { NOT_APPLICABLE } from "./examMarksScheme";
 import {
+  defaultMarksScheme,
+  NOT_APPLICABLE,
+  subjectMarksBreakdown,
+} from "./examMarksScheme";
+import { computeRanks } from "./marks";
+import {
+  ABSENT_LABEL,
   EMPTY_LABEL,
+  EXEMPT_LABEL,
   compareExamsForResult,
   getResultLayout,
   percentageOf,
@@ -9,6 +16,7 @@ import {
   recordMax,
   recordObtained,
   resultCellText,
+  resultExamLabel,
   round2,
 } from "./resultCard";
 import type { ResultLayout } from "./resultCard";
@@ -18,6 +26,55 @@ import type {
   ExamSheetSubjectColumn,
   MarksDoc,
 } from "./type";
+
+/* ------------------------------------------------------------------ */
+/* Grading scale (PDF ke "Instructions" table jaisa)                   */
+/* ------------------------------------------------------------------ */
+
+export const GRADE_SCALE = [
+  { range: "91-100", min: 91, grade: "A1" },
+  { range: "81-90", min: 81, grade: "A2" },
+  { range: "71-80", min: 71, grade: "B1" },
+  { range: "61-70", min: 61, grade: "B2" },
+  { range: "51-60", min: 51, grade: "C1" },
+  { range: "41-50", min: 41, grade: "C2" },
+  { range: "33-40", min: 33, grade: "D" },
+  { range: "32 and Below", min: 0, grade: "E" },
+] as const;
+
+/** Percentage ko nearest whole number karke grade nikalta hai (70.5 -> 71 -> B1). */
+export function gradeFromPercentage(percentage: number): string {
+  const rounded = Math.max(0, Math.round(percentage));
+  const band = GRADE_SCALE.find((item) => rounded >= item.min);
+  return band ? band.grade : "E";
+}
+
+/* ------------------------------------------------------------------ */
+/* Term rule: exam ke naam se term decide hota hai                     */
+/* ------------------------------------------------------------------ */
+
+export type TermKey = "term1" | "term2";
+
+const TERM_LABELS: Record<TermKey, string> = {
+  term1: "TERM-I",
+  term2: "TERM-II",
+};
+
+/**
+ * Term 2 ke exams: naam mein II / 2 / 2nd / second / annual / final aaye.
+ * Baaki sab (Unit Test I, Note Book I, Half Yearly ...) Term 1 hain.
+ * Naya exam naam aaye to sirf yahi pattern badalna hai.
+ */
+const TERM_TWO_PATTERN =
+  /(^|[^a-z0-9])(ii|2|2nd|second|annual|final)([^a-z0-9]|$)/i;
+
+export function getExamTerm(exam: ExamDoc): TermKey {
+  return TERM_TWO_PATTERN.test(exam.examName) ? "term2" : "term1";
+}
+
+/* ------------------------------------------------------------------ */
+/* Types                                                               */
+/* ------------------------------------------------------------------ */
 
 /** One selected exam for one student. */
 export interface ResultExamInput {
@@ -37,48 +94,106 @@ export interface ResultCell {
   counts: boolean;
 }
 
+/** Sum + grade of a group of cells (one term, or all terms = grand total). */
+export interface ResultScore {
+  obtained: number;
+  max: number;
+  text: string;
+  grade: string;
+}
+
+export interface ResultExamHead {
+  id: string;
+  name: string;
+  /** Max marks of this exam (0 = unknown). */
+  max: number;
+  /** Unit Test split hone par part: "test" / "notebook" (grade table filter ke liye). */
+  sub?: "test" | "notebook";
+}
+
+export interface ResultTermHead {
+  key: TermKey;
+  label: string;
+  exams: ResultExamHead[];
+  /** "Marks Obtained (max)" of the term. */
+  max: number;
+}
+
 export interface ResultRow {
   key: string;
+  /** Label shown in the table, e.g. "MATHS" or "ENGLISH (Oral)". */
   subject: string;
-  /** Sheet type of the row: Theory / Written / Oral / Practical / Scholastic. */
-  part: string;
-  /** First row of a subject group; its name cell spans `groupSize` rows. */
-  isGroupStart: boolean;
-  groupSize: number;
-  /** One cell per selected exam, in exam order. */
-  cells: ResultCell[];
-  finalText: string;
-  finalObtained: number;
-  finalMax: number;
+  /** Plain subject name (chart ke liye). */
+  subjectName: string;
+  /** Paper type: "Written", "Oral", "Written + Oral", "" (single paper). */
+  type: string;
+  /** termCells[termIndex][examIndexInTerm] */
+  termCells: ResultCell[][];
+  termScores: ResultScore[];
+  grand: ResultScore;
+}
+
+export interface ResultGradeRow {
+  key: string;
+  subject: string;
+  /** Har exam ka apna grade column: termGrades[termIndex][examIndexInTerm] ("-" jab nahi hai). */
+  termGrades: string[][];
 }
 
 export interface ResultTotals {
   obtained: number;
   max: number;
   percentage: number;
+  grade: string;
   hasMarks: boolean;
 }
 
 export interface ResultTableModel {
   layout: ResultLayout;
-  exams: { id: string; name: string }[];
-  /** Theory table (class 1-8) or the Written/Oral table (PG-UKG). */
-  mainRows: ResultRow[];
-  /** Practical table (class 1-8 only). */
-  practicalRows: ResultRow[];
-  /** Grade (Scholastic) subjects, shown in their own table. */
-  gradeRows: ResultRow[];
-  examTotals: ResultTotals[];
-  finalTotals: ResultTotals;
+  /** Sirf wahi terms jinke exams select hue hain. */
+  terms: ResultTermHead[];
+  /** Grand Total tabhi dikhta hai jab Term 1 aur Term 2 dono ho. */
+  showGrand: boolean;
+  grandMax: number;
+  rows: ResultRow[];
+  /** Scholastic Areas II (grade wale subjects). */
+  gradeRows: ResultGradeRow[];
+  termTotals: ResultTotals[];
+  grandTotals: ResultTotals;
   /** null when there are no counted marks at all. */
   result: "pass" | "fail" | null;
 }
+
+/**
+ * Card ke wo fields jo marks mein nahi hote. Marks entry form banate waqt
+ * inhe Firestore mein save karna (rank save nahi hota, wo calculate hota hai):
+ *
+ *   resultExtras/{session}_{studentUid} -> {
+ *     remarks: string,
+ *     attendancePresent: number,
+ *     attendanceTotal: number,
+ *     resultDate: string   // "DD.MM.YYYY"
+ *   }
+ */
+export interface ResultCardExtras {
+  remarks?: string;
+  attendancePresent?: number | null;
+  attendanceTotal?: number | null;
+  rank?: number | null;
+  resultDate?: string;
+}
+
+/* ------------------------------------------------------------------ */
+/* Internal helpers                                                    */
+/* ------------------------------------------------------------------ */
 
 interface Slot {
   key: string;
   subject: string;
   type: string;
   order: number;
+  /** Report card mein display order (undefined/0 = ordered subjects ke baad). */
+  reportCardOrder?: number;
   isGrade: boolean;
 }
 
@@ -89,10 +204,6 @@ function normalize(value: string): string {
 /** The same subject + type is one row across every exam. */
 function slotKey(column: ExamSheetSubjectColumn): string {
   return `${normalize(column.name)}|${normalize(column.type)}`;
-}
-
-function isPracticalSlot(slot: Slot): boolean {
-  return normalize(slot.type) === "practical";
 }
 
 function partRank(type: string): number {
@@ -109,10 +220,145 @@ function partRank(type: string): number {
   }
 }
 
+/** "Maths" (Theory) -> "Maths"; "English" (Oral) -> "English (Oral)". */
+function rowLabel(slot: Slot): string {
+  const type = normalize(slot.type);
+  if (type === "" || type === "theory" || type === "scholastic") {
+    return slot.subject;
+  }
+  return `${slot.subject} (${slot.type})`;
+}
+
+/**
+ * Exam sheet ke pehle numeric subject column ka max marks. Header ke
+ * "(max)" ke liye fallback: student ke marks na bhare hone par bhi column
+ * heading complete dikhe (marks wale columns dash hote hain phir bhi).
+ */
+function sheetExamMax(columns: Map<string, ExamSheetSubjectColumn>): number {
+  for (const column of columns.values()) {
+    if (!column.isGrade && column.maxMarks > 0) return column.maxMarks;
+  }
+  return 0;
+}
+
+/**
+ * Unit Test exams ka Notebook split active hai? (classes 1-8 scheme + Unit
+ * Test exam). Sheet snapshot par depend nahi karte - purani sheets jinki
+ * componentMax nahi hai un par bhi Notebook column aata hai.
+ */
+function examHasNotebook(input: ResultExamInput, scheme: boolean): boolean {
+  return scheme && input.exam.examCategory === "UNIT_TEST";
+}
+
+/**
+ * Unit Test ke Notebook / Test dono ke max marks. Pehle sheet ka
+ * componentMax, warna exam ke marksScheme se (default scheme).
+ */
+function unitTestComponentMaxes(
+  input: ResultExamInput,
+  columns: Map<string, ExamSheetSubjectColumn>
+): { test: number; notebook: number } {
+  const scheme = input.exam.marksScheme ?? defaultMarksScheme();
+  const schemeBreakdown = subjectMarksBreakdown("UNIT_TEST", scheme, false);
+  let test = 0;
+  let notebook = 0;
+  for (const column of columns.values()) {
+    if (column.isGrade) continue;
+    if (!notebook && (column.componentMax?.notebook ?? 0) > 0) {
+      notebook = column.componentMax?.notebook ?? 0;
+    }
+    if (!test && (column.componentMax?.test ?? 0) > 0) {
+      test = column.componentMax?.test ?? 0;
+    }
+  }
+  return {
+    notebook: notebook || schemeBreakdown.notebook,
+    test: test || schemeBreakdown.theory,
+  };
+}
+
+/**
+ * Unit Test ka Notebook ya Test part ka cell. Components wale records mein
+ * har part alag count hota hai; purane records (components ke bina) mein Test
+ * cell poora total rakhta hai aur Notebook "-" / count nahi hota.
+ */
+function buildComponentCell(
+  input: ResultExamInput,
+  column: ExamSheetSubjectColumn | undefined,
+  comp: "notebook" | "test"
+): ResultCell {
+  if (!input.sheet) {
+    return { text: EMPTY_LABEL, obtained: 0, max: 0, counts: false };
+  }
+  if (!column) {
+    return { text: NOT_APPLICABLE, obtained: 0, max: 0, counts: false };
+  }
+
+  const record = input.marks?.subjectMarks?.[column.id];
+  // Max: pehle record/column ka componentMax, warna exam ke marksScheme se.
+  const scheme = input.exam.marksScheme ?? defaultMarksScheme();
+  const schemeBreakdown = subjectMarksBreakdown("UNIT_TEST", scheme, false);
+  const schemeMax =
+    comp === "notebook" ? schemeBreakdown.notebook : schemeBreakdown.theory;
+  const max =
+    record?.componentMax?.[comp] ?? column.componentMax?.[comp] ?? schemeMax;
+
+  if (!record) return { text: EMPTY_LABEL, obtained: 0, max, counts: false };
+  if (record.status === "absent") {
+    return { text: ABSENT_LABEL, obtained: 0, max, counts: false };
+  }
+  if (record.status === "exempt") {
+    return { text: EXEMPT_LABEL, obtained: 0, max, counts: false };
+  }
+
+  const parts = record.components ?? {};
+  const hasAnyPart = (Object.values(parts) as (number | null)[]).some(
+    (value) => typeof value === "number" && Number.isFinite(value)
+  );
+  if (hasAnyPart) {
+    const value = parts[comp];
+    if (typeof value === "number" && Number.isFinite(value)) {
+      const num = round2(value);
+      return { text: String(num), obtained: num, max, counts: true };
+    }
+    return { text: EMPTY_LABEL, obtained: 0, max, counts: false };
+  }
+
+  // Purana data (components nahi): Notebook count nahi hota, Test cell mein
+  // poora subject total dikhta hai.
+  if (comp === "notebook") {
+    return { text: EMPTY_LABEL, obtained: 0, max: 0, counts: false };
+  }
+  return {
+    text: resultCellText(record),
+    obtained: recordObtained(record),
+    max: recordMax(record),
+    counts: recordCountsInTotal(record),
+  };
+}
+
+/** Ek term ke andar ek head column ka counted max (students ke filled marks se). */
+function countedMaxAt(
+  rows: ResultRow[],
+  termIndex: number,
+  headIndex: number
+): number {
+  return (
+    rows
+      .map((row) => row.termCells[termIndex][headIndex])
+      .find((cell) => cell.counts && cell.max > 0)?.max ?? 0
+  );
+}
+
 function buildCell(
   input: ResultExamInput,
   column: ExamSheetSubjectColumn | undefined
 ): ResultCell {
+  // Exam ke liye koi sheet snapshot hi nahi hai (abhi kisi ka bhi marks save
+  // nahi hua): is student (aur class) ke saare cells "-" hote hain, "NA" nahi.
+  if (!input.sheet) {
+    return { text: EMPTY_LABEL, obtained: 0, max: 0, counts: false };
+  }
   // This exam's sheet has no such paper (e.g. practical in a Unit Test).
   if (!column) {
     return { text: NOT_APPLICABLE, obtained: 0, max: 0, counts: false };
@@ -126,10 +372,23 @@ function buildCell(
   };
 }
 
+/**
+ * Report card ke liye sort key. Defined (>0) reportCardOrder wale subjects
+ * pehle ascending order mein aate hain; undefined / 0 wale Number.MAX_SAFE_INTEGER
+ * lete hain, jo comparator ko unhe ordered subjects ke baad (bottom) rakhta hai.
+ */
+function reportCardSortKey(value: number | undefined): number {
+  return typeof value === "number" && value > 0
+    ? value
+    : Number.MAX_SAFE_INTEGER;
+}
+
 function sortSlots(slots: Slot[], groupByName: boolean): Slot[] {
   if (!groupByName) {
     return [...slots].sort(
       (a, b) =>
+        reportCardSortKey(a.reportCardOrder) -
+          reportCardSortKey(b.reportCardOrder) ||
         a.order - b.order ||
         partRank(a.type) - partRank(b.type) ||
         a.subject.localeCompare(b.subject)
@@ -137,13 +396,23 @@ function sortSlots(slots: Slot[], groupByName: boolean): Slot[] {
   }
 
   // A subject group sits at the position of its lowest `order`, so the
-  // Written and Oral rows of one subject always stay together.
+  // Written and Oral rows of one subject always stay together. The same
+  // applies to the report card order, so a subject (group) whose report card
+  // order is defined floats above the ones that have none.
   const groupOrder = new Map<string, number>();
+  const groupReportCardOrder = new Map<string, number>();
   slots.forEach((slot) => {
     const name = normalize(slot.subject);
     groupOrder.set(
       name,
       Math.min(groupOrder.get(name) ?? Number.MAX_SAFE_INTEGER, slot.order)
+    );
+    groupReportCardOrder.set(
+      name,
+      Math.min(
+        groupReportCardOrder.get(name) ?? Number.MAX_SAFE_INTEGER,
+        reportCardSortKey(slot.reportCardOrder)
+      )
     );
   });
 
@@ -151,6 +420,8 @@ function sortSlots(slots: Slot[], groupByName: boolean): Slot[] {
     const nameA = normalize(a.subject);
     const nameB = normalize(b.subject);
     return (
+      (groupReportCardOrder.get(nameA) ?? Number.MAX_SAFE_INTEGER) -
+        (groupReportCardOrder.get(nameB) ?? Number.MAX_SAFE_INTEGER) ||
       (groupOrder.get(nameA) ?? 0) - (groupOrder.get(nameB) ?? 0) ||
       nameA.localeCompare(nameB) ||
       partRank(a.type) - partRank(b.type) ||
@@ -159,74 +430,58 @@ function sortSlots(slots: Slot[], groupByName: boolean): Slot[] {
   });
 }
 
-function makeRow(slot: Slot, cells: ResultCell[]): ResultRow {
+function scoreOf(cells: ResultCell[]): ResultScore {
   const counted = cells.filter((cell) => cell.counts);
-  const finalObtained = round2(
+  const obtained = round2(
     counted.reduce((sum, cell) => sum + cell.obtained, 0)
   );
-  const finalMax = counted.reduce((sum, cell) => sum + cell.max, 0);
+  const max = counted.reduce((sum, cell) => sum + cell.max, 0);
   return {
-    key: slot.key,
-    subject: slot.subject,
-    part: slot.type,
-    isGroupStart: true,
-    groupSize: 1,
-    cells,
-    finalText: counted.length > 0 ? String(finalObtained) : EMPTY_LABEL,
-    finalObtained,
-    finalMax,
+    obtained,
+    max,
+    text: counted.length > 0 ? String(obtained) : EMPTY_LABEL,
+    grade:
+      counted.length > 0 && max > 0
+        ? gradeFromPercentage((obtained / max) * 100)
+        : EMPTY_LABEL,
   };
 }
 
-function assignGroups(rows: ResultRow[], groupByName: boolean): void {
-  let start = 0;
-  while (start < rows.length) {
-    let end = start + 1;
-    if (groupByName) {
-      const name = normalize(rows[start].subject);
-      while (end < rows.length && normalize(rows[end].subject) === name) {
-        end += 1;
-      }
-    }
-    rows[start].groupSize = end - start;
-    for (let i = start + 1; i < end; i += 1) {
-      rows[i].isGroupStart = false;
-    }
-    start = end;
-  }
-}
-
-function buildRows(
-  slots: Slot[],
-  groupByName: boolean,
-  cellsOf: (slot: Slot) => ResultCell[]
-): ResultRow[] {
-  const rows = sortSlots(slots, groupByName).map((slot) =>
-    makeRow(slot, cellsOf(slot))
-  );
-  assignGroups(rows, groupByName);
-  return rows;
+function totalsOf(scores: ResultScore[], hasMarks: boolean): ResultTotals {
+  const obtained = round2(scores.reduce((sum, score) => sum + score.obtained, 0));
+  const max = scores.reduce((sum, score) => sum + score.max, 0);
+  return {
+    obtained,
+    max,
+    percentage: percentageOf(obtained, max),
+    grade: max > 0 ? gradeFromPercentage((obtained / max) * 100) : EMPTY_LABEL,
+    hasMarks,
+  };
 }
 
 function decideResult(
   rules: ExamRules,
-  numericRows: ResultRow[],
-  finalTotals: ResultTotals
+  rows: ResultRow[],
+  grandTotals: ResultTotals
 ): "pass" | "fail" | null {
-  if (finalTotals.max <= 0) return null;
+  if (grandTotals.max <= 0) return null;
 
   if (rules.passMode === "subject") {
-    const everySubjectPasses = numericRows.every(
+    const everySubjectPasses = rows.every(
       (row) =>
-        row.finalMax <= 0 ||
-        percentageOf(row.finalObtained, row.finalMax) >=
+        row.grand.max <= 0 ||
+        percentageOf(row.grand.obtained, row.grand.max) >=
           rules.subjectPassPercentage
     );
     return everySubjectPasses ? "pass" : "fail";
   }
 
-  return finalTotals.percentage >= rules.totalPassPercentage ? "pass" : "fail";
+  return grandTotals.percentage >= rules.totalPassPercentage ? "pass" : "fail";
 }
+
+/* ------------------------------------------------------------------ */
+/* Main builder                                                        */
+/* ------------------------------------------------------------------ */
 
 export function buildResultTable(params: {
   className: string;
@@ -249,12 +504,19 @@ export function buildResultTable(params: {
       const existing = slotMap.get(key);
       if (existing) {
         existing.order = Math.min(existing.order, column.order);
+        // Chhoti report card order wala value win karta hai (undefined = max).
+        const existingReport = reportCardSortKey(existing.reportCardOrder);
+        const columnReport = reportCardSortKey(column.reportCardOrder);
+        if (columnReport < existingReport) {
+          existing.reportCardOrder = column.reportCardOrder;
+        }
       } else {
         slotMap.set(key, {
           key,
           subject: column.name,
           type: column.type,
           order: column.order,
+          reportCardOrder: column.reportCardOrder,
           isGrade: column.isGrade,
         });
       }
@@ -266,68 +528,157 @@ export function buildResultTable(params: {
   const numericSlots = allSlots.filter((slot) => !slot.isGrade);
   const gradeSlots = allSlots.filter((slot) => slot.isGrade);
 
-  // 2. Class 1-8: Theory table + Practical table.
-  //    PG-UKG: a single table with Written/Oral rows grouped per subject.
-  const mainSlots =
-    layout === "scheme"
-      ? numericSlots.filter((slot) => !isPracticalSlot(slot))
-      : numericSlots;
-  const practicalSlots =
-    layout === "scheme" ? numericSlots.filter(isPracticalSlot) : [];
+  // 2. Selected exams ko terms mein baanto (sirf wahi terms jinme exam hai).
+  const termGroups: {
+    key: TermKey;
+    members: { input: ResultExamInput; index: number }[];
+  }[] = [];
+  (["term1", "term2"] as TermKey[]).forEach((key) => {
+    const members = inputs
+      .map((input, index) => ({ input, index }))
+      .filter(({ input }) => getExamTerm(input.exam) === key);
+    if (members.length > 0) termGroups.push({ key, members });
+  });
 
-  const cellsOf = (slot: Slot): ResultCell[] =>
-    inputs.map((input, index) =>
-      buildCell(input, columnsByExam[index].get(slot.key))
+  // 3. Numeric rows: ek hi table, har subject ek row.
+  const rows: ResultRow[] = sortSlots(
+    numericSlots,
+    layout === "written-oral"
+  ).map((slot) => {
+    const termCells = termGroups.map((group) =>
+      group.members.flatMap(({ input, index }) => {
+        const columns = columnsByExam[index];
+        const column = columns.get(slot.key);
+        // Unit Test (classes 1-8 scheme): Notebook + Test alag column bante hain.
+        if (examHasNotebook(input, layout === "scheme")) {
+          return [
+            buildComponentCell(input, column, "test"),
+            buildComponentCell(input, column, "notebook"),
+          ];
+        }
+        return [buildCell(input, column)];
+      })
     );
-
-  const mainRows = buildRows(mainSlots, layout === "written-oral", cellsOf);
-  const practicalRows = buildRows(practicalSlots, false, cellsOf);
-  const gradeRows = buildRows(gradeSlots, false, cellsOf);
-
-  // 3. Totals use only counted numeric cells (grades and exempt are skipped).
-  const numericRows = [...mainRows, ...practicalRows];
-
-  const examTotals: ResultTotals[] = inputs.map((input, index) => {
-    let obtained = 0;
-    let max = 0;
-    numericRows.forEach((row) => {
-      const cell = row.cells[index];
-      if (cell.counts) {
-        obtained += cell.obtained;
-        max += cell.max;
-      }
-    });
     return {
-      obtained: round2(obtained),
-      max,
-      percentage: percentageOf(obtained, max),
-      hasMarks: input.marks !== null,
+      key: slot.key,
+      subject: rowLabel(slot),
+      subjectName: slot.subject,
+      type: slot.type,
+      termCells,
+      termScores: termCells.map(scoreOf),
+      grand: scoreOf(termCells.flat()),
     };
   });
 
-  const finalObtained = round2(
-    numericRows.reduce((sum, row) => sum + row.finalObtained, 0)
+  // 4. Table headers (exam name + max marks).
+  const terms: ResultTermHead[] = termGroups.map((group, termIndex) => {
+    const exams: ResultExamHead[] = [];
+    group.members.forEach(({ input, index }) => {
+      const columns = columnsByExam[index];
+      const examLabel = resultExamLabel(input.exam.examName);
+
+      // Unit Test (classes 1-8 scheme): Notebook ka column Unit Test ke turant
+      // baad aata hai (Unit Test I, Notebook, Half Yearly ...).
+      if (examHasNotebook(input, layout === "scheme")) {
+        const compMax = unitTestComponentMaxes(input, columns);
+        const notebookIndex = exams.length + 1;
+        const notebookMax =
+          compMax.notebook ||
+          rows
+            .map((row) => row.termCells[termIndex][notebookIndex])
+            .find((cell) => cell.counts && cell.max > 0)?.max ||
+          0;
+        const testMax =
+          compMax.test ||
+          Math.max(0, (input.exam.maxMarks || 0) - notebookMax) ||
+          countedMaxAt(rows, termIndex, exams.length);
+        exams.push({
+          id: `${input.exam.id}:test`,
+          name: examLabel,
+          max: testMax,
+          sub: "test",
+        });
+        exams.push({
+          id: `${input.exam.id}:notebook`,
+          name: "Notebook",
+          max: notebookMax,
+          sub: "notebook",
+        });
+        return;
+      }
+
+      // AddExam mein define kiye gaye max marks (exam.maxMarks) hi heading
+      // mein dikhte hain (Unit Test = 30, Half Yearly = 70, practical 20,
+      // waghera) - chahe student ke marks filled hon ya nahi, aur chahe
+      // sheet mein paper split (Written/Oral/Theory) kaise bhi ho. Purane
+      // exams (jinke paas maxMarks nahi) ke liye counted cells / sheet
+      // fallback rehta hai.
+      exams.push({
+        id: input.exam.id,
+        name: examLabel,
+        max:
+          (typeof input.exam.maxMarks === "number" &&
+          input.exam.maxMarks > 0
+            ? input.exam.maxMarks
+            : countedMaxAt(rows, termIndex, exams.length) ||
+              sheetExamMax(columns)) || 0,
+      });
+    });
+    return {
+      key: group.key,
+      label: TERM_LABELS[group.key],
+      exams,
+      max:
+        rows.reduce(
+          (highest, row) => Math.max(highest, row.termScores[termIndex].max),
+          0
+        ) || exams.reduce((sum, exam) => sum + exam.max, 0),
+    };
+  });
+
+  // 5. Totals (grades / exempt / absent count nahi hote).
+  const termTotals = termGroups.map((group, termIndex) =>
+    totalsOf(
+      rows.map((row) => row.termScores[termIndex]),
+      group.members.some(({ input }) => input.marks !== null)
+    )
   );
-  const finalMax = numericRows.reduce((sum, row) => sum + row.finalMax, 0);
-  const finalTotals: ResultTotals = {
-    obtained: finalObtained,
-    max: finalMax,
-    percentage: percentageOf(finalObtained, finalMax),
-    hasMarks: examTotals.some((total) => total.hasMarks),
-  };
+  const grandTotals = totalsOf(
+    rows.map((row) => row.grand),
+    inputs.some((input) => input.marks !== null)
+  );
+
+  // 6. Scholastic Areas II: har exam ke liye apna grade column (Term-I: Unit
+  //    Test I + Half Yearly, Term-II: Unit Test II + Annual). Jis exam mein
+  //    grade save hai wahi dikhta hai; baaki "-".
+  const gradeRows: ResultGradeRow[] = sortSlots(gradeSlots, false).map(
+    (slot) => ({
+      key: slot.key,
+      subject: slot.subject,
+      termGrades: termGroups.map((group) =>
+        group.members.map(({ input, index }) => {
+          const grade = buildCell(
+            input,
+            columnsByExam[index].get(slot.key)
+          ).text;
+          return grade === EMPTY_LABEL || grade === NOT_APPLICABLE
+            ? EMPTY_LABEL
+            : grade;
+        })
+      ),
+    })
+  );
 
   return {
     layout,
-    exams: inputs.map((input) => ({
-      id: input.exam.id,
-      name: input.exam.examName,
-    })),
-    mainRows,
-    practicalRows,
+    terms,
+    showGrand: terms.length > 1,
+    grandMax: rows.reduce((highest, row) => Math.max(highest, row.grand.max), 0),
+    rows,
     gradeRows,
-    examTotals,
-    finalTotals,
-    result: decideResult(rules, numericRows, finalTotals),
+    termTotals,
+    grandTotals,
+    result: decideResult(rules, rows, grandTotals),
   };
 }
 
@@ -338,4 +689,52 @@ export function rollNumberFromInputs(inputs: ResultExamInput[]): number {
     if (typeof roll === "number" && roll > 0) return roll;
   }
   return 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Rank (Cross List jaisa rule, par selected exams ke combined total par) */
+/* ------------------------------------------------------------------ */
+
+/**
+ * marksPerExam: selected har exam ke liye poori class ke MarksDoc (ek array
+ * per exam). Rank un students ko milta hai jinke SABHI selected exams mein
+ * marks saved hain. rules.rankScope ke hisaab se rank section ya poori class
+ * mein hota hai. Result: { [studentUid]: rank }.
+ */
+export function computeResultRanks(params: {
+  marksPerExam: MarksDoc[][];
+  rules: ExamRules;
+}): Record<string, number> {
+  const { marksPerExam, rules } = params;
+  if (marksPerExam.length === 0) return {};
+
+  const groups = new Map<string, Map<string, { total: number; exams: number }>>();
+  marksPerExam.forEach((list) => {
+    list.forEach((marks) => {
+      const groupKey =
+        rules.rankScope === "class"
+          ? marks.className
+          : `${marks.className}|${marks.section}`;
+      const group =
+        groups.get(groupKey) ??
+        new Map<string, { total: number; exams: number }>();
+      const entry = group.get(marks.studentUid) ?? { total: 0, exams: 0 };
+      entry.total += marks.totalMarks;
+      entry.exams += 1;
+      group.set(marks.studentUid, entry);
+      groups.set(groupKey, group);
+    });
+  });
+
+  const ranks: Record<string, number> = {};
+  groups.forEach((group) => {
+    const rows = Array.from(group.entries())
+      .filter(([, entry]) => entry.exams === marksPerExam.length)
+      .map(([studentUid, entry]) => ({
+        studentUid,
+        totalMarks: round2(entry.total),
+      }));
+    Object.assign(ranks, computeRanks(rows));
+  });
+  return ranks;
 }

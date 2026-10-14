@@ -73,7 +73,44 @@ export function percentageOf(obtained: number, max: number): number {
   return max > 0 ? round2((obtained / max) * 100) : 0;
 }
 
+/**
+ * Report card table ke columns isi fixed order mein dikhte hain:
+ *   Term-I  : Unit Test I, Half Yearly
+ *   Term-II : Unit Test II, Annual / Final
+ * Kisi bhi matlab ke naam (dates ki parwah kiye bina) is order se aate hain;
+ * baaki custom exam naam date + name se peeche sort hote hain.
+ */
+function resultExamPriority(exam: ExamDoc): number {
+  const name = exam.examName.trim().toLowerCase().replace(/[\s_-]+/g, " ");
+  if (/^unit test/.test(name)) {
+    const suffix = name.replace(/^unit test/, "").trim();
+    // Unit Test II (aakhri unit test) Term-II mein Half Yearly ke baad aata hai.
+    return /^(2|two|ii)$/.test(suffix) ? 2 : 0;
+  }
+  if (/^half yearly/.test(name)) return 1;
+  if (/^(annual|final)/.test(name)) return 3;
+  return 4;
+}
+
+/** Header label of an exam, e.g. "Unit Test 1" -> "Unit Test I", "Annual Exam" -> "Annual". */
+export function resultExamLabel(examName: string): string {
+  const trimmed = examName.trim();
+  const normalized = trimmed.toLowerCase().replace(/[\s_-]+/g, " ");
+  if (/^unit test/.test(normalized)) {
+    const suffix = normalized.replace(/^unit test/, "").trim();
+    if (/^(1|one|i)$/.test(suffix)) return "Unit Test I";
+    if (/^(2|two|ii)$/.test(suffix)) return "Unit Test II";
+    return "Unit Test";
+  }
+  if (/^half yearly/.test(normalized)) return "Half Yearly";
+  if (/^annual(\s*exam(ination)?)?$/.test(normalized)) return "Annual";
+  if (/^final(\s*exam(ination)?)?$/.test(normalized)) return "Final";
+  return trimmed;
+}
+
 export function compareExamsForResult(a: ExamDoc, b: ExamDoc): number {
+  const priorityOrder = resultExamPriority(a) - resultExamPriority(b);
+  if (priorityOrder !== 0) return priorityOrder;
   const dateOrder = (a.examStartDate || "").localeCompare(b.examStartDate || "");
   if (dateOrder !== 0) return dateOrder;
   return a.examName.localeCompare(b.examName);
