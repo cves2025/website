@@ -22,6 +22,7 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   "/welcome/admit-card": P.ADMITCARD_VIEW,
   "/welcome/admit-card/schedule": P.ADMITCARD_GENERATE,
   "/welcome/admit-card/generated": P.ADMITCARD_GENERATE,
+  "/welcome/result-card/generated": P.RESULT_VIEW,
   "/welcome/marks": [P.MARKS_ENTER, P.MARKS_VIEW],
   "/welcome/cross-list": P.CROSSLIST_VIEW,
   "/welcome/result": P.RESULT_VIEW,

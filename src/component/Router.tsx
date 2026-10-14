@@ -37,6 +37,7 @@ import IdCardAdmin from './panel/IdCardAdmin'
 import Settings from './panel/settings/Settings'
 import RequireAccess from '../routes/RequireAccess'
 import RequireRoutePermission from '../routes/RequireRoutePermission'
+import GeneratedResultCards from './panel/exams/GeneratedResultCards'
 
 function Router() {
   return (
@@ -69,6 +70,7 @@ function Router() {
           <Route path="admit-card" element={<AdmitCard />} />
           <Route path="admit-card/schedule" element={<ExamSchedule />} />
           <Route path="admit-card/generated" element={<GeneratedAdmitCards />} />
+          <Route path="result-card/generated" element={<GeneratedResultCards />} />
           <Route path="result" element={<ResultPanel />} />
           <Route path="exam-settings" element={<ExamSettings />} />
           <Route path="exam-settings/admit-card-template" element={<AdmitCardTemplate />} />
