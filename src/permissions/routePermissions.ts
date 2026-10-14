@@ -19,6 +19,7 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   "/welcome/id-card/admin": P.IDCARD_ADMIN,
 
   "/welcome/exam/list": P.EXAM_MANAGE,
+  "/welcome/desk-slip": P.DESK_SLIP,
   "/welcome/admit-card": P.ADMITCARD_VIEW,
   "/welcome/admit-card/schedule": P.ADMITCARD_GENERATE,
   "/welcome/admit-card/generated": P.ADMITCARD_GENERATE,

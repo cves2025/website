@@ -256,15 +256,18 @@ function ResultCard({ card, rollNo, academicYear, model }: ResultCardProps) {
               <img
                 src={schoolLogo}
                 alt="school logo"
-                className="h-full w-full scale-125 object-cover grayscale"
+                className="h-full w-full scale-125 object-cover"
                 loading="lazy"
               />
             </div>
 
             <div className="min-w-0 flex-1 text-left sm:text-center">
-              <h3 className="text-lg font-extrabold leading-tight tracking-tight text-black sm:text-2xl">
-                <FitText>CHILDREN&apos;S VALLEY ENGLISH SCHOOL</FitText>
-              </h3>
+              <h3 className="font-cancun text-3xl">
+            <span className="text-green-600">CHILDREN'S</span>
+            <span className="text-blue-800"> VALLEY</span>
+            <span className="text-red-600"> ENGLISH</span>
+            <span className="text-pink-600"> SCHOOL</span>
+          </h3>
               <p className="mt-0.5 text-xs font-semibold italic text-black md:text-sm">
                 <FitText>
                   D 59/295 A, Mahmoorganj, Varanasi &middot; 0542-2220107,
@@ -279,7 +282,7 @@ function ResultCard({ card, rollNo, academicYear, model }: ResultCardProps) {
                 </FitText>
               </div>
               <div className="mt-2 flex justify-center">
-                <div className="inline-block rounded bg-black px-8 py-1 text-sm font-bold tracking-wide text-white md:text-base [-webkit-print-color-adjust:exact] [print-color-adjust:exact]">
+                <div className="inline-block rounded bg-pink-600 px-8 py-1 text-sm font-bold tracking-wide text-white md:text-base [-webkit-print-color-adjust:exact] [print-color-adjust:exact]">
                   RESULT CARD
                 </div>
               </div>

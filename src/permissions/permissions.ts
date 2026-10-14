@@ -21,6 +21,7 @@ export const PERMISSIONS = {
   RESULT_PUBLISH: "result.publish",
   SETTINGS_ACCESS: "settings.access",
   EXAM_SETTINGS: "examSettings.access",
+  DESK_SLIP: "deskslip.access",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

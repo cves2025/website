@@ -35,6 +35,7 @@ import IdCardTeachers from './panel/IdCardTeachers'
 import IdCardStaff from './panel/IdCardStaff'
 import IdCardAdmin from './panel/IdCardAdmin'
 import Settings from './panel/settings/Settings'
+import DeskSlip from './panel/exams/desk-slip/DeskSlip'
 import RequireAccess from '../routes/RequireAccess'
 import RequireRoutePermission from '../routes/RequireRoutePermission'
 import GeneratedResultCards from './panel/exams/GeneratedResultCards'
@@ -68,6 +69,7 @@ function Router() {
           <Route path="teacher/add" element={<AddTeacher />} />
           <Route path="teacher/list" element={<TeachersList />} />
           <Route path="admit-card" element={<AdmitCard />} />
+          <Route path="desk-slip" element={<DeskSlip />} />
           <Route path="admit-card/schedule" element={<ExamSchedule />} />
           <Route path="admit-card/generated" element={<GeneratedAdmitCards />} />
           <Route path="result-card/generated" element={<GeneratedResultCards />} />

@@ -305,3 +305,15 @@ export interface ExamSheetDoc {
   createdAt: unknown;
   subjects: ExamSheetSubjectColumn[];
 }
+
+// ------------------------------- Desk Slip ----------------------
+export interface DeskSlipStudent {
+  id: string;
+  studentId: string;
+  admissionNo: string;
+  studentName: string;
+  fatherName: string;
+  className: string;
+  section: string;
+  photoUrl: string;
+}
