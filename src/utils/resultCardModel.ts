@@ -159,6 +159,8 @@ export interface ResultTableModel {
   /** Scholastic Areas II (grade wale subjects). */
   gradeRows: ResultGradeRow[];
   termTotals: ResultTotals[];
+  /** examTotals[termIndex][examHeadIndex]: har exam column ka apna total + percentage. */
+  examTotals: ResultTotals[][];
   grandTotals: ResultTotals;
   /** null when there are no counted marks at all. */
   result: "pass" | "fail" | null;
@@ -186,6 +188,14 @@ export interface ResultCardExtras {
 /* ------------------------------------------------------------------ */
 /* Internal helpers                                                    */
 /* ------------------------------------------------------------------ */
+
+/**
+ * Classes 1-8 mein EX (exempt) paper ka max total mein judta hai ya nahi.
+ *  true  -> max hamesha AddExam ke scheme jaisa rehta hai (8 subjects = 1600);
+ *           EX wale paper ke obtained marks 0 gine jaate hain.
+ *  false -> EX wale paper ka max total se hat jata hai (max 1600 se kam ho sakta hai).
+ */
+const EXEMPT_COUNTS_IN_MAX = true;
 
 interface Slot {
   key: string;
@@ -251,36 +261,69 @@ function examHasNotebook(input: ResultExamInput, scheme: boolean): boolean {
 }
 
 /**
- * Unit Test ke Notebook / Test dono ke max marks. Pehle sheet ka
- * componentMax, warna exam ke marksScheme se (default scheme).
+ * Unit Test ke Notebook / Test dono ke max marks - sirf exam ke marksScheme se
+ * (AddExam mein jo define hua). Sheet snapshot ka componentMax ignore hota hai,
+ * taaki purani/stale sheet se max kabhi alag na ho.
  */
 function unitTestComponentMaxes(
   input: ResultExamInput,
-  columns: Map<string, ExamSheetSubjectColumn>
+  _columns?: Map<string, ExamSheetSubjectColumn>
 ): { test: number; notebook: number } {
   const scheme = input.exam.marksScheme ?? defaultMarksScheme();
   const schemeBreakdown = subjectMarksBreakdown("UNIT_TEST", scheme, false);
-  let test = 0;
-  let notebook = 0;
-  for (const column of columns.values()) {
-    if (column.isGrade) continue;
-    if (!notebook && (column.componentMax?.notebook ?? 0) > 0) {
-      notebook = column.componentMax?.notebook ?? 0;
-    }
-    if (!test && (column.componentMax?.test ?? 0) > 0) {
-      test = column.componentMax?.test ?? 0;
-    }
-  }
   return {
-    notebook: notebook || schemeBreakdown.notebook,
-    test: test || schemeBreakdown.theory,
+    notebook: schemeBreakdown.notebook,
+    test: schemeBreakdown.theory,
   };
 }
 
+/** True when the paper is a "Practical"-type subject row. */
+function isPracticalPaper(column: ExamSheetSubjectColumn): boolean {
+  return normalize(column.type) === "practical";
+}
+
 /**
- * Unit Test ka Notebook ya Test part ka cell. Components wale records mein
- * har part alag count hota hai; purane records (components ke bina) mein Test
- * cell poora total rakhta hai aur Notebook "-" / count nahi hota.
+ * Classes 1-8 (scheme): one paper's authoritative max marks, taken from the
+ * exam scheme + subject setup - exactly like the Marks Entry page - and NOT
+ * from the saved per-student records (those may carry stale/incomplete maxes).
+ *
+ *  - Unit Test papers are built by buildComponentCell(); this helper returns 0.
+ *  - Main Exams: Science/Computer split into 50 theory (parent row, detected
+ *    via the same-named Practical sibling in this exam's sheet) + 20 practical
+ *    (the Practical-type row); every other subject keeps a plain 70 theory.
+ */
+function schemePaperMax(
+  exam: ExamDoc,
+  column: ExamSheetSubjectColumn,
+  columnsOfExam: Map<string, ExamSheetSubjectColumn>
+): number {
+  if (column.isGrade) return 0;
+  const scheme = exam.marksScheme ?? defaultMarksScheme();
+  if (exam.examCategory === "UNIT_TEST") return 0;
+  const name = normalize(column.name);
+  if (isPracticalPaper(column)) {
+    return subjectMarksBreakdown("MAIN_EXAM", scheme, true).practical;
+  }
+  const hasPracticalSibling = Array.from(columnsOfExam.values()).some(
+    (other) =>
+      other.id !== column.id &&
+      normalize(other.name) === name &&
+      isPracticalPaper(other)
+  );
+  return subjectMarksBreakdown(
+    "MAIN_EXAM",
+    scheme,
+    hasPracticalSibling
+  ).theory;
+}
+
+/**
+ * Unit Test ka Notebook ya Test part ka cell. Classes 1-8 scheme mein max
+ * marks column/ scheme se aate hain aur ek baar exam ka marks doc exist kare
+ * (input.marks) to har paper count hota hai - kisi subject ka record chhut
+ * jaye to bhi us paper ka max total mein aata hai. Practical-type subjects ka
+ * Unit Test mein koi paper nahi hota. Purane records (components ke bina)
+ * mein Test cell poora total rakhta hai aur Notebook "-" / count nahi hota.
  */
 function buildComponentCell(
   input: ResultExamInput,
@@ -294,21 +337,39 @@ function buildComponentCell(
     return { text: NOT_APPLICABLE, obtained: 0, max: 0, counts: false };
   }
 
+  // Unit Tests (classes 1-8) me practical paper nahi hota, isliye
+  // Practical-type subject row ka notebook/test cell bhi NA hai.
+  if (isPracticalPaper(column)) {
+    return { text: NOT_APPLICABLE, obtained: 0, max: 0, counts: false };
+  }
+
   const record = input.marks?.subjectMarks?.[column.id];
-  // Max: pehle record/column ka componentMax, warna exam ke marksScheme se.
+
+  // Max: hamesha exam ke marksScheme se (AddExam), sheet snapshot se nahi.
   const scheme = input.exam.marksScheme ?? defaultMarksScheme();
   const schemeBreakdown = subjectMarksBreakdown("UNIT_TEST", scheme, false);
-  const schemeMax =
-    comp === "notebook" ? schemeBreakdown.notebook : schemeBreakdown.theory;
   const max =
-    record?.componentMax?.[comp] ?? column.componentMax?.[comp] ?? schemeMax;
+    comp === "notebook" ? schemeBreakdown.notebook : schemeBreakdown.theory;
 
-  if (!record) return { text: EMPTY_LABEL, obtained: 0, max, counts: false };
-  if (record.status === "absent") {
-    return { text: ABSENT_LABEL, obtained: 0, max, counts: false };
+  if (record?.status === "exempt") {
+    return {
+      text: EXEMPT_LABEL,
+      obtained: 0,
+      max,
+      counts: EXEMPT_COUNTS_IN_MAX && input.marks !== null,
+    };
   }
-  if (record.status === "exempt") {
-    return { text: EXEMPT_LABEL, obtained: 0, max, counts: false };
+  // Exam ka marks doc hi nahi hai: poora exam count nahi hota.
+  if (input.marks === null) {
+    return { text: EMPTY_LABEL, obtained: 0, max, counts: false };
+  }
+  // Subject enter nahi hua (record missing): paper exists, isliye max count
+  // hota hai, obtained 0.
+  if (!record) {
+    return { text: EMPTY_LABEL, obtained: 0, max, counts: true };
+  }
+  if (record.status === "absent") {
+    return { text: ABSENT_LABEL, obtained: 0, max, counts: true };
   }
 
   const parts = record.components ?? {};
@@ -321,19 +382,20 @@ function buildComponentCell(
       const num = round2(value);
       return { text: String(num), obtained: num, max, counts: true };
     }
-    return { text: EMPTY_LABEL, obtained: 0, max, counts: false };
+    return { text: EMPTY_LABEL, obtained: 0, max, counts: true };
   }
 
-  // Purana data (components nahi): Notebook count nahi hota, Test cell mein
-  // poora subject total dikhta hai.
+  // Purana data (components nahi): Notebook cell "-" rehta hai aur Test cell
+  // mein poora subject total dikhta hai. Max saved record se nahi, scheme ke
+  // total (notebook + test) se aata hai, taaki total hamesha AddExam jaisa rahe.
   if (comp === "notebook") {
     return { text: EMPTY_LABEL, obtained: 0, max: 0, counts: false };
   }
   return {
     text: resultCellText(record),
     obtained: recordObtained(record),
-    max: recordMax(record),
-    counts: recordCountsInTotal(record),
+    max: schemeBreakdown.total,
+    counts: true,
   };
 }
 
@@ -352,7 +414,9 @@ function countedMaxAt(
 
 function buildCell(
   input: ResultExamInput,
-  column: ExamSheetSubjectColumn | undefined
+  column: ExamSheetSubjectColumn | undefined,
+  layout: ResultLayout,
+  columnsOfExam?: Map<string, ExamSheetSubjectColumn>
 ): ResultCell {
   // Exam ke liye koi sheet snapshot hi nahi hai (abhi kisi ka bhi marks save
   // nahi hua): is student (aur class) ke saare cells "-" hote hain, "NA" nahi.
@@ -364,6 +428,38 @@ function buildCell(
     return { text: NOT_APPLICABLE, obtained: 0, max: 0, counts: false };
   }
   const record = input.marks?.subjectMarks?.[column.id];
+
+  // Classes 1-8 (scheme): max marks hamesha scheme se aate hain (saved
+  // records se nahi), aur exam ka marks doc exist karte hi har paper count
+  // hota hai - absent / na-bhare subjects 0 marks par max ke saath count
+  // hote hain. Issi se grand total deterministic rehta hai
+  // (8 subjects x 200 = 1600) aur percentage scheme ke max par banta hai.
+  if (layout === "scheme") {
+    const max = schemePaperMax(
+      input.exam,
+      column,
+      columnsOfExam ?? new Map()
+    );
+    if (record?.status === "exempt") {
+      return {
+        text: EXEMPT_LABEL,
+        obtained: 0,
+        max,
+        counts: EXEMPT_COUNTS_IN_MAX && input.marks !== null && max > 0,
+      };
+    }
+    if (input.marks === null) {
+      return { text: EMPTY_LABEL, obtained: 0, max, counts: false };
+    }
+    return {
+      text: resultCellText(record),
+      obtained: recordObtained(record),
+      max,
+      counts: max > 0,
+    };
+  }
+
+  // Non-scheme (PG, Nursery, LKG, UKG): saved record ke hisaab se.
   return {
     text: resultCellText(record),
     obtained: recordObtained(record),
@@ -525,7 +621,29 @@ export function buildResultTable(params: {
   });
 
   const allSlots = Array.from(slotMap.values());
-  const numericSlots = allSlots.filter((slot) => !slot.isGrade);
+  // Sirf Unit Test select hone par (classes 1-8) practical paper nahi hota, isliye
+  // same naam ke non-practical subject wali Practical (PR) row hata dete hain.
+  // Half Yearly / Annual select hone par ye rows pehle jaisi dikhti hain.
+  const onlyUnitTests =
+    layout === "scheme" &&
+    inputs.length > 0 &&
+    inputs.every((input) => input.exam.examCategory === "UNIT_TEST");
+  const nonPracticalNames = new Set(
+    allSlots
+      .filter((slot) => !slot.isGrade && normalize(slot.type) !== "practical")
+      .map((slot) => normalize(slot.subject))
+  );
+  const numericSlots = allSlots.filter((slot) => {
+    if (slot.isGrade) return false;
+    if (
+      onlyUnitTests &&
+      normalize(slot.type) === "practical" &&
+      nonPracticalNames.has(normalize(slot.subject))
+    ) {
+      return false;
+    }
+    return true;
+  });
   const gradeSlots = allSlots.filter((slot) => slot.isGrade);
 
   // 2. Selected exams ko terms mein baanto (sirf wahi terms jinme exam hai).
@@ -556,7 +674,7 @@ export function buildResultTable(params: {
             buildComponentCell(input, column, "notebook"),
           ];
         }
-        return [buildCell(input, column)];
+        return [buildCell(input, column, layout, columns)];
       })
     );
     return {
@@ -648,6 +766,24 @@ export function buildResultTable(params: {
     inputs.some((input) => input.marks !== null)
   );
 
+  // 5b. Har exam column ka apna total + percentage (Unit Test, Notebook,
+  //     Half Yearly, Annual alag-alag). Order terms[].exams jaisa hi hai:
+  //     Unit Test ke liye pehle "test" phir "notebook" column.
+  const examTotals: ResultTotals[][] = termGroups.map((group, termIndex) => {
+    const totals: ResultTotals[] = [];
+    group.members.forEach(({ input }) => {
+      const heads = examHasNotebook(input, layout === "scheme") ? 2 : 1;
+      for (let offset = 0; offset < heads; offset += 1) {
+        const headIndex = totals.length;
+        const score = scoreOf(
+          rows.map((row) => row.termCells[termIndex][headIndex])
+        );
+        totals.push(totalsOf([score], input.marks !== null));
+      }
+    });
+    return totals;
+  });
+
   // 6. Scholastic Areas II: har exam ke liye apna grade column (Term-I: Unit
   //    Test I + Half Yearly, Term-II: Unit Test II + Annual). Jis exam mein
   //    grade save hai wahi dikhta hai; baaki "-".
@@ -659,7 +795,9 @@ export function buildResultTable(params: {
         group.members.map(({ input, index }) => {
           const grade = buildCell(
             input,
-            columnsByExam[index].get(slot.key)
+            columnsByExam[index].get(slot.key),
+            layout,
+            columnsByExam[index]
           ).text;
           return grade === EMPTY_LABEL || grade === NOT_APPLICABLE
             ? EMPTY_LABEL
@@ -677,6 +815,7 @@ export function buildResultTable(params: {
     rows,
     gradeRows,
     termTotals,
+    examTotals,
     grandTotals,
     result: decideResult(rules, rows, grandTotals),
   };

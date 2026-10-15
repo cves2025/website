@@ -252,9 +252,10 @@ function sortSubjectColumns(
 
 /**
  * Turns a loaded subject into the input layout of its marks cell. The exam
- * scheme decides the split (Unit Test = notebook + test; Main Exam = theory,
- * + practical for Science/Computer on classes 1-8). Classes outside the 1-8
- * scheme (PG, Nur, LKG, UKG) split Unit Tests into Written + Oral (20 + 10)
+ * scheme decides the split (Unit Tests of classes 1-8 = notebook + test for
+ * EVERY subject, no practical; Main Exam = theory, + practical for
+ * Science/Computer on classes 1-8). Classes outside the 1-8 scheme
+ * (PG, Nur, LKG, UKG) split Unit Tests into Written + Oral (20 + 10)
  * and Main Exams into Written + Oral (maxMarks - 20 / 20). Scholastic
  * subjects keep a single grade cell. Other classes get one "Marks" input.
  */
@@ -300,19 +301,24 @@ function enrichSubjectColumn(
       exam.marksScheme,
       isPractical || hasPracticalSibling,
     );
-    if (isPractical) {
-      if (exam.examCategory === "MAIN_EXAM" && breakdown.practical > 0) {
+    if (exam.examCategory === "UNIT_TEST") {
+      // Unit Tests (classes 1-8) never carry a practical paper: every subject -
+      // including Computer / Science and any "Practical"-type subject - is
+      // entered with Notebook + Test only.
+      inputs.push(
+        { component: "notebook", max: breakdown.notebook, label: "Notebook" },
+        { component: "test", max: breakdown.theory, label: "Test" },
+      );
+    } else if (isPractical) {
+      // Main Exams: only the "Practical"-type subject keeps the practical
+      // paper; the theory part is entered on the same-named parent subject.
+      if (breakdown.practical > 0) {
         inputs.push({
           component: "practical",
           max: breakdown.practical,
           label: "Practical",
         });
       }
-    } else if (exam.examCategory === "UNIT_TEST") {
-      inputs.push(
-        { component: "notebook", max: breakdown.notebook, label: "Notebook" },
-        { component: "test", max: breakdown.theory, label: "Test" },
-      );
     } else {
       inputs.push({
         component: "theory",
@@ -913,6 +919,34 @@ function ExamMarks() {
             ),
         );
 
+        // Same-named subjects that DO have a non-practical row. A subject of type
+        // "Practical" is only the Main-Exam practical paper of its same-named
+        // written subject; such sibling rows have no paper in unit tests.
+        const nonPracticalNames = new Set(
+          snapshot.docs
+            .filter((d) => {
+              const data = d.data();
+              return (
+                data.type !== "Practical" &&
+                data.displayInMarksEntry === true
+              );
+            })
+            .map((d) =>
+              String(d.data().name ?? "")
+                .trim()
+                .toLowerCase(),
+            ),
+        );
+
+        // Unit Tests of classes 1-8 never have a practical paper, so the
+        // "Practical"-type sibling row is dropped from the marks entry (the
+        // parent subject already shows Notebook + Test). Subjects where the
+        // "Practical" row is the ONLY row of that name are kept and also get
+        // Notebook + Test.
+        const isUnitTestScheme =
+          selectedExam?.examCategory === "UNIT_TEST" &&
+          isSchemeClass(marksClass);
+
         const oralNames = new Set(
           snapshot.docs
             .filter((d) => {
@@ -930,6 +964,14 @@ function ExamMarks() {
           .map(toSubjectColumn)
           .filter((c): c is SubjectColumnBase => c !== null && Boolean(c.name))
           .sort(sortSubjectColumns)
+          .filter(
+            (c) =>
+              !(
+                isUnitTestScheme &&
+                c.type === "Practical" &&
+                nonPracticalNames.has(c.name.trim().toLowerCase())
+              ),
+          )
           .map((c) =>
             enrichSubjectColumn(
               c,

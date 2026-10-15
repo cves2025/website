@@ -23,7 +23,7 @@ export const MAIN_EXAM_PRACTICAL_THEORY_MARKS = 50;
 export const MAIN_EXAM_PRACTICAL_MARKS = 20;
 
 /** Text shown in the Practical column for subjects without a practical paper. */
-export const NOT_APPLICABLE = "NA";
+export const NOT_APPLICABLE = "N/A";
 
 export interface MarksScheme {
   /** Unit test internal/notebook marks. */

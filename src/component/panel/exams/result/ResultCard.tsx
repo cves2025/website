@@ -124,7 +124,15 @@ function typeLabel(type: string, layout: ResultLayout): string {
 /* ---------------- Statement of marks ---------------- */
 
 function StatementTable({ model }: { model: ResultTableModel }) {
-  const { layout, terms, rows, showGrand, termTotals, grandTotals } = model;
+  const {
+    layout,
+    terms,
+    rows,
+    showGrand,
+    termTotals,
+    examTotals,
+    grandTotals,
+  } = model;
   if (terms.length === 0 || rows.length === 0) return null;
 
   // Same subject ke rows ek group (e.g. English Written + English Oral).
@@ -311,7 +319,16 @@ function StatementTable({ model }: { model: ResultTableModel }) {
           </td>
           {terms.map((term, termIndex) => (
             <Fragment key={term.key}>
-              <td colSpan={term.exams.length} className={CELL} />
+              {term.exams.map((exam, examIndex) => {
+                const examTotal = examTotals[termIndex][examIndex];
+                return (
+                  <td key={exam.id} className={CELL}>
+                    {examTotal
+                      ? totalText(examTotal, String(examTotal.obtained))
+                      : "-"}
+                  </td>
+                );
+              })}
               <td className={CELL}>
                 {totalText(
                   termTotals[termIndex],
@@ -342,7 +359,16 @@ function StatementTable({ model }: { model: ResultTableModel }) {
           </td>
           {terms.map((term, termIndex) => (
             <Fragment key={term.key}>
-              <td colSpan={term.exams.length} className={CELL} />
+              {term.exams.map((exam, examIndex) => {
+                const examTotal = examTotals[termIndex][examIndex];
+                return (
+                  <td key={exam.id} className={CELL}>
+                    {examTotal
+                      ? totalText(examTotal, `${examTotal.percentage}%`)
+                      : "-"}
+                  </td>
+                );
+              })}
               <td colSpan={2} className={CELL}>
                 {totalText(
                   termTotals[termIndex],
@@ -371,12 +397,12 @@ function GradeAreasTable({ model }: { model: ResultTableModel }) {
   // Notebook sirf Statement of Marks ka sub-column hai - grade table mein pure
   // exams hi aate hain (filter sub !== "notebook").
   const gradeExamsPerTerm = model.terms.map((term) =>
-    term.exams.filter((exam) => exam.sub !== "notebook")
+    term.exams.filter((exam) => exam.sub !== "notebook"),
   );
   const subjectWidth = 30;
   const totalExams = gradeExamsPerTerm.reduce(
     (count, exams) => count + exams.length,
-    0
+    0,
   );
   const examWidth = totalExams > 0 ? (100 - subjectWidth) / totalExams : 0;
 
@@ -408,7 +434,7 @@ function GradeAreasTable({ model }: { model: ResultTableModel }) {
               <th key={exam.id} className={HEAD}>
                 {exam.name}
               </th>
-            ))
+            )),
           )}
         </tr>
       </thead>
@@ -424,7 +450,7 @@ function GradeAreasTable({ model }: { model: ResultTableModel }) {
                 >
                   {grade}
                 </td>
-              ))
+              )),
             )}
           </tr>
         ))}
@@ -699,7 +725,14 @@ function ResultCard({
 
   return (
     <div className="mx-auto mt-2 max-w-4xl [-webkit-print-color-adjust:exact] [print-color-adjust:exact] print:m-0 print:h-[296mm] print:w-[210mm] print:max-w-none print:overflow-hidden print:break-after-page print:p-[10px] print:box-border print:last:break-after-auto">
-      <div className="flex h-full flex-col overflow-hidden rounded-xl border-4 border-double border-blue-800 bg-white shadow-lg print:rounded-none print:shadow-none">
+      <div className="relative flex h-full flex-col overflow-hidden rounded-xl border-4 border-double border-blue-800 bg-white shadow-lg print:rounded-none print:shadow-none">
+        {/* Watermark */}
+        <img
+          src={schoolLogo}
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute left-1/2 top-[58%] z-20 w-[700px] -translate-x-1/2 -translate-y-1/2 select-none object-contain opacity-[0.1] mix-blend-multiply"
+        />
         {/* Card header (pehle jaisa) */}
         <div className="border-b-4 border-double border-blue-800 bg-white px-4 py-2 md:px-6">
           <div className="flex items-center justify-between gap-3 text-sm font-semibold text-black">
@@ -800,18 +833,22 @@ function ResultCard({
 
           <div className="mt-1 mb-2 space-y-0.5 px-2 text-[11px]">
             <p>
+              <span className="font-bold">Attendance :</span> {attendance}
+            </p>
+            <p>
+              <span className="font-bold">Result :</span>
+              <span className="font-bold text-green-700">
+                {" "}
+                {resultText.toUpperCase()}
+              </span>
+            </p>
+            <p>
+              <span className="font-bold">Rank :</span> {rankText}
+            </p>
+            <p>
               <span className="font-bold">Class Teacher's Remarks :</span>{" "}
               {extras.remarks?.trim() || "-"}
             </p>
-              <p>
-                <span className="font-bold">Attendance :</span> {attendance}
-              </p>
-              <p>
-                <span className="font-bold">Result :</span> {resultText}
-              </p>
-              <p>
-                <span className="font-bold">Rank :</span> {rankText}
-              </p>
           </div>
 
           <MarksChart rows={model.rows} />
