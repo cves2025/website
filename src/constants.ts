@@ -10,6 +10,7 @@ export const COLLECTION = {
   USERS: "users",
   MARKS: "marks",
   PANEL_SETTINGS: "panelSettings",
+  ATTENDANCE: "attendance",
 };
 
 /** Document id inside COLLECTION.STAMP_SIGN that stores the Principal's

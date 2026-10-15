@@ -13,6 +13,7 @@
  */
 import {
   collection,
+  deleteDoc,
   deleteField,
   doc,
   getDoc,
@@ -172,6 +173,59 @@ export async function saveStudentMarks(
     { merge: true }
   );
 }
+/** Attendance record id is deterministic: one record per student and exam. */
+export function buildAttendanceDocId(session: string, examId: string, studentUid: string): string {
+  return `attendance_${encodeURIComponent(session)}_${encodeURIComponent(examId)}_${encodeURIComponent(studentUid)}`;
+}
+
+export interface SaveExamAttendanceParams {
+  session: string;
+  examId: string;
+  examName: string;
+  className: string;
+  section: string;
+  studentUid: string;
+  studentName: string;
+  admissionNumber: string;
+  presentDays: number | null;
+  totalDays: number | null;
+}
+
+/** Attendance is independent of marks and never changes a marks/result document. */
+export async function saveExamAttendance(params: SaveExamAttendanceParams): Promise<void> {
+  const id = buildAttendanceDocId(params.session, params.examId, params.studentUid);
+  const reference = doc(db, COLLECTION.ATTENDANCE, id);
+  if (params.presentDays === null && params.totalDays === null) {
+    await deleteDoc(reference);
+    return;
+  }
+  if (params.presentDays === null || params.totalDays === null) {
+    throw new Error("Both attendance values are required.");
+  }
+  if (
+    !Number.isInteger(params.presentDays) ||
+    !Number.isInteger(params.totalDays) ||
+    params.presentDays < 0 ||
+    params.totalDays < 0 ||
+    params.presentDays > params.totalDays
+  ) {
+    throw new Error("Invalid attendance values.");
+  }
+  await setDoc(reference, {
+    session: params.session,
+    examId: params.examId,
+    examName: params.examName,
+    className: params.className,
+    section: params.section,
+    studentUid: params.studentUid,
+    studentName: params.studentName,
+    admissionNumber: params.admissionNumber,
+    presentDays: params.presentDays,
+    totalDays: params.totalDays,
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+}
+
 /** Subject list used to build the frozen examSheets columns. */
 export interface ExamSheetSubjectInput {
   id: string;
