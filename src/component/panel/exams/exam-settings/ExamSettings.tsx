@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import Button from "../../../../custom-components/Button";
 import PageHeader from "../../../../custom-components/PageHeader";
+import SuggestedRemarks from "./suggested-remarks/SuggestedRemarks";
 
 function ExamSettings() {
   const navigate = useNavigate();
@@ -31,8 +32,8 @@ function ExamSettings() {
           </div>
         }
       />
-      <div className="rounded-md border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
-        Exam Settings UI is not implemented yet.
+      <div>
+        <SuggestedRemarks />
       </div>
     </div>
   );
