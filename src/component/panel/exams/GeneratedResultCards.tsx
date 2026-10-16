@@ -16,6 +16,7 @@ import { useResultCardStudents } from "./useResultCardStudents";
 import ResultCard from "./result/ResultCard";
 import { COLLECTION } from "../../../constants";
 import { db } from "../../../firebase/config";
+import { useSuggestedRemarks } from "../../../hooks/useSuggestedRemarks";
 
 interface AttendanceSummary {
   attendancePresent: number;
@@ -69,6 +70,12 @@ function GeneratedResultCards() {
   }, [selectedExams]);
 
   const { rules, error: rulesError } = useExamRules();
+  const {
+    getRemark,
+    loading: remarksLoading,
+    error: remarksError,
+  } = useSuggestedRemarks();
+
   const data = useResultCardData({
     session: year,
     className,
@@ -218,8 +225,13 @@ function GeneratedResultCards() {
   }
 
   const busy =
-    data.loading || students.loading || loadingExams || attendanceLoading;
-  const loadError = data.error || students.error || attendanceError;
+    data.loading ||
+    students.loading ||
+    loadingExams ||
+    attendanceLoading ||
+    remarksLoading;
+  const loadError =
+    data.error || students.error || attendanceError || remarksError;
   const renderPrintButton = () => (
     <button
       type="button"
@@ -285,6 +297,9 @@ function GeneratedResultCards() {
             extras={{
               ...attendanceByStudent[card.studentId],
               rank: rankByStudent[card.studentId],
+              remarks: model.grandTotals.hasMarks
+                ? getRemark(attendanceExam?.id, model.grandTotals.percentage)
+                : "",
             }}
           />
         ))}

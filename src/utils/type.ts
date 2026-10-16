@@ -322,3 +322,14 @@ export interface DeskSlipStudent {
   section: string;
   photoUrl: string;
 }
+
+// --------------------------- Exam Settings - Suggested remarks -------------------
+export type SavedRange = { id: string; from: number; to: number; remark: string };
+export type SavedExamRemarks = {
+  examName: string;
+  ranges: SavedRange[];
+  updatedAt: string;
+};
+export type SavedMap = Record<string, SavedExamRemarks>;
+
+export type RemarkRow = { id: string; from: string; to: string; remark: string };

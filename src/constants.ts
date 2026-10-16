@@ -13,6 +13,10 @@ export const COLLECTION = {
   ATTENDANCE: "attendance",
 };
 
+export const PRE_DEFINED_DOC_ID = {
+  SUGGESTED_REMARKS: "suggestedRemarks",
+}
+
 /** Document id inside COLLECTION.STAMP_SIGN that stores the Principal's
     signature and the school stamp image URLs. */
 export const STAMP_SIGN_PRINCIPLE_DOC = "principle";
