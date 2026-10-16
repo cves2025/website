@@ -7,7 +7,8 @@ import {
   generateRollNumber,
 } from "../../../utils/rollNumber";
 import { useAdmitCardGenerator } from "./useAdmitCardGenerator";
-import AdmitCardCard from "./AdmitCardCard";
+import { TEMPLATE_COMPONENTS } from "./exam-settings/admit-card-template/admitCardTemplates";
+import { useAdmitCardTemplate } from "../../../hooks/useAdmitCardTemplate";
 import { ADMIT_CARD_PATH } from "./examScheduleShared";
 import PageHeader from "../../../custom-components/PageHeader";
 
@@ -27,6 +28,9 @@ function GeneratedAdmitCards() {
   const className = searchParams.get("class") ?? "";
   const section = searchParams.get("section") ?? "";
   const studentsRaw = searchParams.get("students") ?? "";
+
+  const { templateId } = useAdmitCardTemplate();
+const CardTemplate = TEMPLATE_COMPONENTS[templateId];
 
   const allStudents = studentsRaw === "all";
   const enrollments = allStudents
@@ -126,7 +130,7 @@ function GeneratedAdmitCards() {
           const rollNo = generateRollNumber(cards, card.id);
 
           return (
-            <AdmitCardCard
+            <CardTemplate
               key={card.id}
               card={card}
               rollNo={rollNo}

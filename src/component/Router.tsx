@@ -24,6 +24,10 @@ import AdmitCard from './panel/exams/AdmitCard'
 import ExamSchedule from './panel/exams/ExamSchedule'
 import GeneratedAdmitCards from './panel/exams/GeneratedAdmitCards'
 import ResultPanel from './panel/exams/result/ResultPanel'
+import ExamSettings from './panel/exams/exam-settings/ExamSettings'
+import AdmitCardTemplate from './panel/exams/exam-settings/AdmitCardTemplate'
+import ResultTemplate from './panel/exams/exam-settings/ResultTemplate'
+
 import ExamMarks from './panel/marks/ExamMarks'
 import CrossList from './panel/marks/CrossList'
 import IdCardStudents from './panel/IdCardStudents'
@@ -31,8 +35,10 @@ import IdCardTeachers from './panel/IdCardTeachers'
 import IdCardStaff from './panel/IdCardStaff'
 import IdCardAdmin from './panel/IdCardAdmin'
 import Settings from './panel/settings/Settings'
+import DeskSlip from './panel/exams/desk-slip/DeskSlip'
 import RequireAccess from '../routes/RequireAccess'
 import RequireRoutePermission from '../routes/RequireRoutePermission'
+import GeneratedResultCards from './panel/exams/GeneratedResultCards'
 
 function Router() {
   return (
@@ -63,9 +69,14 @@ function Router() {
           <Route path="teacher/add" element={<AddTeacher />} />
           <Route path="teacher/list" element={<TeachersList />} />
           <Route path="admit-card" element={<AdmitCard />} />
+          <Route path="desk-slip" element={<DeskSlip />} />
           <Route path="admit-card/schedule" element={<ExamSchedule />} />
           <Route path="admit-card/generated" element={<GeneratedAdmitCards />} />
+          <Route path="result-card/generated" element={<GeneratedResultCards />} />
           <Route path="result" element={<ResultPanel />} />
+          <Route path="exam-settings" element={<ExamSettings />} />
+          <Route path="exam-settings/admit-card-template" element={<AdmitCardTemplate />} />
+          <Route path="exam-settings/result-template" element={<ResultTemplate />} />
           <Route path="marks" element={<ExamMarks />} />
           <Route path="cross-list" element={<CrossList />} />
           <Route path="id-card/students" element={<IdCardStudents />} />

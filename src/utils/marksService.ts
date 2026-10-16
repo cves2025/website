@@ -13,6 +13,7 @@
  */
 import {
   collection,
+  deleteDoc,
   deleteField,
   doc,
   getDoc,
@@ -172,12 +173,67 @@ export async function saveStudentMarks(
     { merge: true }
   );
 }
+/** Attendance record id is deterministic: one record per student and exam. */
+export function buildAttendanceDocId(session: string, examId: string, studentUid: string): string {
+  return `attendance_${encodeURIComponent(session)}_${encodeURIComponent(examId)}_${encodeURIComponent(studentUid)}`;
+}
+
+export interface SaveExamAttendanceParams {
+  session: string;
+  examId: string;
+  examName: string;
+  className: string;
+  section: string;
+  studentUid: string;
+  studentName: string;
+  admissionNumber: string;
+  presentDays: number | null;
+  totalDays: number | null;
+}
+
+/** Attendance is independent of marks and never changes a marks/result document. */
+export async function saveExamAttendance(params: SaveExamAttendanceParams): Promise<void> {
+  const id = buildAttendanceDocId(params.session, params.examId, params.studentUid);
+  const reference = doc(db, COLLECTION.ATTENDANCE, id);
+  if (params.presentDays === null && params.totalDays === null) {
+    await deleteDoc(reference);
+    return;
+  }
+  if (params.presentDays === null || params.totalDays === null) {
+    throw new Error("Both attendance values are required.");
+  }
+  if (
+    !Number.isInteger(params.presentDays) ||
+    !Number.isInteger(params.totalDays) ||
+    params.presentDays < 0 ||
+    params.totalDays < 0 ||
+    params.presentDays > params.totalDays
+  ) {
+    throw new Error("Invalid attendance values.");
+  }
+  await setDoc(reference, {
+    session: params.session,
+    examId: params.examId,
+    examName: params.examName,
+    className: params.className,
+    section: params.section,
+    studentUid: params.studentUid,
+    studentName: params.studentName,
+    admissionNumber: params.admissionNumber,
+    presentDays: params.presentDays,
+    totalDays: params.totalDays,
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+}
+
 /** Subject list used to build the frozen examSheets columns. */
 export interface ExamSheetSubjectInput {
   id: string;
   name: string;
   type: string;
   order: number;
+  /** Optional report card order (undefined = shown after the ordered subjects). */
+  reportCardOrder?: number;
   displayInMarksEntry?: boolean;
 }
 
@@ -220,6 +276,7 @@ function toSheetColumn(
     name: subject.name,
     type: subject.type,
     order: subject.order,
+    ...(subject.reportCardOrder ? { reportCardOrder: subject.reportCardOrder } : {}),
     maxMarks: scheme ? scheme.total : exam.maxMarks,
     ...(componentMax ? { componentMax } : {}),
     isGrade: subject.type === "Scholastic",
@@ -306,6 +363,9 @@ function toStoredSheetColumn(value: unknown): ExamSheetSubjectColumn | null {
     name,
     type: typeof source.type === "string" ? source.type : "",
     order: typeof source.order === "number" ? source.order : 0,
+    ...(typeof source.reportCardOrder === "number" && source.reportCardOrder > 0
+      ? { reportCardOrder: Math.floor(source.reportCardOrder) }
+      : {}),
     maxMarks: typeof source.maxMarks === "number" ? source.maxMarks : 0,
     ...(Object.keys(componentMax).length > 0 ? { componentMax } : {}),
     isGrade: source.isGrade === true || source.type === "Scholastic",
@@ -341,6 +401,32 @@ export async function getExamSheet(
     createdAt: data.createdAt,
     subjects,
   };
+}
+
+/**
+ * Current report card orders (subjectId -> order) of a class, read from the
+ * LIVE subjects collection. Result cards overlay these on the frozen exam sheet
+ * columns, so updating a subject's report card order is reflected immediately,
+ * even when the exam sheet snapshot was created earlier. A subject whose order
+ * is missing/cleared maps to undefined, which places it below the ordered ones.
+ */
+export async function loadSubjectReportCardOrders(
+  className: string
+): Promise<Record<string, number | undefined>> {
+  if (!className) return {};
+  const snapshot = await getDocs(
+    query(
+      collection(db, COLLECTION.SUBJECTS),
+      where("className", "==", className)
+    )
+  );
+  const result: Record<string, number | undefined> = {};
+  snapshot.docs.forEach((documentSnapshot) => {
+    const raw = documentSnapshot.data()?.reportCardOrder;
+    result[documentSnapshot.id] =
+      typeof raw === "number" && raw > 0 ? Math.floor(raw) : undefined;
+  });
+  return result;
 }
 
 /**

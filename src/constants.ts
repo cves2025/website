@@ -6,14 +6,21 @@ export const COLLECTION = {
   EXAM_SCHEDULES: "examSchedules",
   EXAM_SHEETS: "examSheets",
   STAMP_SIGN: "stampSign",
+  SETTINGS: "settings",
   USERS: "users",
   MARKS: "marks",
   PANEL_SETTINGS: "panelSettings",
+  ATTENDANCE: "attendance",
 };
+
+export const PRE_DEFINED_DOC_ID = {
+  SUGGESTED_REMARKS: "suggestedRemarks",
+}
 
 /** Document id inside COLLECTION.STAMP_SIGN that stores the Principal's
     signature and the school stamp image URLs. */
 export const STAMP_SIGN_PRINCIPLE_DOC = "principle";
+export const ADMIT_CARD_SETTINGS_DOC = "admitCard";
 
 /** Field names of the "stampSign"/"principle" document. */
 export const STAMP_SIGN_FIELDS = {

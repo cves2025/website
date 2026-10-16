@@ -61,9 +61,11 @@ export const MENU: MenuItem[] = [
     subLinks: [
       { label: "Exam", path: "/welcome/exam/list" },
       { label: "Admit Card", path: "/welcome/admit-card", end: true },
+      { label: "Desk Slip", path: "/welcome/desk-slip" },
       { label: "Marks", path: "/welcome/marks" },
       { label: "Cross List", path: "/welcome/cross-list" },
       { label: "Result", path: "/welcome/result" },
+      { label: "Exam Settings", path: "/welcome/exam-settings" },
     ],
   },
 ];

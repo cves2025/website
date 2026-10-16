@@ -19,12 +19,17 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   "/welcome/id-card/admin": P.IDCARD_ADMIN,
 
   "/welcome/exam/list": P.EXAM_MANAGE,
+  "/welcome/desk-slip": P.DESK_SLIP,
   "/welcome/admit-card": P.ADMITCARD_VIEW,
   "/welcome/admit-card/schedule": P.ADMITCARD_GENERATE,
   "/welcome/admit-card/generated": P.ADMITCARD_GENERATE,
+  "/welcome/result-card/generated": P.RESULT_VIEW,
   "/welcome/marks": [P.MARKS_ENTER, P.MARKS_VIEW],
   "/welcome/cross-list": P.CROSSLIST_VIEW,
   "/welcome/result": P.RESULT_VIEW,
+  "/welcome/exam-settings": P.EXAM_SETTINGS,
+  "/welcome/exam-settings/admit-card-template": P.EXAM_SETTINGS,
+  "/welcome/exam-settings/result-template": P.EXAM_SETTINGS,
 };
 
 const normalize = (path: string) =>

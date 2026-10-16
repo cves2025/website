@@ -3,6 +3,7 @@ import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   DocumentData,
   onSnapshot,
@@ -54,6 +55,8 @@ interface SubjectDoc {
   name: string;
   type: SubjectType;
   order: number;
+  /** Order of this subject inside the report card table (undefined = display at the bottom). */
+  reportCardOrder?: number;
   className: string;
   displayInAdmitCard?: boolean;
   displayInMarksEntry?: boolean;
@@ -64,6 +67,7 @@ interface SubjectFormValues {
   name: string;
   type: SubjectType;
   order: string;
+  reportCardOrder: string;
   /** Classes the subject is created for (batch write on add). */
   classes: string[];
   displayInAdmitCard: string;
@@ -75,6 +79,7 @@ const DEFAULT_FORM: SubjectFormValues = {
   name: "",
   type: "Theory",
   order: "",
+  reportCardOrder: "",
   classes: [],
   displayInAdmitCard: "true",
   displayInMarksEntry: "true",
@@ -97,6 +102,10 @@ const toSubjectDoc = (
     name: typeof data.name === "string" ? data.name : "",
     type: isSubjectType(data.type) ? data.type : "Theory",
     order: typeof data.order === "number" ? data.order : 1,
+    reportCardOrder:
+      typeof data.reportCardOrder === "number" && data.reportCardOrder > 0
+        ? Math.floor(data.reportCardOrder)
+        : undefined,
     className:
       typeof data.className === "string" ? data.className : fallbackClass,
     displayInAdmitCard: data.displayInAdmitCard === true,
@@ -164,12 +173,20 @@ function Subject() {
       subjects.length > 0
         ? Math.max(...subjects.map((subject) => subject.order)) + 1
         : 1;
+    // Sahi default: max defined report card order + 1. Koi bhi report card
+    // order define nahi hua to existing order hi default rakhte hain.
+    const reportCardOrders = subjects.map((subject) => subject.reportCardOrder ?? 0);
+    const nextReportCardOrder =
+      subjects.length > 0 && reportCardOrders.some((value) => value > 0)
+        ? Math.max(...reportCardOrders) + 1
+        : nextOrder;
     // Pre-select the currently open class; the user can add or remove classes
     // from the multi-select before submitting.
     reset({
       name: "",
       type: "Theory",
       order: String(nextOrder),
+      reportCardOrder: String(nextReportCardOrder),
       classes: [selectedClass],
       displayInAdmitCard: "true",
       displayInMarksEntry: "true",
@@ -184,6 +201,7 @@ function Subject() {
       name: subject.name,
       type: subject.type,
       order: String(subject.order),
+      reportCardOrder: subject.reportCardOrder ? String(subject.reportCardOrder) : "",
       // Pre-select the class this subject row belongs to; the user can add
       // more classes before saving.
       classes: [subject.className],
@@ -212,6 +230,15 @@ function Subject() {
     // Normalize to a positive integer so the Order column always has a value.
     const order = Math.max(1, Math.floor(Number(data.order) || 1));
 
+    // Optional "Report Card Order". Empty means the subject has no fixed
+    // position, so the report card shows it at the bottom (after the ordered
+    // subjects). Non-empty values are normalized to a positive integer.
+    const reportCardOrderRaw = String(data.reportCardOrder ?? "").trim();
+    const reportCardOrder =
+      reportCardOrderRaw !== "" && Number.isFinite(Number(reportCardOrderRaw))
+        ? Math.max(1, Math.floor(Number(reportCardOrderRaw)))
+        : undefined;
+
     const displayInAdmitCard = data.displayInAdmitCard === "true";
     const displayInMarksEntry = data.displayInMarksEntry === "true";
     const displayInReportCard = data.displayInReportCard === "true";
@@ -237,6 +264,9 @@ function Subject() {
             displayInAdmitCard,
             displayInMarksEntry,
             displayInReportCard,
+            ...(reportCardOrder === undefined
+              ? { reportCardOrder: deleteField() }
+              : { reportCardOrder }),
             updatedAt: serverTimestamp(),
           });
           for (const className of classes.filter(
@@ -250,6 +280,7 @@ function Subject() {
               displayInAdmitCard,
               displayInMarksEntry,
               displayInReportCard,
+              ...(reportCardOrder === undefined ? {} : { reportCardOrder }),
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
             });
@@ -264,6 +295,9 @@ function Subject() {
             displayInAdmitCard,
             displayInMarksEntry,
             displayInReportCard,
+            ...(reportCardOrder === undefined
+              ? { reportCardOrder: deleteField() }
+              : { reportCardOrder }),
             updatedAt: serverTimestamp(),
           });
           for (const className of restClasses) {
@@ -275,6 +309,7 @@ function Subject() {
               displayInAdmitCard,
               displayInMarksEntry,
               displayInReportCard,
+              ...(reportCardOrder === undefined ? {} : { reportCardOrder }),
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
             });
@@ -305,6 +340,7 @@ function Subject() {
             displayInAdmitCard,
             displayInMarksEntry,
             displayInReportCard,
+            ...(reportCardOrder === undefined ? {} : { reportCardOrder }),
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });
@@ -428,6 +464,7 @@ function Subject() {
                   <th className="px-4 py-3">Subject Name</th>
                   <th className="px-4 py-3">Type</th>
                   <th className="px-4 py-3">Order</th>
+                  <th className="px-4 py-3">Report Card Order</th>
                   <th className="px-4 py-3 text-center">Actions</th>
                 </tr>
               </thead>
@@ -453,6 +490,22 @@ function Subject() {
                         className={`rounded px-2 py-1 text-xs font-bold ${SUBJECT_TYPE_BADGE[subject.type]}`}
                       >
                         {subject.order}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`rounded px-2 py-1 text-xs font-bold ${
+                          subject.reportCardOrder
+                            ? SUBJECT_TYPE_BADGE[subject.type]
+                            : "bg-gray-200 text-gray-500"
+                        }`}
+                        title={
+                          subject.reportCardOrder
+                            ? "Report card order"
+                            : "No report card order - shown at the bottom of the report card"
+                        }
+                      >
+                        {subject.reportCardOrder ?? "—"}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
@@ -527,6 +580,19 @@ function Subject() {
               },
             }}
           />
+          <CustomInput
+            control={control}
+            name="reportCardOrder"
+            label="Report Card Order"
+            type="number"
+            min={1}
+            placeholder="e.g. 1"
+          />
+          <p className="-mt-2 text-xs text-gray-400">
+            Report card mein subject kis position par dikhega. Khali chhodne par
+            subject report card mein sabse neeche (ordered subjects ke baad)
+            dikhega.
+          </p>
           <Controller
             control={control}
             name="classes"

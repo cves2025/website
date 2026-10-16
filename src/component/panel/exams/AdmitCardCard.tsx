@@ -145,20 +145,14 @@ function AdmitScheduleTable({ papers }: { papers: CardPaper[] }) {
   );
 }
 
-interface AdmitCardCardProps {
-  /** Student the card is printed for. */
+export interface AdmitCardCardProps {
   card: CardStudent;
-  /** Frontend-only roll number, printed after the enrollment number. */
   rollNo: number;
-  /** Exam the card belongs to. */
   exam: ExamDoc;
-  /** Written papers of the class (rendered in the first table). */
   writtenPapers: CardPaper[];
-  /** Practical / viva papers of the class (rendered in the second table). */
   practicalPapers: CardPaper[];
 }
 
-/** Label + single-line value row used in the student details block. */
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <p className="flex gap-1.5">
@@ -168,7 +162,6 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** One printed admit card. */
 function AdmitCardCard({
   card,
   rollNo,
@@ -280,9 +273,6 @@ function AdmitCardCard({
         </div>
       </div>
 
-      {/* Subject wise schedule: the written papers table comes first, and the
-          practical / viva papers of the same subjects are printed in their own
-          table right below it. */}
       <div className="flex flex-1 flex-col p-2 md:p-1">
         {writtenPapers.length > 0 && (
           <>

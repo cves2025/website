@@ -16,6 +16,7 @@
   "dependencies": {
     "firebase": "^12.19.0",
     "jwt-decode": "^4.0.0",
+    "lucide-react": "^1.52.0",
     "papaparse": "^5.5.3",
     "qrcode.react": "^4.2.0",
     "react": "^19.0.0",
