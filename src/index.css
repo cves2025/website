@@ -65,14 +65,21 @@ body {
 
 /* Print rules: one admit card fits exactly one A4 portrait page with a 10px
    margin on all four sides (the card itself sets the A4 size + padding). */
+@page {
+  size: A4 portrait;
+  margin: 5mm;
+}
+
 @media print {
-  @page {
-    size: A4 portrait;
-    margin: 0;
-  }
   html,
   body {
+    width: 100%;
     margin: 0;
     padding: 0;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }
