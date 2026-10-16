@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import Button from "../../../../custom-components/Button";
 import PageHeader from "../../../../custom-components/PageHeader";
-import SuggestedRemarks from "./suggested-remarks/SuggestedRemarks";
+import SuggestedRemarks from "./suggested-remarks/ResultCardSettings";
 
 function ExamSettings() {
   const navigate = useNavigate();

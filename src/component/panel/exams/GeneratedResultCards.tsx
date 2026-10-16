@@ -74,6 +74,7 @@ function GeneratedResultCards() {
     getRemark,
     loading: remarksLoading,
     error: remarksError,
+    getDistributionDate,
   } = useSuggestedRemarks();
 
   const data = useResultCardData({
@@ -94,6 +95,18 @@ function GeneratedResultCards() {
   >({});
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [attendanceError, setAttendanceError] = useState("");
+
+  const distributionDate = useMemo(() => {
+    const ordered = [
+      ...(attendanceExam ? [attendanceExam] : []),
+      ...[...selectedExams].reverse(),
+    ];
+    for (const exam of ordered) {
+      const value = getDistributionDate(exam.id);
+      if (value) return value;
+    }
+    return "";
+  }, [attendanceExam, selectedExams, getDistributionDate]);
 
   useEffect(() => {
     if (!year || !className || !attendanceExam) {
@@ -300,6 +313,7 @@ function GeneratedResultCards() {
               remarks: model.grandTotals.hasMarks
                 ? getRemark(attendanceExam?.id, model.grandTotals.percentage)
                 : "",
+              resultDate: distributionDate,
             }}
           />
         ))}

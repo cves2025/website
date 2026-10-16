@@ -333,3 +333,17 @@ export type SavedExamRemarks = {
 export type SavedMap = Record<string, SavedExamRemarks>;
 
 export type RemarkRow = { id: string; from: string; to: string; remark: string };
+
+// date is stored as an ISO string: "YYYY-MM-DD"
+export type SavedDistributionDate = {
+  examName: string;
+  date: string;
+  updatedAt: string;
+};
+export type SavedDistributionMap = Record<string, SavedDistributionDate>;
+
+// Shape of the whole PANEL_SETTINGS / suggestedRemarks document
+export type SuggestedRemarksDoc = {
+  remarksByExam?: SavedMap;
+  dateByExam?: SavedDistributionMap;
+};
