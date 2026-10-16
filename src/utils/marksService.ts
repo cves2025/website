@@ -429,6 +429,81 @@ export async function loadSubjectReportCardOrders(
   return result;
 }
 
+/** Live subject fields needed to keep a frozen exam sheet in sync with the Subjects page. */
+export interface LiveSubject {
+  id: string;
+  name: string;
+  type: string;
+  order: number;
+  reportCardOrder?: number;
+  displayInMarksEntry: boolean;
+  /** Only an explicit "Show in Report Card = No" hides a subject. A missing field means shown. */
+  hideInReportCard: boolean;
+}
+
+/** Reads the current subjects of a class from the LIVE subjects collection. */
+export async function loadLiveSubjects(className: string): Promise<LiveSubject[]> {
+  if (!className) return [];
+  const snapshot = await getDocs(
+    query(collection(db, COLLECTION.SUBJECTS), where("className", "==", className))
+  );
+  return snapshot.docs.map((documentSnapshot) => {
+    const data = documentSnapshot.data();
+    const rawOrder = data.reportCardOrder;
+    return {
+      id: documentSnapshot.id,
+      name: typeof data.name === "string" ? data.name : "",
+      type: typeof data.type === "string" ? data.type : "",
+      order: typeof data.order === "number" ? data.order : 1,
+      reportCardOrder:
+        typeof rawOrder === "number" && rawOrder > 0 ? Math.floor(rawOrder) : undefined,
+      displayInMarksEntry: data.displayInMarksEntry === true,
+      hideInReportCard: data.displayInReportCard === false,
+    };
+  });
+}
+
+/**
+ * Returns a copy of a frozen exam sheet that matches the live Subjects page:
+ * - subjects with "Show in Report Card" = No are removed,
+ * - the live report card order is applied,
+ * - subjects created after the sheet was frozen are added when they are Scholastic
+ *   (grades never change totals) or when marks were already saved for them.
+ * Numeric subjects without any saved marks are NOT added, so totals of old
+ * results never change because a new subject was created later.
+ * The sheet stored in Firestore is never modified.
+ */
+export function syncSheetWithLiveSubjects(params: {
+  sheet: ExamSheetDoc;
+  exam: ExamDoc;
+  className: string;
+  liveSubjects: readonly LiveSubject[];
+  /** Subject ids that have a saved record in the marks of this exam. */
+  subjectIdsWithMarks: ReadonlySet<string>;
+}): ExamSheetDoc {
+  const { sheet, exam, className, liveSubjects, subjectIdsWithMarks } = params;
+  const liveById = new Map(liveSubjects.map((subject) => [subject.id, subject]));
+
+  const columns: ExamSheetSubjectColumn[] = sheet.subjects
+    .filter((column) => !liveById.get(column.id)?.hideInReportCard)
+    .map((column) => {
+      const live = liveById.get(column.id);
+      return live ? { ...column, reportCardOrder: live.reportCardOrder } : column;
+    });
+
+  const inSheet = new Set(sheet.subjects.map((column) => column.id));
+  liveSubjects.forEach((live) => {
+    if (inSheet.has(live.id) || live.hideInReportCard || !live.displayInMarksEntry) return;
+    if (!live.name) return;
+    const isGrade = live.type === "Scholastic";
+    if (!isGrade && !subjectIdsWithMarks.has(live.id)) return;
+    columns.push(toSheetColumn(live, exam, className));
+  });
+
+  columns.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+  return { ...sheet, subjects: columns };
+}
+
 /**
  * Loads the marks of one exam (all classes, or restricted to a class / section).
  * Equality filters only, no orderBy; the result is passed through
