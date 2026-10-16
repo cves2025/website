@@ -138,15 +138,57 @@ function todayLabel(): string {
 const totalText = (totals: ResultTotals, value: string): string =>
   totals.hasMarks && totals.max > 0 ? value : "-";
 
-/**
+/** Shows "obtained/max", or "-" when no marks are saved. */
+const marksText = (totals: ResultTotals): string =>
+  totals.hasMarks && totals.max > 0 ? `${totals.obtained}/${totals.max}` : "-";
 
- * Type column ka short label.
+type TotalCell = {
+  key: string;
+  colSpan: number;
+  text: string;
+  percentText: string;
+};
 
- * PG / Nursery / LKG / UKG (written-oral): Written -> (W), Oral -> (O).
+function buildExamTotalCells(
+  term: ResultTableModel["terms"][number],
+  totals: (ResultTotals | null | undefined)[],
+): TotalCell[] {
+  const cells: TotalCell[] = [];
+  let index = 0;
 
- * Baaki classes (scheme): Written -> (WR), Practical -> (PR), Oral -> (O).
+  while (index < term.exams.length) {
+    const exam = term.exams[index];
+    const isUnitTestWithNotebook =
+      exam.sub !== "notebook" && term.exams[index + 1]?.sub === "notebook";
+    const indexes = isUnitTestWithNotebook ? [index, index + 1] : [index];
 
- */
+    const withMarks = indexes
+      .map((i) => totals[i])
+      .filter(
+        (item): item is ResultTotals => !!item && item.hasMarks && item.max > 0,
+      );
+
+    const obtained =
+      Math.round(
+        withMarks.reduce((sum, item) => sum + item.obtained, 0) * 100,
+      ) / 100;
+    const max = withMarks.reduce((sum, item) => sum + item.max, 0);
+    const hasData = withMarks.length > 0 && max > 0;
+
+    cells.push({
+      key: exam.id,
+      colSpan: indexes.length,
+      text: hasData ? `${obtained}/${max}` : "-",
+      percentText: hasData
+        ? `${Math.round((obtained / max) * 10000) / 100}%`
+        : "-",
+    });
+
+    index += indexes.length;
+  }
+
+  return cells;
+}
 
 function typeLabel(type: string, layout: ResultLayout): string {
   const t = String(type ?? "")
@@ -408,6 +450,8 @@ function StatementTable({ model }: { model: ResultTableModel }) {
 
         {/* Total */}
 
+        {/* Total */}
+
         <tr className="font-bold">
           <td colSpan={hasTypes ? 2 : 1} className={`${CELL} text-left`}>
             Total
@@ -415,25 +459,13 @@ function StatementTable({ model }: { model: ResultTableModel }) {
 
           {terms.map((term, termIndex) => (
             <Fragment key={term.key}>
-              {term.exams.map((exam, examIndex) => {
-                const examTotal = examTotals[termIndex][examIndex];
+              {buildExamTotalCells(term, examTotals[termIndex]).map((cell) => (
+                <td key={cell.key} colSpan={cell.colSpan} className={CELL}>
+                  {cell.text}
+                </td>
+              ))}
 
-                return (
-                  <td key={exam.id} className={CELL}>
-                    {examTotal
-                      ? totalText(examTotal, String(examTotal.obtained))
-                      : "-"}
-                  </td>
-                );
-              })}
-
-              <td className={CELL}>
-                {totalText(
-                  termTotals[termIndex],
-
-                  String(termTotals[termIndex].obtained),
-                )}
-              </td>
+              <td className={CELL}>{marksText(termTotals[termIndex])}</td>
 
               <td className={CELL}>
                 {totalText(termTotals[termIndex], termTotals[termIndex].grade)}
@@ -443,9 +475,7 @@ function StatementTable({ model }: { model: ResultTableModel }) {
 
           {showGrand && (
             <>
-              <td className={CELL}>
-                {totalText(grandTotals, String(grandTotals.obtained))}
-              </td>
+              <td className={CELL}>{marksText(grandTotals)}</td>
 
               <td className={CELL}>
                 {totalText(grandTotals, grandTotals.grade)}
@@ -463,22 +493,15 @@ function StatementTable({ model }: { model: ResultTableModel }) {
 
           {terms.map((term, termIndex) => (
             <Fragment key={term.key}>
-              {term.exams.map((exam, examIndex) => {
-                const examTotal = examTotals[termIndex][examIndex];
-
-                return (
-                  <td key={exam.id} className={CELL}>
-                    {examTotal
-                      ? totalText(examTotal, `${examTotal.percentage}%`)
-                      : "-"}
-                  </td>
-                );
-              })}
+              {buildExamTotalCells(term, examTotals[termIndex]).map((cell) => (
+                <td key={cell.key} colSpan={cell.colSpan} className={CELL}>
+                  {cell.percentText}
+                </td>
+              ))}
 
               <td colSpan={2} className={CELL}>
                 {totalText(
                   termTotals[termIndex],
-
                   String(termTotals[termIndex].percentage),
                 )}
               </td>
