@@ -6,6 +6,7 @@ import {
   getDoc,
   getDocs,
   query,
+  QueryConstraint,
   QueryDocumentSnapshot,
   serverTimestamp,
   Timestamp,
@@ -25,6 +26,7 @@ import {
 
 import { db } from "../../../firebase/config";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
+import { generateClassRollNumbers } from "../../../utils/rollNumbers";
 import Modal from "../../../custom-components/Modal";
 import PageHeader from "../../../custom-components/PageHeader";
 import Button from "../../../custom-components/Button";
@@ -73,26 +75,25 @@ export default function StudentList() {
   const [selectedClass, setSelectedClass] = useState("");
   const [selectedSection, setSelectedSection] = useState("");
   const [selectedYear, setSelectedYear] = useState(
-    academicYears[0]?.value ?? ""
+    academicYears[0]?.value ?? "",
   );
 
   const [sortField, setSortField] = useState<SortField>("createdAt");
-  const [sortDirection, setSortDirection] =
-    useState<SortDirection>("desc");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [sortActive, setSortActive] = useState(false);
 
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
   const [page, setPage] = useState(1);
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [studentPhotos, setStudentPhotos] = useState<Record<string, string>>({});
-
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
+  const [studentPhotos, setStudentPhotos] = useState<Record<string, string>>(
+    {},
   );
 
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const convertStudent = (
-    docSnapshot: QueryDocumentSnapshot<DocumentData>
+    docSnapshot: QueryDocumentSnapshot<DocumentData>,
   ): EnrollmentRecord => {
     const data = docSnapshot.data();
 
@@ -111,9 +112,7 @@ export default function StudentList() {
       status: data.status ?? "active",
       isDeleted: data.isDeleted === true,
       createdAt:
-        data.createdAt instanceof Timestamp
-          ? data.createdAt.seconds
-          : 0,
+        data.createdAt instanceof Timestamp ? data.createdAt.seconds : 0,
     };
   };
 
@@ -123,10 +122,7 @@ export default function StudentList() {
     try {
       const searchValue = search.trim().toLowerCase();
 
-      const enrollmentCollection = collection(
-        db,
-        COLLECTION.ENROLLMENTS
-      );
+      const enrollmentCollection = collection(db, COLLECTION.ENROLLMENTS);
 
       /*
        * -------------------------------------------------------
@@ -139,11 +135,17 @@ export default function StudentList() {
        * extra Firestore composite indexes.
        */
 
+      const constraints: QueryConstraint[] = [
+        where("academicYear", "==", selectedYear),
+      ];
+
+      // Read only the selected class instead of the whole academic year.
+      if (selectedClass) {
+        constraints.push(where("className", "==", selectedClass));
+      }
+
       const snapshot = await getDocs(
-        query(
-          enrollmentCollection,
-          where("academicYear", "==", selectedYear)
-        )
+        query(enrollmentCollection, ...constraints),
       );
 
       let result = snapshot.docs
@@ -152,13 +154,13 @@ export default function StudentList() {
 
       if (selectedClass) {
         result = result.filter(
-          (student) => student.className === selectedClass
+          (student) => student.className === selectedClass,
         );
       }
 
       if (selectedSection) {
         result = result.filter(
-          (student) => student.section === selectedSection
+          (student) => student.section === selectedSection,
         );
       }
 
@@ -175,7 +177,7 @@ export default function StudentList() {
 
       if (searchValue) {
         result = result.filter((student) =>
-          student.firstName.toLowerCase().startsWith(searchValue)
+          student.firstName.toLowerCase().startsWith(searchValue),
         );
       }
 
@@ -199,13 +201,10 @@ export default function StudentList() {
             ? "studentName"
             : "createdAt";
         effectiveDirection =
-          searchValue || selectedClass || selectedSection
-            ? "asc"
-            : "desc";
+          searchValue || selectedClass || selectedSection ? "asc" : "desc";
       }
 
-      const directionMultiplier =
-        effectiveDirection === "asc" ? 1 : -1;
+      const directionMultiplier = effectiveDirection === "asc" ? 1 : -1;
 
       result.sort((a, b) => {
         let comparison = 0;
@@ -232,18 +231,12 @@ export default function StudentList() {
            * numbers whenever both sides are numeric.
            */
 
-          const leftNumber =
-            left === "" ? NaN : Number(left);
-          const rightNumber =
-            right === "" ? NaN : Number(right);
+          const leftNumber = left === "" ? NaN : Number(left);
+          const rightNumber = right === "" ? NaN : Number(right);
 
           if (!Number.isNaN(leftNumber) && !Number.isNaN(rightNumber)) {
             comparison =
-              leftNumber < rightNumber
-                ? -1
-                : leftNumber > rightNumber
-                  ? 1
-                  : 0;
+              leftNumber < rightNumber ? -1 : leftNumber > rightNumber ? 1 : 0;
           } else {
             comparison = left < right ? -1 : left > right ? 1 : 0;
           }
@@ -261,9 +254,7 @@ export default function StudentList() {
       console.error("Load students error:", error);
 
       toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to load students."
+        error instanceof Error ? error.message : "Failed to load students.",
       );
     } finally {
       setLoading(false);
@@ -289,24 +280,21 @@ export default function StudentList() {
       clearTimeout(searchTimerRef.current);
     }
 
-    searchTimerRef.current = setTimeout(() => {
-      setPage(1);
+    searchTimerRef.current = setTimeout(
+      () => {
+        setPage(1);
 
-      loadStudents();
-    }, search ? SEARCH_DELAY : 0);
+        loadStudents();
+      },
+      search ? SEARCH_DELAY : 0,
+    );
 
     return () => {
       if (searchTimerRef.current) {
         clearTimeout(searchTimerRef.current);
       }
     };
-  }, [
-    search,
-    selectedClass,
-    selectedSection,
-    selectedYear,
-    loadStudents,
-  ]);
+  }, [search, selectedClass, selectedSection, selectedYear, loadStudents]);
 
   /*
    * -----------------------------------------------------------
@@ -384,13 +372,24 @@ export default function StudentList() {
     setDeletingId(studentToDelete.id);
 
     try {
-      await updateDoc(
-        doc(db, COLLECTION.ENROLLMENTS, studentToDelete.id),
-        {
-          isDeleted: true,
-          updatedAt: serverTimestamp(),
-        }
-      );
+      await updateDoc(doc(db, COLLECTION.ENROLLMENTS, studentToDelete.id), {
+        isDeleted: true,
+        updatedAt: serverTimestamp(),
+      });
+
+      // Roll numbers are stored per class, so refresh the class this
+      // student belonged to.
+      try {
+        await generateClassRollNumbers(
+          studentToDelete.className,
+          studentToDelete.academicYear,
+        );
+      } catch (rollNumberError) {
+        console.error("Failed to refresh roll numbers:", rollNumberError);
+        toast.error(
+          "Student removed, but roll numbers could not be refreshed. Please regenerate them from Settings.",
+        );
+      }
 
       toast.success("Student enrollment removed.");
 
@@ -404,9 +403,7 @@ export default function StudentList() {
       console.error("Delete enrollment error:", error);
 
       toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to delete enrollment."
+        error instanceof Error ? error.message : "Failed to delete enrollment.",
       );
     } finally {
       setDeletingId(null);
@@ -445,9 +442,7 @@ export default function StudentList() {
       return;
     }
 
-    const missingIds = visibleStudentIds.filter(
-      (id) => !(id in studentPhotos)
-    );
+    const missingIds = visibleStudentIds.filter((id) => !(id in studentPhotos));
     if (missingIds.length === 0) {
       return;
     }
@@ -459,21 +454,19 @@ export default function StudentList() {
         missingIds.map(async (studentId) => {
           try {
             const snapshot = await getDoc(
-              doc(db, COLLECTION.STUDENTS, studentId)
+              doc(db, COLLECTION.STUDENTS, studentId),
             );
             const data = snapshot.data();
             return {
               id: studentId,
               photo:
-                typeof data?.studentPhoto === "string"
-                  ? data.studentPhoto
-                  : "",
+                typeof data?.studentPhoto === "string" ? data.studentPhoto : "",
             };
           } catch (error) {
             console.warn("Could not load student photo:", error);
             return { id: studentId, photo: "" };
           }
-        })
+        }),
       );
 
       if (cancelled) return;
@@ -537,16 +530,12 @@ export default function StudentList() {
         {/* Search */}
 
         <div>
-          <label className="mb-1 block text-sm font-medium">
-            Search
-          </label>
+          <label className="mb-1 block text-sm font-medium">Search</label>
 
           <input
             type="search"
             value={search}
-            onChange={(event) =>
-              setSearch(event.target.value)
-            }
+            onChange={(event) => setSearch(event.target.value)}
             placeholder="Search student name..."
             className="w-full rounded-md border px-3 py-2 outline-none"
           />
@@ -561,9 +550,7 @@ export default function StudentList() {
 
           <select
             value={selectedYear}
-            onChange={(event) =>
-              setSelectedYear(event.target.value)
-            }
+            onChange={(event) => setSelectedYear(event.target.value)}
             className="w-full rounded-md border px-3 py-2"
           >
             {academicYears.map((year) => (
@@ -577,15 +564,11 @@ export default function StudentList() {
         {/* Class */}
 
         <div>
-          <label className="mb-1 block text-sm font-medium">
-            Class
-          </label>
+          <label className="mb-1 block text-sm font-medium">Class</label>
 
           <select
             value={selectedClass}
-            onChange={(event) =>
-              setSelectedClass(event.target.value)
-            }
+            onChange={(event) => setSelectedClass(event.target.value)}
             className="w-full rounded-md border px-3 py-2"
           >
             <option value="">All Classes</option>
@@ -601,15 +584,11 @@ export default function StudentList() {
         {/* Section */}
 
         <div>
-          <label className="mb-1 block text-sm font-medium">
-            Section
-          </label>
+          <label className="mb-1 block text-sm font-medium">Section</label>
 
           <select
             value={selectedSection}
-            onChange={(event) =>
-              setSelectedSection(event.target.value)
-            }
+            onChange={(event) => setSelectedSection(event.target.value)}
             className="w-full rounded-md border px-3 py-2"
           >
             <option value="">All Sections</option>
@@ -629,13 +608,9 @@ export default function StudentList() {
         <table className="w-full min-w-[1000px]">
           <thead>
             <tr className="border-b bg-gray-50 text-left">
-              <th className="px-4 py-3">
-                Sr. No.
-              </th>
+              <th className="px-4 py-3">Sr. No.</th>
 
-              <th className="px-4 py-3">
-                Photo
-              </th>
+              <th className="px-4 py-3">Photo</th>
 
               {sortableHeader("Enrollment", "enrollment")}
 
@@ -649,19 +624,14 @@ export default function StudentList() {
 
               {sortableHeader("Phone", "phone")}
 
-              <th className="px-4 py-3">
-                Actions
-              </th>
+              <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
 
           <tbody>
             {loading ? (
               <tr>
-                <td
-                  colSpan={9}
-                  className="px-4 py-10 text-center"
-                >
+                <td colSpan={9} className="px-4 py-10 text-center">
                   Loading students...
                 </td>
               </tr>
@@ -676,13 +646,8 @@ export default function StudentList() {
               </tr>
             ) : (
               visibleStudents.map((student, index) => (
-                <tr
-                  key={student.id}
-                  className="border-b last:border-b-0"
-                >
-                  <td className="px-4 py-3">
-                    {startIndex + index + 1}
-                  </td>
+                <tr key={student.id} className="border-b last:border-b-0">
+                  <td className="px-4 py-3">{startIndex + index + 1}</td>
                   <td className="px-4 py-3">
                     {studentPhotos[student.studentId] ? (
                       <img
@@ -697,29 +662,19 @@ export default function StudentList() {
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3">
-                    {student.enrollment}
-                  </td>
+                  <td className="px-4 py-3">{student.enrollment}</td>
 
                   <td className="px-4 py-3 font-medium">
                     {student.studentName}
                   </td>
 
-                  <td className="px-4 py-3">
-                    {student.className}
-                  </td>
+                  <td className="px-4 py-3">{student.className}</td>
 
-                  <td className="px-4 py-3">
-                    {student.section}
-                  </td>
+                  <td className="px-4 py-3">{student.section}</td>
 
-                  <td className="px-4 py-3">
-                    {student.fatherName || "-"}
-                  </td>
+                  <td className="px-4 py-3">{student.fatherName || "-"}</td>
 
-                  <td className="px-4 py-3">
-                    {student.phone || "-"}
-                  </td>
+                  <td className="px-4 py-3">{student.phone || "-"}</td>
 
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
@@ -728,9 +683,7 @@ export default function StudentList() {
                         title="Edit"
                         aria-label={`Edit ${student.studentName}`}
                         onClick={() => {
-                          navigate(
-                            `/welcome/student/add?edit=${student.id}`
-                          );
+                          navigate(`/welcome/student/add?edit=${student.id}`);
                         }}
                         className="rounded border p-2 text-sm text-blue-600 hover:bg-blue-50"
                       >

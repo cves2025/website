@@ -11,6 +11,7 @@ export const COLLECTION = {
   MARKS: "marks",
   PANEL_SETTINGS: "panelSettings",
   ATTENDANCE: "attendance",
+  ROLL_NUMBER: "rollNumber",
 };
 
 export const PRE_DEFINED_DOC_ID = {

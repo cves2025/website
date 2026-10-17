@@ -17,6 +17,7 @@ import {
 } from "../../utils/studentImport";
 import { COLLECTION } from "../../constants";
 import { db } from "../../firebase/config";
+import { generateClassRollNumbers } from "../../utils/rollNumbers";
 
 const PREVIEW_ROWS = 5;
 
@@ -67,6 +68,25 @@ async function importStudentsToFirestore(rows: StudentRow[]): Promise<number> {
   return imported;
 }
 
+interface RosterKey {
+  className: string;
+  academicYear: string;
+}
+
+/** Unique class + session pairs found in the imported rows. */
+function collectRosters(rows: StudentRow[]): RosterKey[] {
+  const rosters = new Map<string, RosterKey>();
+
+  for (const row of rows) {
+    const { className, academicYear } = toFirestoreEnrollment(row, "");
+    if (!className || !academicYear) continue;
+
+    rosters.set(`${academicYear}_${className}`, { className, academicYear });
+  }
+
+  return Array.from(rosters.values());
+}
+
 function firestoreErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     const lower = error.message.toLowerCase();
@@ -105,7 +125,9 @@ function BulkStudentImport({ onImported }: BulkStudentImportProps) {
       setFileName(file.name);
     } catch (parseError) {
       setError(
-        parseError instanceof Error ? parseError.message : "Could not read the file.",
+        parseError instanceof Error
+          ? parseError.message
+          : "Could not read the file.",
       );
       setStudents([]);
       setErrors([]);
@@ -117,9 +139,11 @@ function BulkStudentImport({ onImported }: BulkStudentImportProps) {
     }
   };
 
-const handleImport = async () => {
+  const handleImport = async () => {
     if (!students.length) {
-      setError("No valid students to import - fix the missing required field(s) shown below first.");
+      setError(
+        "No valid students to import - fix the missing required field(s) shown below first.",
+      );
       return;
     }
     setError("");
@@ -127,9 +151,28 @@ const handleImport = async () => {
     setLoading(true);
     try {
       const count = await importStudentsToFirestore(students);
+
+      // Generate roll numbers once per affected class, not once per student.
+      let rollNumbersUpdated = true;
+      try {
+        await Promise.all(
+          collectRosters(students).map(({ className, academicYear }) =>
+            generateClassRollNumbers(className, academicYear),
+          ),
+        );
+      } catch (rollNumberError) {
+        rollNumbersUpdated = false;
+        console.error("Failed to generate roll numbers:", rollNumberError);
+      }
+
       // Mirror locally so the Admit Card / ID card panels can use the rows.
       saveStudentsLocally(students);
       setMessage(`✅ ${count} student(s) uploaded to Cloud Firestore.`);
+      if (!rollNumbersUpdated) {
+        setError(
+          "Students were imported, but roll numbers could not be generated. Please regenerate them from Settings.",
+        );
+      }
       onImported?.(students);
     } catch (importError) {
       setError(firestoreErrorMessage(importError));
@@ -187,7 +230,10 @@ const handleImport = async () => {
         {fileName && (
           <p className="mt-4 inline-flex items-center gap-2 bg-blue-100 text-blue-700 rounded-full px-3 py-1 text-sm font-semibold">
             {fileName}
-            <button onClick={reset} className="text-blue-700 hover:text-blue-900 font-bold">
+            <button
+              onClick={reset}
+              className="text-blue-700 hover:text-blue-900 font-bold"
+            >
               ✕
             </button>
           </p>
@@ -195,14 +241,17 @@ const handleImport = async () => {
       </div>
 
       <p className="text-xs text-gray-500 mt-3">
-        Flexible column names are accepted (e.g. <em>Name / Student Name / Full Name</em>,
-        <em> Enrollment / Roll No / Admission No</em>, <em>Class</em>, <em>Section</em>,
-        Father's Name, Mother's Name, DOB, Phone, Email, Address). A single{" "}
-        <em>DOB</em> column is automatically split into day / month / year. Extra columns are ignored.
-        Class spellings are mapped to the school's class list (<em>5th</em> / <em>Class 5</em> /{" "}
-        <em>V</em> &rarr; <span className="font-semibold">5</span>) and the session is stored in the{" "}
-        <span className="font-semibold">2026-27</span> form, so uploaded students appear together with the
-        manually added ones in the Admit Card, Result and ID card panels.
+        Flexible column names are accepted (e.g.{" "}
+        <em>Name / Student Name / Full Name</em>,
+        <em> Enrollment / Roll No / Admission No</em>, <em>Class</em>,{" "}
+        <em>Section</em>, Father's Name, Mother's Name, DOB, Phone, Email,
+        Address). A single <em>DOB</em> column is automatically split into day /
+        month / year. Extra columns are ignored. Class spellings are mapped to
+        the school's class list (<em>5th</em> / <em>Class 5</em> / <em>V</em>{" "}
+        &rarr; <span className="font-semibold">5</span>) and the session is
+        stored in the <span className="font-semibold">2026-27</span> form, so
+        uploaded students appear together with the manually added ones in the
+        Admit Card, Result and ID card panels.
       </p>
 
       {error && (
@@ -219,12 +268,12 @@ const handleImport = async () => {
       {missingColumns.length > 0 && (
         <p className="mt-4 bg-orange-50 text-orange-800 border border-orange-300 rounded-md px-4 py-2 text-sm font-semibold">
           ⚠️ Required column(s) not found in this file:{" "}
-          <span className="font-bold">{missingColumns.join(", ")}</span>. Add these columns -
-          otherwise the affected rows are rejected below.
+          <span className="font-bold">{missingColumns.join(", ")}</span>. Add
+          these columns - otherwise the affected rows are rejected below.
         </p>
       )}
 
-{/* Preview */}
+      {/* Preview */}
       {students.length > 0 && (
         <div className="mt-4 bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
           <div className="px-4 py-3 border-b border-gray-200 flex flex-wrap items-center justify-between gap-2">
@@ -256,7 +305,9 @@ const handleImport = async () => {
               {students.slice(0, PREVIEW_ROWS).map((s, i) => (
                 <tr key={i}>
                   <td className="px-4 py-2 font-semibold">{s.enrollment}</td>
-                  <td className="px-4 py-2">{s.firstName} {s.lastName}</td>
+                  <td className="px-4 py-2">
+                    {s.firstName} {s.lastName}
+                  </td>
                   <td className="px-4 py-2">{s.className}</td>
                   <td className="px-4 py-2">{s.section}</td>
                   <td className="px-4 py-2">{s.fatherName || "-"}</td>
@@ -279,20 +330,26 @@ const handleImport = async () => {
       {errors.length > 0 && (
         <div className="mt-4 bg-yellow-50 border border-yellow-300 rounded-xl p-4">
           <p className="font-bold text-yellow-800 mb-2">
-            ⚠️ {errors.length} row(s) skipped - missing required field(s) or invalid data:
+            ⚠️ {errors.length} row(s) skipped - missing required field(s) or
+            invalid data:
           </p>
           <div className="max-h-40 overflow-y-auto text-sm">
             {errors.map((err, i) => (
               <p key={i} className="text-yellow-800">
-                <span className="font-semibold">Row {err.row}</span> ({err.name} / {err.enrollment}) — {err.message}
+                <span className="font-semibold">Row {err.row}</span> ({err.name}{" "}
+                / {err.enrollment}) — {err.message}
               </p>
             ))}
           </div>
           <p className="mt-2 text-xs text-yellow-800">
-            Header names are matched loosely (e.g. <em>Name of Student</em>, <em>Class &amp; Section</em>,{" "}
-            <em>Mobile No.</em> all work). If a required field is reported as missing, check the{" "}
-            <span className="font-semibold">"Columns detected in your file"</span> list below and rename the
-            column to the template spelling, or download the CSV template and paste your rows into it.
+            Header names are matched loosely (e.g. <em>Name of Student</em>,{" "}
+            <em>Class &amp; Section</em>, <em>Mobile No.</em> all work). If a
+            required field is reported as missing, check the{" "}
+            <span className="font-semibold">
+              "Columns detected in your file"
+            </span>{" "}
+            list below and rename the column to the template spelling, or
+            download the CSV template and paste your rows into it.
           </p>
         </div>
       )}
