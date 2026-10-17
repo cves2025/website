@@ -2,10 +2,8 @@ import { useMemo } from "react";
 import { NavLink, useSearchParams } from "react-router-dom";
 import { FaPrint } from "react-icons/fa";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
-import {
-  compareStudentsByName,
-  generateRollNumber,
-} from "../../../utils/rollNumber";
+import { compareStudentsByName } from "../../../utils/rollNumber";
+import { useClassRollNumbers } from "../../../hooks/useClassRollNumbers";
 import { useAdmitCardGenerator } from "./useAdmitCardGenerator";
 import { TEMPLATE_COMPONENTS } from "./exam-settings/admit-card-template/admitCardTemplates";
 import { useAdmitCardTemplate } from "../../../hooks/useAdmitCardTemplate";
@@ -30,7 +28,7 @@ function GeneratedAdmitCards() {
   const studentsRaw = searchParams.get("students") ?? "";
 
   const { templateId } = useAdmitCardTemplate();
-const CardTemplate = TEMPLATE_COMPONENTS[templateId];
+  const CardTemplate = TEMPLATE_COMPONENTS[templateId];
 
   const allStudents = studentsRaw === "all";
   const enrollments = allStudents
@@ -50,11 +48,27 @@ const CardTemplate = TEMPLATE_COMPONENTS[templateId];
     autoGenerate: true,
   });
 
-  /* Cards are printed alphabetically by student name, and the roll number
-     printed on a card follows that same alphabetical order. */
+  const {
+    getRollNumber,
+    loading: loadingRollNumbers,
+    error: rollNumberError,
+  } = useClassRollNumbers({
+    academicYear: gen.selectedYear,
+    classNames: gen.selectedClass ? [gen.selectedClass] : [],
+  });
+
+  /* Cards are printed in roll number order. Students without a generated
+     roll number fall back to alphabetical order. */
   const cards = useMemo(
-    () => [...gen.cards].sort(compareStudentsByName),
-    [gen.cards],
+    () =>
+      [...gen.cards].sort((a, b) => {
+        const rollA = getRollNumber(a.studentId, a.id);
+        const rollB = getRollNumber(b.studentId, b.id);
+
+        if (rollA > 0 && rollB > 0 && rollA !== rollB) return rollA - rollB;
+        return compareStudentsByName(a, b);
+      }),
+    [gen.cards, getRollNumber],
   );
 
   const missingSelection =
@@ -85,7 +99,8 @@ const CardTemplate = TEMPLATE_COMPONENTS[templateId];
     <button
       type="button"
       onClick={() => window.print()}
-      className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-700"
+      disabled={loadingRollNumbers}
+      className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
     >
       <FaPrint />
       Print{gen.cards.length > 0 ? ` all ${gen.cards.length}` : ""}
@@ -96,21 +111,23 @@ const CardTemplate = TEMPLATE_COMPONENTS[templateId];
     <div className="mx-auto max-w-5xl print:p-0 print:m-0 print:max-w-none">
       {/* Top bar */}
       <div className="print:hidden">
-      <PageHeader
-        title="Admit Cards"
-        titleStyle="text-primaryBlue"
-        description={
-          <p>
-            {selectedExam ? selectedExam.examName : "Loading exam..."}
-            {gen.selectedClass ? ` · ${toOrdinalLabel(gen.selectedClass)}` : ""}
-            {gen.selectedSection ? ` · Section ${gen.selectedSection}` : ""}
-            {gen.cards.length > 0 ? ` · ${gen.cards.length} student(s)` : ""}
-          </p>
-        }
-        descriptionStyle="text-gray-500"
-        button={<>{renderPrintButton()}</>}
-      />
-      </div>      
+        <PageHeader
+          title="Admit Cards"
+          titleStyle="text-primaryBlue"
+          description={
+            <p>
+              {selectedExam ? selectedExam.examName : "Loading exam..."}
+              {gen.selectedClass
+                ? ` · ${toOrdinalLabel(gen.selectedClass)}`
+                : ""}
+              {gen.selectedSection ? ` · Section ${gen.selectedSection}` : ""}
+              {gen.cards.length > 0 ? ` · ${gen.cards.length} student(s)` : ""}
+            </p>
+          }
+          descriptionStyle="text-gray-500"
+          button={<>{renderPrintButton()}</>}
+        />
+      </div>
 
       {gen.generateError && gen.cards.length === 0 && (
         <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 print:hidden">
@@ -118,7 +135,14 @@ const CardTemplate = TEMPLATE_COMPONENTS[templateId];
         </div>
       )}
 
-      {gen.cards.length === 0 && !gen.generateError && (
+      {rollNumberError && (
+        <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 print:hidden">
+          Roll numbers could not be loaded. The cards will show "-" for the roll
+          number.
+        </div>
+      )}
+
+      {(gen.cards.length === 0 || loadingRollNumbers) && !gen.generateError && (
         <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-6 text-center text-sm font-semibold text-blue-700 print:hidden">
           Preparing admit cards...
         </div>
@@ -126,20 +150,17 @@ const CardTemplate = TEMPLATE_COMPONENTS[templateId];
 
       {/* The cards */}
       {selectedExam &&
-        cards.map((card) => {
-          const rollNo = generateRollNumber(cards, card.id);
-
-          return (
-            <CardTemplate
-              key={card.id}
-              card={card}
-              rollNo={rollNo}
-              exam={selectedExam}
-              writtenPapers={gen.writtenPapers}
-              practicalPapers={gen.practicalPapers}
-            />
-          );
-        })}
+        !loadingRollNumbers &&
+        cards.map((card) => (
+          <CardTemplate
+            key={card.id}
+            card={card}
+            rollNo={getRollNumber(card.studentId, card.id)}
+            exam={selectedExam}
+            writtenPapers={gen.writtenPapers}
+            practicalPapers={gen.practicalPapers}
+          />
+        ))}
 
       {/* Bottom bar */}
       <div className="mt-8 flex flex-wrap items-center justify-end gap-2 print:hidden">

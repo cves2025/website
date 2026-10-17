@@ -49,7 +49,7 @@ const buildRollNumberEntries = (
     rollNumber: index + 1,
   }));
 
-const getRollNumberDocumentId = (
+export const getRollNumberDocumentId = (
   academicYear: string,
   className: string
 ) => `${academicYear}_${className}`;
