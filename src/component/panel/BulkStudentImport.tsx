@@ -18,6 +18,10 @@ import {
 import { COLLECTION } from "../../constants";
 import { db } from "../../firebase/config";
 import { generateClassRollNumbers } from "../../utils/rollNumbers";
+import {
+  enrollmentKey,
+  findExistingEnrollmentKeys,
+} from "../../utils/duplicateEnrollments";
 
 const PREVIEW_ROWS = 5;
 
@@ -110,12 +114,14 @@ function BulkStudentImport({ onImported }: BulkStudentImportProps) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [skippedDuplicates, setSkippedDuplicates] = useState<StudentRow[]>([]);
 
   const readFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setError("");
     setMessage("");
+    setSkippedDuplicates([]);
     try {
       const result: StudentImportResult = await parseStudentFile(file);
       setStudents(result.students);
@@ -150,13 +156,30 @@ function BulkStudentImport({ onImported }: BulkStudentImportProps) {
     setMessage("");
     setLoading(true);
     try {
-      const count = await importStudentsToFirestore(students);
+      // Skip students whose enrollment number already exists in the session.
+      const existingKeys = await findExistingEnrollmentKeys(students);
+      const isDuplicate = (student: StudentRow) =>
+        existingKeys.has(
+          enrollmentKey(student.academicYear, student.enrollment),
+        );
+      const newStudents = students.filter((student) => !isDuplicate(student));
+      const duplicates = students.filter(isDuplicate);
+      setSkippedDuplicates(duplicates);
+
+      if (newStudents.length === 0) {
+        setError(
+          "All students in this file already exist for their session. Nothing was uploaded.",
+        );
+        return;
+      }
+
+      const count = await importStudentsToFirestore(newStudents);
 
       // Generate roll numbers once per affected class, not once per student.
       let rollNumbersUpdated = true;
       try {
         await Promise.all(
-          collectRosters(students).map(({ className, academicYear }) =>
+          collectRosters(newStudents).map(({ className, academicYear }) =>
             generateClassRollNumbers(className, academicYear),
           ),
         );
@@ -166,14 +189,19 @@ function BulkStudentImport({ onImported }: BulkStudentImportProps) {
       }
 
       // Mirror locally so the Admit Card / ID card panels can use the rows.
-      saveStudentsLocally(students);
-      setMessage(`✅ ${count} student(s) uploaded to Cloud Firestore.`);
+      saveStudentsLocally(newStudents);
+      setMessage(
+        `✅ ${count} student(s) uploaded to Cloud Firestore.` +
+          (duplicates.length > 0
+            ? ` ${duplicates.length} duplicate(s) skipped.`
+            : ""),
+      );
       if (!rollNumbersUpdated) {
         setError(
           "Students were imported, but roll numbers could not be generated. Please regenerate them from Settings.",
         );
       }
-      onImported?.(students);
+      onImported?.(newStudents);
     } catch (importError) {
       setError(firestoreErrorMessage(importError));
     } finally {
@@ -189,6 +217,7 @@ function BulkStudentImport({ onImported }: BulkStudentImportProps) {
     setFileName("");
     setMessage("");
     setError("");
+    setSkippedDuplicates([]);
   };
 
   const inputClass =
@@ -323,6 +352,25 @@ function BulkStudentImport({ onImported }: BulkStudentImportProps) {
               ...and {students.length - PREVIEW_ROWS} more row(s).
             </p>
           )}
+        </div>
+      )}
+
+      {/* Skipped duplicates */}
+      {skippedDuplicates.length > 0 && (
+        <div className="mt-4 bg-yellow-50 border border-yellow-300 rounded-xl p-4">
+          <p className="font-bold text-yellow-800 mb-2">
+            ⚠️ {skippedDuplicates.length} student(s) skipped - the enrollment
+            number already exists for that session (recycle bin included):
+          </p>
+          <div className="max-h-40 overflow-y-auto text-sm">
+            {skippedDuplicates.map((student) => (
+              <p key={student.id} className="text-yellow-800">
+                <span className="font-semibold">{student.enrollment}</span> (
+                {student.fullName} · Class {student.className} ·{" "}
+                {student.academicYear})
+              </p>
+            ))}
+          </div>
         </div>
       )}
 
