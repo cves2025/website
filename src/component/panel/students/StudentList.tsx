@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   collection,
   doc,
@@ -6,6 +6,7 @@ import {
   getDoc,
   getDocs,
   query,
+  QueryConstraint,
   QueryDocumentSnapshot,
   serverTimestamp,
   Timestamp,
@@ -25,14 +26,17 @@ import {
 
 import { db } from "../../../firebase/config";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
+import { generateClassRollNumbers } from "../../../utils/rollNumbers";
 import Modal from "../../../custom-components/Modal";
 import PageHeader from "../../../custom-components/PageHeader";
 import Button from "../../../custom-components/Button";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 75, 100];
-const SEARCH_DELAY = 350;
 
-interface EnrollmentRecord {
+const academicYears = generateAcademicYears();
+
+/** One row of the student list (an enrollment joined with display fields). */
+interface StudentListRow {
   id: string;
   studentId: string;
   studentName: string;
@@ -60,219 +64,241 @@ type SortField =
 
 type SortDirection = "asc" | "desc";
 
+function toStudentRow(
+  docSnapshot: QueryDocumentSnapshot<DocumentData>,
+): StudentListRow {
+  const data = docSnapshot.data();
+
+  return {
+    id: docSnapshot.id,
+    studentId: data.studentId ?? "",
+    studentName: data.studentName ?? "",
+    firstName: data.firstName ?? "",
+    lastName: data.lastName ?? "",
+    enrollment: data.enrollment ?? "",
+    className: data.className ?? "",
+    section: data.section ?? "",
+    academicYear: data.academicYear ?? "",
+    fatherName: data.fatherName ?? "",
+    phone: data.phone ?? "",
+    status: data.status ?? "active",
+    isDeleted: data.isDeleted === true,
+    createdAt: data.createdAt instanceof Timestamp ? data.createdAt.seconds : 0,
+  };
+}
+
+/**
+ * A student matches the search text when it is a prefix of the full name,
+ * of any single word of the name (first or last name), or of the
+ * enrollment (admission) number.
+ */
+function matchesSearch(student: StudentListRow, searchValue: string): boolean {
+  const fullName = (
+    student.studentName || `${student.firstName} ${student.lastName}`
+  )
+    .trim()
+    .toLowerCase();
+
+  const enrollment = String(student.enrollment ?? "")
+    .trim()
+    .toLowerCase();
+
+  return (
+    fullName.startsWith(searchValue) ||
+    fullName.split(/\s+/).some((word) => word.startsWith(searchValue)) ||
+    enrollment.startsWith(searchValue)
+  );
+}
+
+/**
+ * Column comparator. Enrollment / phone values are stored as text but are
+ * usually numeric (e.g. "1001"), so they are compared as numbers whenever
+ * both sides are numeric.
+ */
+function compareRows(
+  a: StudentListRow,
+  b: StudentListRow,
+  field: SortField,
+  direction: SortDirection,
+): number {
+  let comparison = 0;
+
+  if (field === "createdAt") {
+    comparison = Number(a.createdAt) - Number(b.createdAt);
+  } else {
+    const left =
+      field === "studentName"
+        ? `${a.firstName} ${a.lastName}`.trim().toLowerCase()
+        : String(a[field] ?? "").toLowerCase();
+    const right =
+      field === "studentName"
+        ? `${b.firstName} ${b.lastName}`.trim().toLowerCase()
+        : String(b[field] ?? "").toLowerCase();
+
+    const leftNumber = left === "" ? NaN : Number(left);
+    const rightNumber = right === "" ? NaN : Number(right);
+
+    comparison =
+      !Number.isNaN(leftNumber) && !Number.isNaN(rightNumber)
+        ? leftNumber - rightNumber
+        : left.localeCompare(right);
+  }
+
+  if (comparison === 0) comparison = a.id.localeCompare(b.id);
+
+  return direction === "asc" ? comparison : -comparison;
+}
+
+/**
+ * Default list order: class order of `CLASSES` (PG, Nursery, LKG ...), then
+ * section, then name. Unknown classes go to the end.
+ */
+function compareByClassOrder(a: StudentListRow, b: StudentListRow): number {
+  const rank = (className: string) => {
+    const index = CLASSES.indexOf(className);
+    return index === -1 ? CLASSES.length : index;
+  };
+
+  return (
+    rank(a.className) - rank(b.className) ||
+    a.section.localeCompare(b.section) ||
+    compareRows(a, b, "studentName", "asc")
+  );
+}
+
 export default function StudentList() {
   const navigate = useNavigate();
-  const academicYears = generateAcademicYears();
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [studentToDelete, setStudentToDelete] =
-    useState<EnrollmentRecord | null>(null);
-  const [students, setStudents] = useState<EnrollmentRecord[]>([]);
+  const [studentToDelete, setStudentToDelete] = useState<StudentListRow | null>(
+    null,
+  );
+  const [rows, setRows] = useState<StudentListRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState("");
   const [selectedClass, setSelectedClass] = useState("");
   const [selectedSection, setSelectedSection] = useState("");
   const [selectedYear, setSelectedYear] = useState(
-    academicYears[0]?.value ?? ""
+    academicYears[0]?.value ?? "",
   );
 
   const [sortField, setSortField] = useState<SortField>("createdAt");
-  const [sortDirection, setSortDirection] =
-    useState<SortDirection>("desc");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [sortActive, setSortActive] = useState(false);
 
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
   const [page, setPage] = useState(1);
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [studentPhotos, setStudentPhotos] = useState<Record<string, string>>({});
-
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
+  const [studentPhotos, setStudentPhotos] = useState<Record<string, string>>(
+    {},
   );
 
-  const convertStudent = (
-    docSnapshot: QueryDocumentSnapshot<DocumentData>
-  ): EnrollmentRecord => {
-    const data = docSnapshot.data();
+  /* Ignores the answer of an outdated request (fast filter changes). */
+  const requestIdRef = useRef(0);
 
-    return {
-      id: docSnapshot.id,
-      studentId: data.studentId ?? "",
-      studentName: data.studentName ?? "",
-      firstName: data.firstName ?? "",
-      lastName: data.lastName ?? "",
-      enrollment: data.enrollment ?? "",
-      className: data.className ?? "",
-      section: data.section ?? "",
-      academicYear: data.academicYear ?? "",
-      fatherName: data.fatherName ?? "",
-      phone: data.phone ?? "",
-      status: data.status ?? "active",
-      isDeleted: data.isDeleted === true,
-      createdAt:
-        data.createdAt instanceof Timestamp
-          ? data.createdAt.seconds
-          : 0,
-    };
-  };
+  /* The search box is focused as soon as the page opens. */
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    searchInputRef.current?.focus();
+  }, []);
+
+  /*
+   * -----------------------------------------------------------
+   * Data source (the only place that reads enrollments)
+   * -----------------------------------------------------------
+   *
+   * Enrollments are read once per academic year / class selection.
+   * Search, section, sorting and pagination work on this in-memory
+   * list, so they cost no Firestore reads.
+   */
 
   const loadStudents = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
 
     try {
-      const searchValue = search.trim().toLowerCase();
-
-      const enrollmentCollection = collection(
-        db,
-        COLLECTION.ENROLLMENTS
-      );
-
-      /*
-       * -------------------------------------------------------
-       * Data source
-       * -------------------------------------------------------
-       *
-       * Enrollments are fetched for the selected academic year
-       * and then filtered / sorted / paginated on the client so
-       * the list can be sorted by any column without requiring
-       * extra Firestore composite indexes.
-       */
-
-      const snapshot = await getDocs(
-        query(
-          enrollmentCollection,
-          where("academicYear", "==", selectedYear)
-        )
-      );
-
-      let result = snapshot.docs
-        .map(convertStudent)
-        .filter((student) => !student.isDeleted);
+      const constraints: QueryConstraint[] = [
+        where("academicYear", "==", selectedYear),
+      ];
 
       if (selectedClass) {
-        result = result.filter(
-          (student) => student.className === selectedClass
-        );
+        constraints.push(where("className", "==", selectedClass));
       }
 
-      if (selectedSection) {
-        result = result.filter(
-          (student) => student.section === selectedSection
-        );
-      }
+      const snapshot = await getDocs(
+        query(collection(db, COLLECTION.ENROLLMENTS), ...constraints),
+      );
 
-      /*
-       * -------------------------------------------------------
-       * Search mode
-       * -------------------------------------------------------
-       *
-       * Name prefix search.
-       *
-       * Example:
-       * "rah" -> Rahul, Raghav, Rakesh...
-       */
+      if (requestId !== requestIdRef.current) return;
 
-      if (searchValue) {
-        result = result.filter((student) =>
-          student.firstName.toLowerCase().startsWith(searchValue)
-        );
-      }
-
-      /*
-       * -------------------------------------------------------
-       * Column sorting
-       * -------------------------------------------------------
-       *
-       * Until the user clicks a column header the original
-       * server-side defaults are kept:
-       *   - search / class / section -> name ascending
-       *   - otherwise                -> newest first
-       */
-
-      let effectiveField = sortField;
-      let effectiveDirection = sortDirection;
-
-      if (!sortActive) {
-        effectiveField =
-          searchValue || selectedClass || selectedSection
-            ? "studentName"
-            : "createdAt";
-        effectiveDirection =
-          searchValue || selectedClass || selectedSection
-            ? "asc"
-            : "desc";
-      }
-
-      const directionMultiplier =
-        effectiveDirection === "asc" ? 1 : -1;
-
-      result.sort((a, b) => {
-        let comparison = 0;
-
-        if (effectiveField === "createdAt") {
-          const left = Number(a.createdAt);
-          const right = Number(b.createdAt);
-          comparison = left < right ? -1 : left > right ? 1 : 0;
-        } else {
-          let left: string;
-          let right: string;
-
-          if (effectiveField === "studentName") {
-            left = `${a.firstName} ${a.lastName}`.trim().toLowerCase();
-            right = `${b.firstName} ${b.lastName}`.trim().toLowerCase();
-          } else {
-            left = String(a[effectiveField] ?? "").toLowerCase();
-            right = String(b[effectiveField] ?? "").toLowerCase();
-          }
-
-          /*
-           * Enrollment / phone values are stored as text but are
-           * usually numeric (e.g. "1001"), so compare them as
-           * numbers whenever both sides are numeric.
-           */
-
-          const leftNumber =
-            left === "" ? NaN : Number(left);
-          const rightNumber =
-            right === "" ? NaN : Number(right);
-
-          if (!Number.isNaN(leftNumber) && !Number.isNaN(rightNumber)) {
-            comparison =
-              leftNumber < rightNumber
-                ? -1
-                : leftNumber > rightNumber
-                  ? 1
-                  : 0;
-          } else {
-            comparison = left < right ? -1 : left > right ? 1 : 0;
-          }
-        }
-
-        if (comparison === 0) {
-          comparison = a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-        }
-
-        return comparison * directionMultiplier;
-      });
-
-      setStudents(result);
+      setRows(snapshot.docs.map(toStudentRow).filter((row) => !row.isDeleted));
     } catch (error) {
       console.error("Load students error:", error);
 
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to load students."
-      );
+      if (requestId === requestIdRef.current) {
+        toast.error(
+          error instanceof Error ? error.message : "Failed to load students.",
+        );
+      }
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
+  }, [selectedYear, selectedClass]);
+
+  useEffect(() => {
+    void loadStudents();
+  }, [loadStudents]);
+
+  /* Back to the first page whenever the list content changes. */
+  useEffect(() => {
+    setPage(1);
+  }, [search, selectedClass, selectedSection, selectedYear]);
+
+  const students = useMemo(() => {
+    const searchValue = search.trim().toLowerCase();
+
+    let result = rows;
+
+    if (selectedSection) {
+      result = result.filter((row) => row.section === selectedSection);
+    }
+
+    if (searchValue) {
+      result = result.filter((row) => matchesSearch(row, searchValue));
+    }
+
+    // A column header was clicked: that choice wins.
+    if (sortActive) {
+      return [...result].sort((a, b) =>
+        compareRows(a, b, sortField, sortDirection),
+      );
+    }
+
+    if (searchValue || selectedClass) {
+      return [...result].sort((a, b) =>
+        compareRows(a, b, "studentName", "asc"),
+      );
+    }
+
+    // Default view: newest student pinned on top, the rest class-wise.
+    const newest = result.reduce<StudentListRow | null>(
+      (latest, row) =>
+        (row.createdAt ?? 0) > (latest?.createdAt ?? 0) ? row : latest,
+      null,
+    );
+
+    const rest = result
+      .filter((row) => row !== newest)
+      .sort(compareByClassOrder);
+
+    return newest ? [newest, ...rest] : rest;
   }, [
+    rows,
     search,
     selectedClass,
     selectedSection,
-    selectedYear,
     sortField,
     sortDirection,
     sortActive,
@@ -280,37 +306,7 @@ export default function StudentList() {
 
   /*
    * -----------------------------------------------------------
-   * Initial/filter/search loading
-   * -----------------------------------------------------------
-   */
-
-  useEffect(() => {
-    if (searchTimerRef.current) {
-      clearTimeout(searchTimerRef.current);
-    }
-
-    searchTimerRef.current = setTimeout(() => {
-      setPage(1);
-
-      loadStudents();
-    }, search ? SEARCH_DELAY : 0);
-
-    return () => {
-      if (searchTimerRef.current) {
-        clearTimeout(searchTimerRef.current);
-      }
-    };
-  }, [
-    search,
-    selectedClass,
-    selectedSection,
-    selectedYear,
-    loadStudents,
-  ]);
-
-  /*
-   * -----------------------------------------------------------
-   * Column sorting
+   * Column sorting / pagination handlers
    * -----------------------------------------------------------
    */
 
@@ -326,22 +322,10 @@ export default function StudentList() {
     setPage(1);
   };
 
-  /*
-   * -----------------------------------------------------------
-   * Records per page
-   * -----------------------------------------------------------
-   */
-
   const handlePageSizeChange = (size: number) => {
     setPageSize(size);
     setPage(1);
   };
-
-  /*
-   * -----------------------------------------------------------
-   * Next page
-   * -----------------------------------------------------------
-   */
 
   const handleNext = () => {
     if (!hasNextPage || loading) {
@@ -350,12 +334,6 @@ export default function StudentList() {
 
     setPage(currentPage + 1);
   };
-
-  /*
-   * -----------------------------------------------------------
-   * Previous page
-   * -----------------------------------------------------------
-   */
 
   const handlePrevious = () => {
     if (currentPage <= 1) {
@@ -373,7 +351,8 @@ export default function StudentList() {
    * IMPORTANT:
    * We do NOT delete the permanent student document or the
    * enrollment document. We only mark the enrollment as
-   * `isDeleted: true` so it is hidden from the list.
+   * `isDeleted: true` so it is hidden from the list. The row is
+   * removed from the local list, so no re-read is needed.
    */
 
   const handleDelete = async () => {
@@ -381,32 +360,41 @@ export default function StudentList() {
       return;
     }
 
-    setDeletingId(studentToDelete.id);
+    const removedStudent = studentToDelete;
+    setDeletingId(removedStudent.id);
 
     try {
-      await updateDoc(
-        doc(db, COLLECTION.ENROLLMENTS, studentToDelete.id),
-        {
-          isDeleted: true,
-          updatedAt: serverTimestamp(),
-        }
-      );
+      await updateDoc(doc(db, COLLECTION.ENROLLMENTS, removedStudent.id), {
+        isDeleted: true,
+        updatedAt: serverTimestamp(),
+      });
+
+      // Roll numbers are stored per class, so refresh the class this
+      // student belonged to.
+      try {
+        await generateClassRollNumbers(
+          removedStudent.className,
+          removedStudent.academicYear,
+        );
+      } catch (rollNumberError) {
+        console.error("Failed to refresh roll numbers:", rollNumberError);
+        toast.error(
+          "Student removed, but roll numbers could not be refreshed. Please regenerate them from Settings.",
+        );
+      }
 
       toast.success("Student enrollment removed.");
 
+      setRows((current) =>
+        current.filter((row) => row.id !== removedStudent.id),
+      );
       setIsDeleteModalOpen(false);
       setStudentToDelete(null);
-
-      setPage(1);
-
-      await loadStudents();
     } catch (error) {
       console.error("Delete enrollment error:", error);
 
       toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to delete enrollment."
+        error instanceof Error ? error.message : "Failed to delete enrollment.",
       );
     } finally {
       setDeletingId(null);
@@ -445,9 +433,7 @@ export default function StudentList() {
       return;
     }
 
-    const missingIds = visibleStudentIds.filter(
-      (id) => !(id in studentPhotos)
-    );
+    const missingIds = visibleStudentIds.filter((id) => !(id in studentPhotos));
     if (missingIds.length === 0) {
       return;
     }
@@ -459,21 +445,19 @@ export default function StudentList() {
         missingIds.map(async (studentId) => {
           try {
             const snapshot = await getDoc(
-              doc(db, COLLECTION.STUDENTS, studentId)
+              doc(db, COLLECTION.STUDENTS, studentId),
             );
             const data = snapshot.data();
             return {
               id: studentId,
               photo:
-                typeof data?.studentPhoto === "string"
-                  ? data.studentPhoto
-                  : "",
+                typeof data?.studentPhoto === "string" ? data.studentPhoto : "",
             };
           } catch (error) {
             console.warn("Could not load student photo:", error);
             return { id: studentId, photo: "" };
           }
-        })
+        }),
       );
 
       if (cancelled) return;
@@ -537,17 +521,14 @@ export default function StudentList() {
         {/* Search */}
 
         <div>
-          <label className="mb-1 block text-sm font-medium">
-            Search
-          </label>
+          <label className="mb-1 block text-sm font-medium">Search</label>
 
           <input
+            ref={searchInputRef}
             type="search"
             value={search}
-            onChange={(event) =>
-              setSearch(event.target.value)
-            }
-            placeholder="Search student name..."
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search by name or enrollment no..."
             className="w-full rounded-md border px-3 py-2 outline-none"
           />
         </div>
@@ -561,9 +542,7 @@ export default function StudentList() {
 
           <select
             value={selectedYear}
-            onChange={(event) =>
-              setSelectedYear(event.target.value)
-            }
+            onChange={(event) => setSelectedYear(event.target.value)}
             className="w-full rounded-md border px-3 py-2"
           >
             {academicYears.map((year) => (
@@ -577,15 +556,11 @@ export default function StudentList() {
         {/* Class */}
 
         <div>
-          <label className="mb-1 block text-sm font-medium">
-            Class
-          </label>
+          <label className="mb-1 block text-sm font-medium">Class</label>
 
           <select
             value={selectedClass}
-            onChange={(event) =>
-              setSelectedClass(event.target.value)
-            }
+            onChange={(event) => setSelectedClass(event.target.value)}
             className="w-full rounded-md border px-3 py-2"
           >
             <option value="">All Classes</option>
@@ -601,15 +576,11 @@ export default function StudentList() {
         {/* Section */}
 
         <div>
-          <label className="mb-1 block text-sm font-medium">
-            Section
-          </label>
+          <label className="mb-1 block text-sm font-medium">Section</label>
 
           <select
             value={selectedSection}
-            onChange={(event) =>
-              setSelectedSection(event.target.value)
-            }
+            onChange={(event) => setSelectedSection(event.target.value)}
             className="w-full rounded-md border px-3 py-2"
           >
             <option value="">All Sections</option>
@@ -629,13 +600,9 @@ export default function StudentList() {
         <table className="w-full min-w-[1000px]">
           <thead>
             <tr className="border-b bg-gray-50 text-left">
-              <th className="px-4 py-3">
-                Sr. No.
-              </th>
+              <th className="px-4 py-3">Sr. No.</th>
 
-              <th className="px-4 py-3">
-                Photo
-              </th>
+              <th className="px-4 py-3">Photo</th>
 
               {sortableHeader("Enrollment", "enrollment")}
 
@@ -649,19 +616,14 @@ export default function StudentList() {
 
               {sortableHeader("Phone", "phone")}
 
-              <th className="px-4 py-3">
-                Actions
-              </th>
+              <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
 
           <tbody>
             {loading ? (
               <tr>
-                <td
-                  colSpan={9}
-                  className="px-4 py-10 text-center"
-                >
+                <td colSpan={9} className="px-4 py-10 text-center">
                   Loading students...
                 </td>
               </tr>
@@ -676,13 +638,8 @@ export default function StudentList() {
               </tr>
             ) : (
               visibleStudents.map((student, index) => (
-                <tr
-                  key={student.id}
-                  className="border-b last:border-b-0"
-                >
-                  <td className="px-4 py-3">
-                    {startIndex + index + 1}
-                  </td>
+                <tr key={student.id} className="border-b last:border-b-0">
+                  <td className="px-4 py-3">{startIndex + index + 1}</td>
                   <td className="px-4 py-3">
                     {studentPhotos[student.studentId] ? (
                       <img
@@ -697,29 +654,19 @@ export default function StudentList() {
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3">
-                    {student.enrollment}
-                  </td>
+                  <td className="px-4 py-3">{student.enrollment}</td>
 
                   <td className="px-4 py-3 font-medium">
                     {student.studentName}
                   </td>
 
-                  <td className="px-4 py-3">
-                    {student.className}
-                  </td>
+                  <td className="px-4 py-3">{student.className}</td>
 
-                  <td className="px-4 py-3">
-                    {student.section}
-                  </td>
+                  <td className="px-4 py-3">{student.section}</td>
 
-                  <td className="px-4 py-3">
-                    {student.fatherName || "-"}
-                  </td>
+                  <td className="px-4 py-3">{student.fatherName || "-"}</td>
 
-                  <td className="px-4 py-3">
-                    {student.phone || "-"}
-                  </td>
+                  <td className="px-4 py-3">{student.phone || "-"}</td>
 
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
@@ -728,9 +675,7 @@ export default function StudentList() {
                         title="Edit"
                         aria-label={`Edit ${student.studentName}`}
                         onClick={() => {
-                          navigate(
-                            `/welcome/student/add?edit=${student.id}`
-                          );
+                          navigate(`${ADD_STUDENT_PATH}?edit=${student.id}`);
                         }}
                         className="rounded border p-2 text-sm text-blue-600 hover:bg-blue-50"
                       >

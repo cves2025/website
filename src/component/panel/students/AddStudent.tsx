@@ -43,6 +43,7 @@ import {
   deleteStudentPhoto,
   PhotoKind,
 } from "../../../firebase/studentPhotos";
+import { generateClassRollNumbers } from "../../../utils/rollNumbers";
 
 type StudentTab = "info" | "school" | "bulk";
 
@@ -330,7 +331,7 @@ function firestoreErrorMessage(error: unknown): string {
  * from the OS file manager (clipboard files).
  */
 function imageFileFromClipboard(
-  clipboardData: DataTransfer | null | undefined
+  clipboardData: DataTransfer | null | undefined,
 ): File | null {
   if (!clipboardData) return null;
   for (const item of clipboardData.items) {
@@ -349,77 +350,54 @@ interface NextEditCandidate {
   id: string;
 }
 
-/**
- * Finds the enrollment id to open next in edit mode after a student update:
- *   1. the next student of the same class (sorted by first / last name), then
- *   2. the first student of the following class (in `CLASSES` order), for the
- *      same academic year.
- * Returns `null` when there is no next student left to edit.
- */
+interface EnrollmentRow {
+  id: string;
+  firstNameLower: string;
+  lastNameLower: string;
+}
+
+/** Reads the active enrollments of one class and sorts them by name. */
+async function fetchClassRows(
+  className: string,
+  academicYear: string,
+): Promise<EnrollmentRow[]> {
+  const snapshot = await getDocs(
+    query(
+      collection(db, COLLECTION.ENROLLMENTS),
+      where("academicYear", "==", academicYear),
+      where("className", "==", className),
+    ),
+  );
+
+  return snapshot.docs
+    .filter((docSnapshot) => docSnapshot.data().isDeleted !== true)
+    .map((docSnapshot) => {
+      const data = docSnapshot.data();
+      return {
+        id: docSnapshot.id,
+        firstNameLower: String(
+          data.firstNameLower ?? String(data.firstName ?? "").toLowerCase(),
+        ),
+        lastNameLower: String(
+          data.lastNameLower ?? String(data.lastName ?? "").toLowerCase(),
+        ),
+      };
+    })
+    .sort(
+      (a, b) =>
+        a.firstNameLower.localeCompare(b.firstNameLower) ||
+        a.lastNameLower.localeCompare(b.lastNameLower) ||
+        a.id.localeCompare(b.id),
+    );
+}
+
 async function findNextStudentToEdit(
   currentEnrollmentId: string,
   className: string,
   academicYear: string,
 ): Promise<NextEditCandidate | null> {
-  const snapshot = await getDocs(
-    query(
-      collection(db, COLLECTION.ENROLLMENTS),
-      where("academicYear", "==", academicYear),
-    ),
-  );
-
-  interface EnrollmentRow {
-    id: string;
-    className: string;
-    firstNameLower: string;
-    lastNameLower: string;
-  }
-
-  const rows: EnrollmentRow[] = snapshot.docs
-    .map((docSnapshot) => {
-      const data = docSnapshot.data();
-      return {
-        id: docSnapshot.id,
-        className: String(data.className ?? ""),
-        firstNameLower: String(
-          data.firstNameLower ??
-            String(data.firstName ?? "").toLowerCase(),
-        ),
-        lastNameLower: String(
-          data.lastNameLower ??
-            String(data.lastName ?? "").toLowerCase(),
-        ),
-        isDeleted: data.isDeleted === true,
-      };
-    })
-    .filter((row) => !row.isDeleted);
-
-  const byClassName = new Map<string, EnrollmentRow[]>();
-  for (const row of rows) {
-    const classRows = byClassName.get(row.className);
-    if (classRows) {
-      classRows.push(row);
-    } else {
-      byClassName.set(row.className, [row]);
-    }
-  }
-
-  const compareByName = (a: EnrollmentRow, b: EnrollmentRow) => {
-    const firstNameOrder = a.firstNameLower.localeCompare(b.firstNameLower);
-    if (firstNameOrder !== 0) return firstNameOrder;
-
-    const lastNameOrder = a.lastNameLower.localeCompare(b.lastNameLower);
-    if (lastNameOrder !== 0) return lastNameOrder;
-
-    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-  };
-
-  for (const classRows of byClassName.values()) {
-    classRows.sort(compareByName);
-  }
-
   // 1) The next student of the same class.
-  const currentClassRows = byClassName.get(className) ?? [];
+  const currentClassRows = await fetchClassRows(className, academicYear);
   const currentIndex = currentClassRows.findIndex(
     (row) => row.id === currentEnrollmentId,
   );
@@ -432,7 +410,7 @@ async function findNextStudentToEdit(
   const startIndex = currentClassIndex === -1 ? 0 : currentClassIndex + 1;
 
   for (let index = startIndex; index < CLASSES.length; index++) {
-    const classRows = byClassName.get(CLASSES[index]) ?? [];
+    const classRows = await fetchClassRows(CLASSES[index], academicYear);
     if (classRows.length > 0) {
       return { id: classRows[0].id };
     }
@@ -456,8 +434,7 @@ function AddStudent() {
   const [pendingMotherPhoto, setPendingMotherPhoto] = useState<File | null>(
     null,
   );
-  const [nextStudentConfirmOpen, setNextStudentConfirmOpen] =
-    useState(false);
+  const [nextStudentConfirmOpen, setNextStudentConfirmOpen] = useState(false);
   const [loadingNextStudent, setLoadingNextStudent] = useState(false);
 
   /* Copy-paste photo routing: which photo box receives an image pasted from
@@ -470,7 +447,7 @@ function AddStudent() {
 
   const registerPhotoPasteTarget = (
     key: string,
-    handler: ((file: File | null) => void) | null
+    handler: ((file: File | null) => void) | null,
   ) => {
     if (handler) {
       photoPasteTargets.current[key] = handler;
@@ -549,9 +526,9 @@ function AddStudent() {
       // A paste while a photo box is focused targets that exact box.
       const target = event.target as HTMLElement | null;
       const boxKey =
-        target?.closest?.("[data-photo-upload]")?.getAttribute(
-          "data-photo-upload"
-        ) ?? "";
+        target
+          ?.closest?.("[data-photo-upload]")
+          ?.getAttribute("data-photo-upload") ?? "";
 
       const handler =
         photoPasteTargets.current[boxKey] ||
@@ -760,6 +737,14 @@ function AddStudent() {
         const studentRef = doc(db, COLLECTION.STUDENTS, editingStudentId);
         const enrollmentRef = doc(db, COLLECTION.ENROLLMENTS, editEnrollmentId);
 
+        const existingEnrollmentSnapshot = await getDoc(enrollmentRef);
+
+        if (!existingEnrollmentSnapshot.exists()) {
+          throw new Error("Enrollment record not found.");
+        }
+
+        const previousEnrollment = existingEnrollmentSnapshot.data();
+
         batch.update(studentRef, {
           ...studentFields,
           updatedAt: serverTimestamp(),
@@ -770,6 +755,62 @@ function AddStudent() {
         });
 
         await batch.commit();
+
+        const previousClassName = String(
+          previousEnrollment.className ?? "",
+        ).trim();
+        const previousAcademicYear = String(
+          previousEnrollment.academicYear ?? "",
+        );
+        const currentClassName = data.className.trim();
+        const currentAcademicYear = `20${data.sessionStart.trim()}-${data.sessionEnd.trim()}`;
+
+        const rosterChanged =
+          previousClassName !== currentClassName ||
+          previousAcademicYear !== currentAcademicYear ||
+          String(previousEnrollment.studentName ?? "").trim() !==
+            data.fullName.trim();
+
+        const rostersToRefresh = rosterChanged
+          ? [
+              {
+                className: previousClassName,
+                academicYear: previousAcademicYear,
+              },
+              {
+                className: currentClassName,
+                academicYear: currentAcademicYear,
+              },
+            ]
+          : [];
+
+        const affectedRosters = new Map<
+          string,
+          { className: string; academicYear: string }
+        >();
+
+        for (const roster of rostersToRefresh) {
+          if (!roster.className || !roster.academicYear) continue;
+
+          affectedRosters.set(
+            `${roster.academicYear}_${roster.className}`,
+            roster,
+          );
+        }
+
+        let rollNumbersUpdated = true;
+
+        try {
+          await Promise.all(
+            Array.from(affectedRosters.values()).map(
+              ({ className, academicYear }) =>
+                generateClassRollNumbers(className, academicYear),
+            ),
+          );
+        } catch (error) {
+          rollNumbersUpdated = false;
+          console.error("Failed to refresh roll numbers:", error);
+        }
 
         setPendingStudentPhoto(null);
         setPendingFatherPhoto(null);
@@ -806,6 +847,12 @@ function AddStudent() {
         toast.success(
           `Student ${studentFields.fullName} updated successfully!`,
         );
+
+        if (!rollNumbersUpdated) {
+          toast.error(
+            "Student updated, but roll numbers could not be refreshed. Please regenerate them from Settings.",
+          );
+        }
         return;
       }
 
@@ -827,6 +874,18 @@ function AddStudent() {
 
       await batch.commit();
 
+      let rollNumbersUpdated = true;
+
+      try {
+        await generateClassRollNumbers(
+          data.className.trim(),
+          `20${data.sessionStart.trim()}-${data.sessionEnd.trim()}`,
+        );
+      } catch (error) {
+        rollNumbersUpdated = false;
+        console.error("Failed to generate roll numbers:", error);
+      }
+
       reset(defaultValues);
       setPendingStudentPhoto(null);
       setPendingFatherPhoto(null);
@@ -835,6 +894,12 @@ function AddStudent() {
       setActiveTab("info");
 
       toast.success(`Student ${studentFields.fullName} added successfully!`);
+
+      if (!rollNumbersUpdated) {
+        toast.error(
+          "Student added, but roll numbers could not be generated. Please regenerate them from Settings.",
+        );
+      }
     } catch (error) {
       toast.error(firestoreErrorMessage(error));
     }
@@ -1275,7 +1340,7 @@ function AddStudent() {
               control={control}
               name="email"
               prefix="MANDATORY E-MAIL ADDRESS"
-              maxLength={50}              
+              maxLength={50}
             />
           </div>
 

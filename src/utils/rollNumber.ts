@@ -28,29 +28,6 @@ export function compareStudentsByName(
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
-/**
- * Frontend-only roll number (1-based) of one student on an admit card.
- *
- * The roll number is derived from the student's position once the given
- * students are sorted alphabetically by name, so cards printed in that order
- * read 1, 2, 3, ... It is computed on the fly for display only and is never
- * stored in the database.
- */
-export function generateRollNumber(
-  students: CardStudent[],
-  studentId: string,
-): number {
-  const target = students.find((student) => student.id === studentId);
-  if (!target) return 0;
-
-  let rank = 1;
-  for (const student of students) {
-    if (student.id === studentId) continue;
-    if (compareStudentsByName(student, target) < 0) rank += 1;
-  }
-  return rank;
-}
-
 /** Minimal student fields needed to order students for roll derivation. */
 export interface RollSortableStudent {
   studentUid: string;

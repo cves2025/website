@@ -309,7 +309,7 @@ function StatementTable({ model }: { model: ResultTableModel }) {
   const colWidth = (100 - subjectWidth) / valueCols;
 
   return (
-    <table className="w-full table-fixed border-collapse border border-gray-500 text-[10px]">
+    <table className="w-full table-fixed border-collapse border border-gray-500 text-[12px]">
       <colgroup>
         <col style={{ width: `${subjectNameWidth}%` }} />
 
@@ -322,11 +322,10 @@ function StatementTable({ model }: { model: ResultTableModel }) {
 
       <thead>
         <tr>
-          <th colSpan={hasTypes ? 2 : 1} className={`${HEAD} text-left`}>
-            Scholastic Areas:
-          </th>
-
-          <th colSpan={valueCols} className={`${HEAD} bg-blue-100 text-[10px]`}>
+          <th
+            colSpan={valueCols + (hasTypes ? 2 : 1)}
+            className={`${HEAD} bg-yellow-200 text-[10px]`}
+          >
             Statement of Marks
           </th>
         </tr>
@@ -399,7 +398,7 @@ function StatementTable({ model }: { model: ResultTableModel }) {
                     {first && (
                       <td
                         rowSpan={span}
-                        className={`${CELL} text-left font-medium uppercase leading-tight`}
+                        className={`${CELL} text-left font-bold uppercase leading-tight`}
                       >
                         {span > 1 ? group.name : row.subject}
                       </td>
@@ -426,7 +425,7 @@ function StatementTable({ model }: { model: ResultTableModel }) {
                           {row.termScores[termIndex].text}
                         </td>
 
-                        <td className={CELL}>
+                        <td className={`${CELL} font-bold`}>
                           {row.termScores[termIndex].grade}
                         </td>
                       </Fragment>
@@ -434,11 +433,13 @@ function StatementTable({ model }: { model: ResultTableModel }) {
 
                     {showGrand && (
                       <>
-                        <td className={`${CELL} font-semibold`}>
+                        <td className={`${CELL} font-bold`}>
                           {row.grand.text}
                         </td>
 
-                        <td className={CELL}>{row.grand.grade}</td>
+                        <td className={`${CELL} font-bold`}>
+                          {row.grand.grade}
+                        </td>
                       </>
                     )}
                   </tr>
@@ -547,7 +548,7 @@ function GradeAreasTable({ model }: { model: ResultTableModel }) {
   const examWidth = totalExams > 0 ? (100 - subjectWidth) / totalExams : 0;
 
   return (
-    <table className="mt-1 w-full table-fixed border-collapse border border-gray-500 text-[10px]">
+    <table className="mt-1 w-full table-fixed border-collapse border border-gray-500 text-[12px]">
       <colgroup>
         <col style={{ width: `${subjectWidth}%` }} />
 
@@ -557,7 +558,7 @@ function GradeAreasTable({ model }: { model: ResultTableModel }) {
       </colgroup>
 
       <thead>
-        <tr className="bg-blue-100">
+        <tr className="bg-yellow-200">
           <th className={`${HEAD} text-left`}>Scholastic Areas II:</th>
 
           {model.terms.map((term, termIndex) => (
@@ -587,13 +588,15 @@ function GradeAreasTable({ model }: { model: ResultTableModel }) {
       <tbody>
         {model.gradeRows.map((row) => (
           <tr key={row.key}>
-            <td className={`${CELL} text-left uppercase`}>{row.subject}</td>
+            <td className={`${CELL} text-left font-bold uppercase`}>
+              {row.subject}
+            </td>
 
             {row.termGrades.map((termGrades, termIndex) =>
               termGrades.map((grade, examIndex) => (
                 <td
                   key={gradeExamsPerTerm[termIndex][examIndex].id}
-                  className={CELL}
+                  className={`${CELL} font-bold`}
                 >
                   {grade}
                 </td>
@@ -775,7 +778,7 @@ function MarksChart({ rows }: { rows: ResultRow[] }) {
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <p className="flex gap-1 text-[12px]">
-      <span className="w-36 shrink-0 text-gray-700">{label} :</span>
+      <span className="w-36 shrink-0 text-gray-800">{label} :</span>
 
       <FitText className="flex-1 font-medium uppercase">{value}</FitText>
     </p>
@@ -936,8 +939,8 @@ function ResultCard({
   const qrValue = resultQrPayload({ card, rollNo, academicYear, model });
 
   return (
-    <div className="mx-auto mt-2 max-w-4xl [-webkit-print-color-adjust:exact] [print-color-adjust:exact] print:m-0 print:h-[296mm] print:w-[210mm] print:max-w-none print:overflow-hidden print:break-after-page print:p-[10px] print:box-border print:last:break-after-auto">
-      <div className="relative flex h-full flex-col overflow-hidden rounded-xl border-4 border-double border-blue-800 bg-white shadow-lg print:rounded-none print:shadow-none">
+    <div className="mx-auto mt-2 max-w-4xl [-webkit-print-color-adjust:exact] [print-color-adjust:exact] print:m-0 print:min-h-0 print:w-full print:max-w-none print:overflow-visible print:break-after-page print:p-0 print:box-border print:last:break-after-auto">
+      <div className="relative flex flex-col overflow-visible rounded-xl border-4 border-double border-blue-800 bg-white shadow-lg print:rounded-none print:shadow-none">
         {/* Watermark */}
 
         <img
@@ -954,7 +957,7 @@ function ResultCard({
             <FitText className="flex-1">School Code: 09670911304</FitText>
 
             <FitText className="flex-1 text-right">
-              Affiliation No.: 14203-05
+              Govt. Affiliated School
             </FitText>
           </div>
 
@@ -979,26 +982,21 @@ function ResultCard({
                 <span className="text-pink-600"> SCHOOL</span>
               </h3>
 
-              <p className="mt-0.5 text-xs font-semibold italic text-black md:text-sm">
-                <FitText>
-                  D 59/295 A, Mahmoorganj, Varanasi &middot; 0542-2220107,
-                  9336576690
-                </FitText>
+              <p className="text-xl font-bold text-cyan-600">
+                <FitText>Co-Education English Medium School</FitText>
               </p>
 
-              <div className="mt-1 text-xs font-bold text-black sm:text-sm">
-                <FitText>
-                  <span className="mr-3">A Gov. Affiliated</span>
-
-                  <span className="mr-3">C.B.S.E. Pattern</span>
-
-                  <span>Co - Education</span>
+              <div className="font-bold text-black text-lg -mt-2">
+                <FitText className="text-center">
+                  <span className="inline-block origin-center">
+                    Mahmoorganj, Varanasi-9336576690
+                  </span>
                 </FitText>
               </div>
 
-              <div className="mt-2 flex justify-center">
-                <div className="inline-block rounded bg-pink-600 px-8 py-1 text-sm font-bold tracking-wide text-white md:text-base">
-                  REPORT CARD
+              <div className="flex justify-center">
+                <div className="inline-block rounded bg-blue-700 px-4 py-1 font-bold tracking-wide text-white text-lg">
+                  ACADEMIC PROGRESS REPORT
                 </div>
               </div>
             </div>
@@ -1112,7 +1110,7 @@ function ResultCard({
                 />
 
                 <span className="mt-0.5 block text-[9px] font-semibold text-gray-600">
-                  www.cves.in
+                  Student ID
                 </span>
               </div>
 
@@ -1132,11 +1130,11 @@ function ResultCard({
 
           {/* Instructions */}
 
-          <div className="px-2 pt-0.5 pb-1 text-center text-[9px]">
+          <div className="shrink-0 px-2 pt-1 pb-4 text-center text-[9px] print:break-inside-avoid">
             {/* <p className="font-bold">Instructions</p> */}
 
-            <p className="text-left">
-              Grading scale for scholastic areas: Grades are awarded on a
+            <p className="text-left text-[8px] leading-tight">
+              Grading scale for scholastic areas: Grades are awarded on an
               8-point grading scale as follows -
             </p>
 

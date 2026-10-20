@@ -170,6 +170,35 @@ export interface AllClassesLengthOfStudents {
   refresh: () => Promise<void>;
 }
 
+/** Fields of an `enrollments` document used by roll number and edit-navigation logic. */
+export interface EnrollmentRecord {
+  studentId?: string;
+  studentName?: string;
+  firstName?: string;
+  lastName?: string;
+  className?: string;
+  academicYear?: string;
+  isDeleted?: boolean;
+}
+
+export interface RollNumberEntry {
+  studentId: string;
+  name: string;
+  rollNumber: number;
+}
+
+export interface RollNumberDocument {
+  academicYear: string;
+  className: string;
+  students: RollNumberEntry[];
+  updatedAt: unknown;
+}
+
+export interface RollNumberGenerationResult {
+  classCount: number;
+  studentCount: number;
+}
+
 /* --------------------------------------------------------------- teacher -- */
 
 /** Classes a teacher handles inside one section, together with the subjects. */

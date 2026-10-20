@@ -5,6 +5,7 @@ import { academicYears } from "../examScheduleShared";
 import PageHeader from "../../../../custom-components/PageHeader";
 import useExamList from "../../../../hooks/useExamList";
 import useDeskSlipStudents from "../../../../hooks/useDeskSlipStudents";
+import useClassRollNumbers from "../../../../hooks/useClassRollNumbers";
 import DeskSlipCard from "./DeskSlipCard";
 
 const inputClass =
@@ -32,6 +33,14 @@ const DeskSlip: React.FC = () => {
     section: selectedSection,
     enabled: readyToLoad,
   });
+
+  const { getRollNumber, loading: loadingRollNumbers } = useClassRollNumbers({
+    academicYear: session,
+    classNames: selectedClass === "all" ? CLASSES : [selectedClass],
+    enabled: readyToLoad,
+  });
+
+  const isLoading = loading || loadingRollNumbers;
 
   return (
     <div className="flex flex-col gap-2 print:block print:m-0 print:w-full print:p-0">
@@ -152,7 +161,7 @@ const DeskSlip: React.FC = () => {
         </div>
       </div>
       {/* Toolbar */}
-      {readyToLoad && !loading && students.length > 0 && (
+      {readyToLoad && !isLoading && students.length > 0 && (
         <div className="flex items-center justify-between print:hidden">
           <span className="text-sm text-gray-500">
             {students.length} desk slip{students.length > 1 ? "s" : ""}
@@ -169,9 +178,9 @@ const DeskSlip: React.FC = () => {
       {/* Slips */}
       {!readyToLoad ? (
         <p className="rounded-lg bg-white p-10 text-center text-gray-500">
-          Session aur Exam select karo.
+          Select a session and an exam.
         </p>
-      ) : loading ? (
+      ) : isLoading ? (
         <p className="rounded-lg bg-white p-10 text-center">
           Loading students...
         </p>
@@ -196,6 +205,7 @@ const DeskSlip: React.FC = () => {
               studentName={student.studentName}
               fatherName={student.fatherName}
               photoUrl={student.photoUrl}
+              rollNo={getRollNumber(student.studentId, student.id)}
             />
           ))}
         </div>

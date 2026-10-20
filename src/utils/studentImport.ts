@@ -1256,13 +1256,15 @@ export async function parseStudentFile(
 
     // Reject duplicate enrollment numbers (one student record per enrollment).
     const enrollmentValue = getValue("enrollment");
-    const enrollmentKey = enrollmentValue.trim().toLowerCase();
+        const enrollmentKey = `${session.academicYear}|${enrollmentValue
+      .trim()
+      .toLowerCase()}`;
     if (seenDocIds.has(enrollmentKey)) {
       errors.push({
         row: rowNumber,
         enrollment: enrollmentValue,
         name: fullName || "-",
-        message: "Duplicate enrollment number in file",
+                message: "Duplicate enrollment number for the same session in file",
       });
       return;
     }

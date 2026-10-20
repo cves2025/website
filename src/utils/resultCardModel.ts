@@ -821,15 +821,6 @@ export function buildResultTable(params: {
   };
 }
 
-/** Roll number as stored with the marks (same as the Cross List). */
-export function rollNumberFromInputs(inputs: ResultExamInput[]): number {
-  for (const input of inputs) {
-    const roll = input.marks?.rollNumber;
-    if (typeof roll === "number" && roll > 0) return roll;
-  }
-  return 0;
-}
-
 /* ------------------------------------------------------------------ */
 /* Rank (Cross List jaisa rule, par selected exams ke combined total par) */
 /* ------------------------------------------------------------------ */

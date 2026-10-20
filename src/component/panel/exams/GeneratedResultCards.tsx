@@ -5,12 +5,10 @@ import { FaPrint } from "react-icons/fa";
 import PageHeader from "../../../custom-components/PageHeader";
 import { useExamRules } from "../../../hooks/useExamRules";
 import { useResultCardData } from "../../../hooks/useResultCardData";
+import { useClassRollNumbers } from "../../../hooks/useClassRollNumbers";
 import { compareStudentsByName } from "../../../utils/rollNumber";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
-import {
-  buildResultTable,
-  rollNumberFromInputs,
-} from "../../../utils/resultCardModel";
+import { buildResultTable } from "../../../utils/resultCardModel";
 import { ADMIT_CARD_PATH, useExamTemplates } from "./examScheduleShared";
 import { useResultCardStudents } from "./useResultCardStudents";
 import ResultCard from "./result/ResultCard";
@@ -90,6 +88,16 @@ function GeneratedResultCards() {
     enrollments: [],
     allStudents: true,
   });
+
+  const {
+    getRollNumber,
+    loading: rollNumbersLoading,
+    error: rollNumbersError,
+  } = useClassRollNumbers({
+    academicYear: year,
+    classNames: className ? [className] : [],
+  });
+
   const [attendanceByStudent, setAttendanceByStudent] = useState<
     Record<string, AttendanceSummary>
   >({});
@@ -157,9 +165,18 @@ function GeneratedResultCards() {
     };
   }, [year, className, section, attendanceExam]);
 
+  /* Cards follow the roll number order; students without a generated roll
+     number fall back to alphabetical order. */
   const sortedStudents = useMemo(
-    () => [...students.cards].sort(compareStudentsByName),
-    [students.cards],
+    () =>
+      [...students.cards].sort((a, b) => {
+        const rollA = getRollNumber(a.studentId, a.id);
+        const rollB = getRollNumber(b.studentId, b.id);
+
+        if (rollA > 0 && rollB > 0 && rollA !== rollB) return rollA - rollB;
+        return compareStudentsByName(a, b);
+      }),
+    [students.cards, getRollNumber],
   );
 
   const allResults = useMemo(
@@ -169,7 +186,7 @@ function GeneratedResultCards() {
 
         return {
           card,
-          rollNo: rollNumberFromInputs(inputs),
+          rollNo: getRollNumber(card.studentId, card.id),
           model: buildResultTable({
             className,
             inputs,
@@ -177,7 +194,7 @@ function GeneratedResultCards() {
           }),
         };
       }),
-    [sortedStudents, data.inputsFor, className, rules],
+    [sortedStudents, data.inputsFor, className, rules, getRollNumber],
   );
 
   const rankByStudent = useMemo(() => {
@@ -242,7 +259,8 @@ function GeneratedResultCards() {
     students.loading ||
     loadingExams ||
     attendanceLoading ||
-    remarksLoading;
+    remarksLoading ||
+    rollNumbersLoading;
   const loadError =
     data.error || students.error || attendanceError || remarksError;
   const renderPrintButton = () => (
@@ -287,6 +305,12 @@ function GeneratedResultCards() {
               Retry
             </button>
           )}
+        </div>
+      )}
+      {rollNumbersError && (
+        <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 print:hidden">
+          Roll numbers could not be loaded. The cards will show "-" for the roll
+          number.
         </div>
       )}
       {busy && (

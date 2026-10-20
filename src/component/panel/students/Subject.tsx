@@ -27,7 +27,13 @@ import { db } from "../../../firebase/config";
 import PageHeader from "../../../custom-components/PageHeader";
 import Button from "../../../custom-components/Button";
 
-type SubjectType = "Written" | "Oral" | "Written + Oral" | "Theory" | "Practical" | "Scholastic";
+type SubjectType =
+  | "Written"
+  | "Oral"
+  | "Written + Oral"
+  | "Theory"
+  | "Practical"
+  | "Scholastic";
 
 const SUBJECT_TYPES: SubjectType[] = [
   "Written",
@@ -39,8 +45,8 @@ const SUBJECT_TYPES: SubjectType[] = [
 ];
 
 const SUBJECT_TYPE_BADGE: Record<SubjectType, string> = {
-  "Written": "bg-green-200 text-green-700",
-  "Oral": "bg-green-300 text-green-700",
+  Written: "bg-green-200 text-green-700",
+  Oral: "bg-green-300 text-green-700",
   "Written + Oral": "bg-green-100 text-green-700",
   Theory: "bg-blue-100 text-blue-700",
   Practical: "bg-amber-100 text-amber-700",
@@ -93,7 +99,7 @@ const CLASS_OPTIONS: SearchableOption[] = CLASSES.map((className) => ({
 
 const toSubjectDoc = (
   documentSnapshot: QueryDocumentSnapshot<DocumentData>,
-  fallbackClass: string
+  fallbackClass: string,
 ): SubjectDoc => {
   const data = documentSnapshot.data() as Record<string, unknown>;
 
@@ -110,7 +116,7 @@ const toSubjectDoc = (
       typeof data.className === "string" ? data.className : fallbackClass,
     displayInAdmitCard: data.displayInAdmitCard === true,
     displayInMarksEntry: data.displayInMarksEntry === true,
-    displayInReportCard: data.displayInReportCard === true,
+    displayInReportCard: data.displayInReportCard !== false,
   };
 };
 
@@ -120,21 +126,16 @@ function Subject() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const {
-    control,
-    handleSubmit,
-    reset,
-    setValue,
-    watch,
-  } = useForm<SubjectFormValues>({
-    defaultValues: DEFAULT_FORM,
-  });
+  const { control, handleSubmit, reset, setValue, watch } =
+    useForm<SubjectFormValues>({
+      defaultValues: DEFAULT_FORM,
+    });
 
   const subjectName = watch("name");
   const subjectClasses = watch("classes");
   const [saving, setSaving] = useState(false);
   const [subjectToDelete, setSubjectToDelete] = useState<SubjectDoc | null>(
-    null
+    null,
   );
   const [deleting, setDeleting] = useState(false);
 
@@ -145,7 +146,7 @@ function Subject() {
     const subjectsQuery = query(
       collection(db, COLLECTION.SUBJECTS),
       where("className", "==", selectedClass),
-      orderBy("order", "asc")
+      orderBy("order", "asc"),
     );
 
     const unsubscribe = onSnapshot(
@@ -153,15 +154,15 @@ function Subject() {
       (snapshot) => {
         setSubjects(
           snapshot.docs.map((documentSnapshot) =>
-            toSubjectDoc(documentSnapshot, selectedClass)
-          )
+            toSubjectDoc(documentSnapshot, selectedClass),
+          ),
         );
         setLoading(false);
       },
       (error) => {
         console.error("Failed to load subjects:", error);
         setLoading(false);
-      }
+      },
     );
 
     return unsubscribe;
@@ -175,7 +176,9 @@ function Subject() {
         : 1;
     // Sahi default: max defined report card order + 1. Koi bhi report card
     // order define nahi hua to existing order hi default rakhte hain.
-    const reportCardOrders = subjects.map((subject) => subject.reportCardOrder ?? 0);
+    const reportCardOrders = subjects.map(
+      (subject) => subject.reportCardOrder ?? 0,
+    );
     const nextReportCardOrder =
       subjects.length > 0 && reportCardOrders.some((value) => value > 0)
         ? Math.max(...reportCardOrders) + 1
@@ -201,19 +204,29 @@ function Subject() {
       name: subject.name,
       type: subject.type,
       order: String(subject.order),
-      reportCardOrder: subject.reportCardOrder ? String(subject.reportCardOrder) : "",
+      reportCardOrder: subject.reportCardOrder
+        ? String(subject.reportCardOrder)
+        : "",
       // Pre-select the class this subject row belongs to; the user can add
       // more classes before saving.
       classes: [subject.className],
-      displayInAdmitCard: subject.displayInAdmitCard === false ? "false" : "true",
-      displayInMarksEntry: subject.displayInMarksEntry === false ? "false" : "true",
-      displayInReportCard: subject.displayInReportCard === false ? "false" : "true",
+      displayInAdmitCard:
+        subject.displayInAdmitCard === false ? "false" : "true",
+      displayInMarksEntry:
+        subject.displayInMarksEntry === false ? "false" : "true",
+      displayInReportCard:
+        subject.displayInReportCard === false ? "false" : "true",
     });
     setModalOpen(true);
   };
 
   const handleDisplayToggle =
-    (name: "displayInAdmitCard" | "displayInMarksEntry" | "displayInReportCard") =>
+    (
+      name:
+        | "displayInAdmitCard"
+        | "displayInMarksEntry"
+        | "displayInReportCard",
+    ) =>
     (value: string) => {
       setValue(name, value === "true" ? "true" : "false");
     };
@@ -270,7 +283,7 @@ function Subject() {
             updatedAt: serverTimestamp(),
           });
           for (const className of classes.filter(
-            (cls) => cls !== originalClass
+            (cls) => cls !== originalClass,
           )) {
             batch.set(doc(collection(db, COLLECTION.SUBJECTS)), {
               name,
@@ -319,7 +332,7 @@ function Subject() {
         toast.success(
           classes.length === 1
             ? "Subject updated."
-            : `Subject updated for ${classes.length} classes.`
+            : `Subject updated for ${classes.length} classes.`,
         );
       } else {
         const classes = Array.isArray(data.classes) ? data.classes : [];
@@ -349,7 +362,7 @@ function Subject() {
         toast.success(
           classes.length === 1
             ? "Subject added."
-            : `Subject added to ${classes.length} classes.`
+            : `Subject added to ${classes.length} classes.`,
         );
       }
       setModalOpen(false);
@@ -440,7 +453,7 @@ function Subject() {
                 ? "Loading..."
                 : `${subjects.length} subject${subjects.length === 1 ? "" : "s"}`}
             </p>
-          </div>          
+          </div>
         </div>
         {loading ? (
           <div className="px-4 py-10 text-center">
@@ -544,7 +557,8 @@ function Subject() {
         loading={saving}
         submitDisabled={
           !subjectName?.trim() ||
-          (!Array.isArray(subjectClasses) || subjectClasses.length === 0)
+          !Array.isArray(subjectClasses) ||
+          subjectClasses.length === 0
         }
         onSubmit={handleSubmit(onSubmit)}
       >

@@ -9,6 +9,7 @@ export interface DeskSlipCardProps {
   studentName: string;
   fatherName: string;
   photoUrl?: string;
+  rollNo?: number;
 }
 
 const DeskSlipCard: React.FC<DeskSlipCardProps> = ({
@@ -20,6 +21,7 @@ const DeskSlipCard: React.FC<DeskSlipCardProps> = ({
   studentName,
   fatherName,
   photoUrl,
+  rollNo = 0,
 }) => (
   <div className="box-border h-[4cm] w-[9cm] break-inside-avoid overflow-hidden border border-dashed border-gray-400 bg-white p-[1mm]">
     <div className="flex h-full flex-col border border-gray-400 bg-white font-sans text-[12px] leading-tight text-gray-800">
@@ -36,12 +38,17 @@ const DeskSlipCard: React.FC<DeskSlipCardProps> = ({
             Admission No : <strong>{admissionNo || "-"}</strong>
           </div>
 
-          <div className="border-b border-gray-400 px-1.5 py-[3px]">
-            Class :{" "}
-            <strong>
-              {className}
-              {section ? ` - ${section}` : ""}
-            </strong>
+                    <div className="flex items-center justify-between border-b border-gray-400 px-1.5 py-[3px]">
+            <span>
+              Class :{" "}
+              <strong>
+                {className}
+                {section ? ` - ${section}` : ""}
+              </strong>
+            </span>
+            <span>
+              Roll No : <strong>{rollNo > 0 ? rollNo : "-"}</strong>
+            </span>
           </div>
 
           <div className="border-b border-gray-400 bg-gray-100 px-1.5 py-[3px] text-[9px] font-bold">
