@@ -1,189 +1,215 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore";
-import { COLLECTION } from "../../../constants";
-import { db } from "../../../firebase/config";
+import { useCallback, useRef, useState } from "react";
+import type { ExamRules } from "../../../utils/examRules";
+import type { MarksSubjectColumn } from "../../../utils/marksEntry";
 import {
-  buildSubjectColumns,
-  type MarksSubjectColumn,
-  type SubjectDocInput,
-} from "../../../utils/marksEntry";
-import { loadMarksForExam } from "../../../utils/marksService";
+  ensureExamSheet,
+  saveExamAttendance,
+  saveStudentMarks,
+  type MarksRowSnapshot,
+} from "../../../utils/marksService";
 import type {
-  SavedAttendance,
+  StudentWrite,
   UploadRosterStudent,
 } from "../../../utils/marksUpload";
-import type { ExamDoc, MarksDoc } from "../../../utils/type";
+import type { ExamDoc } from "../../../utils/type";
+
+const CONCURRENCY = 4;
 
 interface Params {
   session: string;
   exam: ExamDoc | null;
   className: string;
+  /** Every marks entry column of the class (the exam sheet needs all of them). */
+  columns: readonly MarksSubjectColumn[];
+  rules: ExamRules;
 }
 
-export interface MarksUploadData {
-  loading: boolean;
-  error: string | null;
-  /** Every student of the class + session, all sections. */
-  roster: UploadRosterStudent[];
-  /** Marks entry columns of the class for this exam. */
-  columns: MarksSubjectColumn[];
-  savedMarks: Record<string, MarksDoc>;
-  savedAttendance: Record<string, SavedAttendance>;
-  reload: () => void;
+export interface UploadSaveJob {
+  student: UploadRosterStudent;
+  write: StudentWrite;
+  rollNumber: number;
+  /** True when a marks document already exists for this student. */
+  existed: boolean;
 }
 
-interface Loaded {
-  roster: UploadRosterStudent[];
-  subjectDocs: SubjectDocInput[];
-  savedMarks: Record<string, MarksDoc>;
-  savedAttendance: Record<string, SavedAttendance>;
+export interface UploadSaveFailure {
+  studentName: string;
+  admissionNumber: string;
+  reason: string;
 }
 
-const EMPTY: Loaded = {
-  roster: [],
-  subjectDocs: [],
-  savedMarks: {},
-  savedAttendance: {},
-};
+export interface UploadSaveReport {
+  saved: number;
+  failed: UploadSaveFailure[];
+  warnings: string[];
+}
+
+export interface UploadSaveProgress {
+  done: number;
+  total: number;
+}
+
+const hasMarkChanges = (write: StudentWrite): boolean =>
+  Object.values(write.outcomes).some(
+    (outcome) => outcome.state === "new" || outcome.state === "overwrite"
+  );
+
+async function runPool<T>(
+  items: readonly T[],
+  limit: number,
+  worker: (item: T) => Promise<void>
+): Promise<void> {
+  let next = 0;
+  const runners = Array.from(
+    { length: Math.min(limit, items.length) },
+    async () => {
+      while (next < items.length) {
+        const item = items[next];
+        next += 1;
+        await worker(item);
+      }
+    }
+  );
+  await Promise.all(runners);
+}
 
 /**
- * One-shot load of everything the Excel upload needs for one exam + class:
- * the roster (all sections), the subjects, the saved marks and the saved
- * attendance. Same queries and filters as the Marks page.
+ * Saves the planned students of an Excel upload one by one (a few in
+ * parallel), reports progress and collects the failures instead of stopping
+ * at the first error.
  */
-export function useMarksUploadData({
+export function useMarksUploadSave({
   session,
   exam,
   className,
-}: Params): MarksUploadData {
-  const [loaded, setLoaded] = useState<Loaded>(EMPTY);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [nonce, setNonce] = useState(0);
-  const examId = exam?.id ?? "";
+  columns,
+  rules,
+}: Params) {
+  const [saving, setSaving] = useState(false);
+  const [progress, setProgress] = useState<UploadSaveProgress>({
+    done: 0,
+    total: 0,
+  });
+  const [report, setReport] = useState<UploadSaveReport | null>(null);
+  const busyRef = useRef(false);
 
-  useEffect(() => {
-    if (!session || !examId || !className) {
-      setLoaded(EMPTY);
-      setLoading(false);
-      setError(null);
-      return;
-    }
+  const resetReport = useCallback(() => setReport(null), []);
 
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
+  const save = useCallback(
+    async (jobs: readonly UploadSaveJob[]): Promise<UploadSaveReport | null> => {
+      if (busyRef.current || !exam || jobs.length === 0) return null;
+      busyRef.current = true;
+      setSaving(true);
+      setReport(null);
+      setProgress({ done: 0, total: jobs.length });
 
-    Promise.all([
-      getDocs(
-        query(
-          collection(db, COLLECTION.ENROLLMENTS),
-          where("className", "==", className),
-          where("academicYear", "==", session)
-        )
-      ),
-      getDocs(
-        query(
-          collection(db, COLLECTION.SUBJECTS),
-          where("className", "==", className)
-        )
-      ),
-      loadMarksForExam(session, examId, className),
-      getDocs(
-        query(
-          collection(db, COLLECTION.ATTENDANCE),
-          where("session", "==", session),
-          where("examId", "==", examId),
-          where("className", "==", className)
-        )
-      ),
-    ])
-      .then(([enrollments, subjects, marksDocs, attendance]) => {
-        if (cancelled) return;
+      const failed: UploadSaveFailure[] = [];
+      const warnings: string[] = [];
+      let saved = 0;
+      let done = 0;
+      let anyMarksSaved = false;
 
-        const roster: UploadRosterStudent[] = [];
-        enrollments.docs.forEach((enrollment) => {
-          const data = enrollment.data();
-          if (data.isDeleted === true) return;
-          const studentUid =
-            typeof data.studentId === "string" ? data.studentId : "";
-          if (!studentUid) return;
-          roster.push({
-            studentUid,
-            admissionNumber: String(data.enrollment ?? "").trim(),
-            studentName:
-              typeof data.studentName === "string" ? data.studentName : "",
-            fatherName:
-              typeof data.fatherName === "string" ? data.fatherName : "",
-            section: typeof data.section === "string" ? data.section : "",
-          });
-        });
-        roster.sort((a, b) =>
-          a.studentName.localeCompare(b.studentName, undefined, {
-            sensitivity: "base",
-          })
-        );
+      const saveJob = async (job: UploadSaveJob) => {
+        const { student, write } = job;
+        const snapshot: MarksRowSnapshot = {
+          studentUid: student.studentUid,
+          admissionNumber: student.admissionNumber,
+          studentName: student.studentName,
+          fatherName: student.fatherName,
+          className,
+          section: student.section,
+          rollNumber: job.rollNumber,
+        };
+        const problems: string[] = [];
 
-        const savedMarks: Record<string, MarksDoc> = {};
-        marksDocs.forEach((marks) => {
-          savedMarks[marks.studentUid] = marks;
-        });
-
-        const savedAttendance: Record<string, SavedAttendance> = {};
-        attendance.docs.forEach((item) => {
-          const data = item.data();
-          const studentUid = String(data.studentUid ?? "");
-          if (
-            !studentUid ||
-            typeof data.presentDays !== "number" ||
-            typeof data.totalDays !== "number"
-          ) {
-            return;
+        if (hasMarkChanges(write)) {
+          try {
+            await saveStudentMarks({
+              session,
+              examId: exam.id,
+              examName: exam.examName,
+              examType: exam.examCategory,
+              student: snapshot,
+              subjectMarks: write.subjectMarks,
+              clearedSubjectKeys: write.clearedSubjectKeys,
+              legacySubjectKeysToDelete: [],
+              existed: job.existed,
+              rules,
+            });
+            anyMarksSaved = true;
+          } catch (error) {
+            console.error("Failed to save marks:", error);
+            problems.push("Marks could not be saved.");
           }
-          savedAttendance[studentUid] = {
-            presentDays: data.presentDays,
-            totalDays: data.totalDays,
-          };
-        });
+        }
 
-        setLoaded({
-          roster,
-          subjectDocs: subjects.docs.map((subject) => ({
-            id: subject.id,
-            data: subject.data(),
-          })),
-          savedMarks,
-          savedAttendance,
-        });
-        setLoading(false);
-      })
-      .catch((loadError) => {
-        if (cancelled) return;
-        console.error("Failed to load marks upload data:", loadError);
-        setLoaded(EMPTY);
-        setError("Could not load the students, subjects or saved marks.");
-        setLoading(false);
-      });
+        if (write.attendanceChange) {
+          try {
+            await saveExamAttendance({
+              session,
+              examId: exam.id,
+              examName: exam.examName,
+              className,
+              section: student.section,
+              studentUid: student.studentUid,
+              studentName: student.studentName,
+              admissionNumber: student.admissionNumber,
+              presentDays: write.attendanceChange.presentDays,
+              totalDays: write.attendanceChange.totalDays,
+            });
+          } catch (error) {
+            console.error("Failed to save attendance:", error);
+            problems.push("Attendance could not be saved.");
+          }
+        }
 
-    return () => {
-      cancelled = true;
-    };
-  }, [session, examId, className, nonce]);
+        if (problems.length === 0) {
+          saved += 1;
+        } else {
+          failed.push({
+            studentName: student.studentName,
+            admissionNumber: student.admissionNumber,
+            reason: problems.join(" "),
+          });
+        }
+        done += 1;
+        setProgress({ done, total: jobs.length });
+      };
 
-  const columns = useMemo(
-    () => buildSubjectColumns(loaded.subjectDocs, exam, className),
-    [loaded.subjectDocs, exam, className]
+      try {
+        await runPool(jobs, CONCURRENCY, saveJob);
+
+        if (anyMarksSaved) {
+          const sheetOk = await ensureExamSheet(
+            session,
+            exam,
+            className,
+            columns.map((column) => ({
+              id: column.id,
+              name: column.name,
+              type: column.type,
+              order: column.order,
+              reportCardOrder: column.reportCardOrder,
+              displayInMarksEntry: true,
+            }))
+          );
+          if (!sheetOk) {
+            warnings.push(
+              "The exam sheet could not be created. It will be retried on the next save."
+            );
+          }
+        }
+      } finally {
+        busyRef.current = false;
+        setSaving(false);
+      }
+
+      const result: UploadSaveReport = { saved, failed, warnings };
+      setReport(result);
+      return result;
+    },
+    [session, exam, className, columns, rules]
   );
 
-  const reload = useCallback(() => setNonce((value) => value + 1), []);
-
-  return {
-    loading,
-    error,
-    roster: loaded.roster,
-    columns,
-    savedMarks: loaded.savedMarks,
-    savedAttendance: loaded.savedAttendance,
-    reload,
-  };
+  return { saving, progress, report, save, resetReport };
 }

@@ -24,11 +24,18 @@ import {
 } from "../../../utils/marksUpload";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import type { ExamDoc } from "../../../utils/type";
-import { NO_SCOPE, PERMISSIONS, scopedClasses, subjectAccess } from "../../../permissions";
+import {
+  NO_SCOPE,
+  PERMISSIONS,
+  scopedClasses,
+  subjectAccess,
+} from "../../../permissions";
 import Button from "../../../custom-components/Button";
 import Modal from "../../../custom-components/Modal";
 import { myContext } from "../../context/MyContextProvider";
+import toast from "react-hot-toast";
 import { useMarksUploadData } from "./useMarksUploadData";
+import { useMarksUploadSave, type UploadSaveJob } from "./useMarksUploadSave";
 
 const academicYears = generateAcademicYears();
 
@@ -109,12 +116,12 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
   }, [isOpen]);
 
   const yearExams = exams.filter(
-    (item) => item.status === "active" && item.academicYear === year
+    (item) => item.status === "active" && item.academicYear === year,
   );
   const exam = yearExams.find((item) => item.id === examId) ?? null;
   const allowedClasses = scopedClasses(scope, CLASSES);
   const selectionReady = Boolean(
-    year && exam && className && allowedClasses.includes(className)
+    year && exam && className && allowedClasses.includes(className),
   );
 
   const data = useMarksUploadData({
@@ -122,27 +129,29 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
     exam: selectionReady ? exam : null,
     className: selectionReady ? className : "",
   });
-  const dataReady = selectionReady && !data.loading && data.error === null;
+  const rulesReady = !rulesState.loading && !rulesState.error;
+  const dataReady =
+    selectionReady && !data.loading && data.error === null && rulesReady;
 
   /** Per-section permission: edit rights differ between sections. */
   const canEditSubject = useCallback(
     (section: string, column: MarksSubjectColumn): boolean =>
       canEnter &&
       subjectAccess(scope, className, section, column.name) === "edit",
-    [canEnter, scope, className]
+    [canEnter, scope, className],
   );
 
   const { writableSections, templateColumns } = useMemo(() => {
     const sections = Array.from(
-      new Set(data.roster.map((student) => student.section))
+      new Set(data.roster.map((student) => student.section)),
     );
     const writable = new Set(
       sections.filter((section) =>
-        data.columns.some((column) => canEditSubject(section, column))
-      )
+        data.columns.some((column) => canEditSubject(section, column)),
+      ),
     );
     const columns = data.columns.filter((column) =>
-      Array.from(writable).some((section) => canEditSubject(section, column))
+      Array.from(writable).some((section) => canEditSubject(section, column)),
     );
     return { writableSections: writable, templateColumns: columns };
   }, [data.roster, data.columns, canEditSubject]);
@@ -179,7 +188,7 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
       setFileName(file.name);
     } catch (error) {
       setParseError(
-        error instanceof Error ? error.message : "Could not read the file."
+        error instanceof Error ? error.message : "Could not read the file.",
       );
     }
   };
@@ -199,7 +208,19 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
       includeAttendance: true,
       rules,
     });
-  }, [parsed, exam, dataReady, year, className, data, canEditSubject, rules]);
+  }, [
+    parsed,
+    exam,
+    dataReady,
+    year,
+    className,
+    data.columns,
+    data.roster,
+    data.savedMarks,
+    data.savedAttendance,
+    canEditSubject,
+    rules,
+  ]);
 
   const rows = useMemo(() => {
     if (!plan) return [];
@@ -208,7 +229,7 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
       write: evaluateStudentWrite(
         plan,
         planned,
-        overwriteBy[planned.student?.studentUid ?? ""] === true
+        overwriteBy[planned.student?.studentUid ?? ""] === true,
       ),
     }));
   }, [plan, overwriteBy]);
@@ -223,6 +244,50 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
     });
     return result;
   }, [rows]);
+
+  const { saving, progress, report, save, resetReport } = useMarksUploadSave({
+    session: year,
+    exam,
+    className,
+    columns: data.columns,
+    rules,
+  });
+
+  // A new file, a new selection or reopening the modal clears the old report.
+  useEffect(() => {
+    resetReport();
+  }, [parsed, year, examId, className, isOpen, resetReport]);
+
+  const saveJobs = useMemo<UploadSaveJob[]>(() => {
+    if (!plan) return [];
+    return rows.flatMap(({ planned, write }) => {
+      if (!planned.student || !write || !write.hasChanges) return [];
+      return [
+        {
+          student: planned.student,
+          write,
+          rollNumber: plan.rollNumbers.get(planned.student.studentUid) ?? 1,
+          existed: Boolean(data.savedMarks[planned.student.studentUid]),
+        },
+      ];
+    });
+  }, [plan, rows, data.savedMarks]);
+
+  const handleSave = async () => {
+    const result = await save(saveJobs);
+    if (!result) return;
+    setOverwriteBy({});
+    data.reload();
+    if (result.failed.length === 0) {
+      toast.success(`Marks saved for ${result.saved} student(s).`);
+    } else if (result.saved > 0) {
+      toast.error(
+        `${result.saved} saved, ${result.failed.length} failed. See the report.`,
+      );
+    } else {
+      toast.error("Nothing could be saved. See the report.");
+    }
+  };
 
   const headerOf = useMemo(() => {
     const map = new Map<string, string>();
@@ -261,13 +326,13 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={saving ? () => undefined : onClose}
       title="Upload Marks from Excel"
       description="Pick the exam and class, download the template, fill it and upload it. You see exactly what will be saved before anything is written."
       cancelText="Close"
-      onSubmit={() => undefined}
-      submitText={`Save ${counts.ready} student(s)`}
-      submitDisabled
+      onSubmit={() => void handleSave()}
+      submitText={saving ? "Saving..." : `Save ${counts.ready} student(s)`}
+      submitDisabled={saving || counts.ready === 0 || !canEnter}
       hideSubmit={!plan || fileProblems.length > 0}
       modalClassName="max-w-6xl"
     >
@@ -343,8 +408,8 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
 
       {!selectionReady ? (
         <p className="mt-4 rounded-md border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
-          Select the academic year, exam and class. Every section of the class is
-          covered by one file.
+          Select the academic year, exam and class. Every section of the class
+          is covered by one file.
         </p>
       ) : data.loading ? (
         <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-6 text-center text-sm font-semibold text-blue-700">
@@ -397,7 +462,10 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
               </span>
             )}
             <span className="text-xs text-gray-500">
-              {data.roster.filter((s) => writableSections.has(s.section)).length}{" "}
+              {
+                data.roster.filter((s) => writableSections.has(s.section))
+                  .length
+              }{" "}
               student(s) in the template
             </span>
           </div>
@@ -421,8 +489,63 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
           )}
 
           {/* ---- Step 4: preview --------------------------------------- */}
+          {/* ---- Step 4: preview --------------------------------------- */}
           {plan && fileProblems.length === 0 && (
             <div className="mt-4">
+              {saving && (
+                <div className="mb-3 rounded-md border border-blue-200 bg-blue-50 px-4 py-3">
+                  <p className="text-sm font-semibold text-blue-700">
+                    Saving {progress.done} of {progress.total} student(s)...
+                  </p>
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-blue-100">
+                    <div
+                      className="h-full bg-blue-600 transition-all"
+                      style={{
+                        width: `${
+                          progress.total === 0
+                            ? 0
+                            : Math.round((progress.done / progress.total) * 100)
+                        }%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {report && (
+                <div
+                  className={`mb-3 rounded-md border px-4 py-3 text-sm ${
+                    report.failed.length === 0
+                      ? "border-green-300 bg-green-50 text-green-800"
+                      : "border-red-300 bg-red-50 text-red-700"
+                  }`}
+                  role="status"
+                >
+                  <p className="font-semibold">
+                    {report.saved} student(s) saved
+                    {report.failed.length > 0
+                      ? `, ${report.failed.length} failed.`
+                      : "."}
+                  </p>
+                  {report.failed.map((item) => (
+                    <p key={`${item.admissionNumber}-${item.studentName}`}>
+                      {item.admissionNumber} - {item.studentName}: {item.reason}
+                    </p>
+                  ))}
+                  {report.warnings.map((text) => (
+                    <p key={text} className="text-amber-800">
+                      {text}
+                    </p>
+                  ))}
+                  {report.failed.length > 0 && (
+                    <p className="mt-1 font-normal">
+                      The preview below is refreshed. Failed students show as
+                      &quot;Ready&quot; again, so you can press Save once more.
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                 {[
                   ["Rows in file", rows.length, "text-gray-800"],
@@ -506,7 +629,7 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
                       const uid = planned.student?.studentUid ?? "";
                       const hasErrors = planned.errors.length > 0;
                       const states = write ? countStates(write) : null;
-                      const isOpen = openRows[planned.rowNumber] === true;
+                      const isRowOpen = openRows[planned.rowNumber] === true;
                       const detailItems = write
                         ? [
                             ...Object.values(write.outcomes),
@@ -551,6 +674,7 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
                                 <input
                                   type="checkbox"
                                   checked={overwriteBy[uid] === true}
+                                  disabled={saving}
                                   onChange={(event) =>
                                     setOverwriteBy((previous) => ({
                                       ...previous,
@@ -582,12 +706,12 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
                                       onClick={() =>
                                         setOpenRows((previous) => ({
                                           ...previous,
-                                          [planned.rowNumber]: !isOpen,
+                                          [planned.rowNumber]: !isRowOpen,
                                         }))
                                       }
                                       className="ml-1 text-xs font-semibold text-blue-700 underline"
                                     >
-                                      {isOpen ? "hide" : "details"}
+                                      {isRowOpen ? "hide" : "details"}
                                     </button>
                                   )}
                                 </div>
@@ -598,15 +722,17 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
                             <td className="px-3 py-2 text-gray-700">
                               {write?.hasChanges
                                 ? `${formatMarks(write.summary.totalMarks)} / ${formatMarks(
-                                    write.summary.totalMaxMarks
+                                    write.summary.totalMaxMarks,
                                   )} (${formatMarks(write.summary.percentage)}%) ${write.summary.result.toUpperCase()}`
                                 : "-"}
                             </td>
                           </tr>
                           {(planned.errors.length > 0 ||
                             planned.warnings.length > 0 ||
-                            (isOpen && detailItems.length > 0)) && (
-                            <tr className={hasErrors ? "bg-red-50" : "bg-white"}>
+                            (isRowOpen && detailItems.length > 0)) && (
+                            <tr
+                              className={hasErrors ? "bg-red-50" : "bg-white"}
+                            >
                               <td colSpan={8} className="px-3 pb-2 text-xs">
                                 {planned.errors.map((text) => (
                                   <p key={text} className="text-red-700">
@@ -618,7 +744,7 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
                                     {text}
                                   </p>
                                 ))}
-                                {isOpen &&
+                                {isRowOpen &&
                                   detailItems.map((item) => (
                                     <p key={item.key} className="text-gray-700">
                                       <span
@@ -628,9 +754,8 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
                                       </span>
                                       {item.key === "attendance"
                                         ? "Attendance"
-                                        : headerOf.get(item.key) ?? item.key}
-                                      : {item.existing || "-"} →{" "}
-                                      {item.incoming}
+                                        : (headerOf.get(item.key) ?? item.key)}
+                                      : {item.existing || "-"} → {item.incoming}
                                     </p>
                                   ))}
                               </td>
@@ -646,8 +771,8 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
               {plan.notInFile.length > 0 && (
                 <details className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-4 py-2 text-sm">
                   <summary className="cursor-pointer font-semibold text-gray-700">
-                    {plan.notInFile.length} student(s) of the class are not in the
-                    file (nothing will change for them)
+                    {plan.notInFile.length} student(s) of the class are not in
+                    the file (nothing will change for them)
                   </summary>
                   <div className="mt-2 text-xs text-gray-600">
                     {plan.notInFile.map((student) => (
@@ -661,8 +786,8 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
               )}
 
               <p className="mt-3 text-xs text-gray-500">
-                Saving is added in the next step. Students with an error are
-                skipped completely. Empty cells never change saved marks.
+                Students with an error are skipped completely. Empty cells never
+                change saved marks.
               </p>
             </div>
           )}
