@@ -33,9 +33,7 @@ import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 
 import {
   ExamCategory,
-  isSchemeClass,
   marksSchemeFromDoc,
-  subjectMarksBreakdown,
 } from "../../../utils/examMarksScheme";
 
 import { useExamRules } from "../../../hooks/useExamRules";
@@ -49,7 +47,6 @@ import {
   formatMarks,
   listLegacySubjectKeys,
   normalizeLegacyMarksDoc,
-  round2,
 } from "../../../utils/marks";
 
 import {
@@ -64,9 +61,20 @@ import {
   ExamDoc,
   MarksData,
   MarksDoc,
-  SubjectComponentName,
-  SubjectMarksRecord,
 } from "../../../utils/type";
+import {
+  CELL_KEY,
+  GRADE_OPTIONS,
+  buildStudentDraft,
+  buildSubjectColumns,
+  normalizeGrade,
+  resolveCell,
+  subjectStatusToken,
+  toMarkTokenOrRaw,
+  type MarksComponentInput,
+  type MarksSubjectColumn,
+  type StudentDraftPlan,
+} from "../../../utils/marksEntry";
 
 import PageHeader from "../../../custom-components/PageHeader";
 
@@ -84,24 +92,11 @@ import {
   subjectAccess,
   type SubjectAccess,
 } from "../../../permissions";
+import MarksUploadModal from "./MarksUploadModal";
 
 const academicYears = generateAcademicYears();
 
 const AUTO_SAVE_DELAY = 600;
-
-const ORAL_MAX_MAIN_EXAM = 20;
-
-/**
-
- * Unit Test written / oral split for classes outside the 1-8 scheme
-
- * (PG, Nur, LKG, UKG): 20 written + 10 oral = exam maxMarks (30).
-
- */
-
-const UNIT_TEST_WRITTEN_MAX = 20;
-
-const UNIT_TEST_ORAL_MAX = 10;
 
 const inputClass =
   "w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500";
@@ -117,23 +112,6 @@ const readOnlyInputClass = "!bg-gray-100 !text-gray-500 cursor-not-allowed";
 
 const invalidInputClass =
   "border-red-500 focus:ring-red-500/40 focus:border-red-500";
-
-const GRADE_OPTIONS = ["A+", "A", "B+", "B", "C+", "C", "D", "E", "F"];
-
-/** Draft keys: one per component input (or grade) of every subject cell. */
-
-const CELL_KEY = {
-  component: (
-    studentUid: string,
-
-    subjectId: string,
-
-    component: SubjectComponentName | null,
-  ): string => `${studentUid}::${subjectId}::${component ?? "marks"}`,
-
-  grade: (studentUid: string, subjectId: string): string =>
-    `${studentUid}::${subjectId}::grade`,
-};
 
 interface AttendanceDraft {
   presentDays: string;
@@ -151,84 +129,6 @@ interface MarksRowStudent {
 
   section: string;
 }
-
-/** One input of a subject column: a single component, or the whole total. */
-
-interface MarksComponentInput {
-  /** Component name for scheme subjects; null for the single total input. */
-
-  component: SubjectComponentName | null;
-
-  /** Maximum marks of this component / total. */
-
-  max: number;
-
-  /** Header label shown above the input (e.g. "Notebook (5)"). */
-
-  label: string;
-}
-
-interface MarksSubjectColumn {
-  /** SubjectDoc id - the key used inside subjectMarks. */
-
-  id: string;
-
-  name: string;
-
-  type: string;
-
-  order: number;
-
-  /** Optional report card order (undefined = report card ke bottom mein). */
-
-  reportCardOrder?: number;
-
-  /** Scholastic subjects keep one grade cell and no component inputs. */
-
-  isGrade: boolean;
-
-  inputs: MarksComponentInput[];
-}
-
-/** A subject as loaded from Firestore, before the scheme-based layout. */
-
-interface SubjectColumnBase {
-  id: string;
-
-  name: string;
-
-  type: string;
-
-  order: number;
-
-  reportCardOrder?: number;
-}
-
-/** What one subject of one student will be written as (or not written). */
-
-type ResolvedSubject =
-  | { kind: "clear" }
-  | { kind: "invalid" }
-  | { kind: "status"; status: "absent" | "exempt" }
-  | {
-      kind: "present";
-
-      obtained: number;
-
-      maxMarks: number;
-
-      components: Partial<Record<SubjectComponentName, number | null>>;
-
-      componentMax: Partial<Record<SubjectComponentName, number>>;
-    };
-
-/** Parsed state of one cell's draft. */
-
-type ResolvedCell =
-  | { kind: "empty" }
-  | { kind: "status"; status: "absent" | "exempt" }
-  | { kind: "number"; value: number }
-  | { kind: "invalid" };
 
 function toExamCategory(value: unknown): ExamCategory {
   return value === "MAIN_EXAM" ? "MAIN_EXAM" : "UNIT_TEST";
@@ -313,473 +213,6 @@ function sortRowStudents(a: MarksRowStudent, b: MarksRowStudent): number {
   });
 }
 
-function toSubjectColumn(
-  snapshot: QueryDocumentSnapshot<DocumentData>,
-): SubjectColumnBase | null {
-  const data = snapshot.data();
-
-  if (data.displayInMarksEntry !== true) return null;
-
-  return {
-    id: snapshot.id,
-
-    name: typeof data.name === "string" ? data.name : "",
-
-    type: typeof data.type === "string" ? data.type : "",
-
-    order: typeof data.order === "number" ? data.order : 1,
-
-    reportCardOrder:
-      typeof data.reportCardOrder === "number" && data.reportCardOrder > 0
-        ? Math.floor(data.reportCardOrder)
-        : undefined,
-  };
-}
-
-function sortSubjectColumns(
-  a: SubjectColumnBase,
-
-  b: SubjectColumnBase,
-): number {
-  return a.order - b.order || a.name.localeCompare(b.name);
-}
-
-/**
-
- * Turns a loaded subject into the input layout of its marks cell. The exam
-
- * scheme decides the split (Unit Tests of classes 1-8 = notebook + test for
-
- * EVERY subject, no practical; Main Exam = theory, + practical for
-
- * Science/Computer on classes 1-8). Classes outside the 1-8 scheme
-
- * (PG, Nur, LKG, UKG) split Unit Tests into Written + Oral (20 + 10)
-
- * and Main Exams into Written + Oral (maxMarks - 20 / 20). Scholastic
-
- * subjects keep a single grade cell. Other classes get one "Marks" input.
-
- */
-
-function enrichSubjectColumn(
-  column: SubjectColumnBase,
-
-  exam: ExamDoc | null,
-
-  className: string,
-
-  hasPracticalSibling: boolean,
-
-  hasOralSibling: boolean,
-): MarksSubjectColumn {
-  if (column.type === "Scholastic") {
-    return { ...column, isGrade: true, inputs: [] };
-  }
-
-  const inputs: MarksComponentInput[] = [];
-
-  const isMainExam = exam?.examCategory === "MAIN_EXAM";
-
-  const oralMax = exam ? Math.min(ORAL_MAX_MAIN_EXAM, exam.maxMarks) : 0;
-
-  if (exam && isMainExam && column.type === "Written + Oral") {
-    // One subject row holding both papers.
-
-    inputs.push(
-      { component: "written", max: exam.maxMarks - oralMax, label: "Written" },
-
-      { component: "oral", max: oralMax, label: "Oral" },
-    );
-  } else if (exam && isMainExam && column.type === "Oral") {
-    // Separate Oral row: only the oral paper marks.
-
-    inputs.push({ component: null, max: oralMax, label: "Oral" });
-  } else if (
-    exam &&
-    isMainExam &&
-    column.type === "Written" &&
-    hasOralSibling
-  ) {
-    // Separate Written row of a subject that also has an Oral row.
-
-    inputs.push({
-      component: null,
-
-      max: exam.maxMarks - oralMax,
-
-      label: "Written",
-    });
-  } else if (exam && isSchemeClass(className)) {
-    const isPractical = column.type === "Practical";
-
-    const breakdown = subjectMarksBreakdown(
-      exam.examCategory,
-
-      exam.marksScheme,
-
-      isPractical || hasPracticalSibling,
-    );
-
-    if (exam.examCategory === "UNIT_TEST") {
-      // Unit Tests (classes 1-8) never carry a practical paper: every subject -
-
-      // including Computer / Science and any "Practical"-type subject - is
-
-      // entered with Notebook + Test only.
-
-      inputs.push(
-        { component: "notebook", max: breakdown.notebook, label: "Notebook" },
-
-        { component: "test", max: breakdown.theory, label: "Test" },
-      );
-    } else if (isPractical) {
-      // Main Exams: only the "Practical"-type subject keeps the practical
-
-      // paper; the theory part is entered on the same-named parent subject.
-
-      if (breakdown.practical > 0) {
-        inputs.push({
-          component: "practical",
-
-          max: breakdown.practical,
-
-          label: "Practical",
-        });
-      }
-    } else {
-      inputs.push({
-        component: "theory",
-
-        max: breakdown.theory,
-
-        label: "Theory",
-      });
-    }
-  } else if (exam && column.type === "Written + Oral") {
-    // Unit Tests of classes outside the 1-8 scheme (PG, Nur, LKG, UKG):
-
-    // one subject row holding both papers, 20 written + 10 oral = 30.
-
-    inputs.push(
-      { component: "written", max: UNIT_TEST_WRITTEN_MAX, label: "Written" },
-
-      { component: "oral", max: UNIT_TEST_ORAL_MAX, label: "Oral" },
-    );
-  } else if (exam && column.type === "Oral") {
-    // Separate Oral row (e.g. Conversation): only the oral paper marks.
-
-    inputs.push({ component: null, max: UNIT_TEST_ORAL_MAX, label: "Oral" });
-  } else if (exam && column.type === "Written" && hasOralSibling) {
-    // Separate Written row of a subject that also has an Oral row.
-
-    inputs.push({
-      component: null,
-
-      max: UNIT_TEST_WRITTEN_MAX,
-
-      label: "Written",
-    });
-  } else {
-    inputs.push({ component: null, max: exam?.maxMarks ?? 0, label: "Marks" });
-  }
-
-  return { ...column, isGrade: false, inputs };
-}
-
-function normalizeGrade(value: string): string {
-  return value
-
-    .toUpperCase()
-
-    .replace(/[^A-F0-9+-]/g, "")
-
-    .slice(0, 3);
-}
-
-/** "AB"/"EX" (any case) are shown back in the cell as uppercase tokens. */
-
-function toMarkTokenOrRaw(value: string): string {
-  const upper = value.trim().toUpperCase();
-
-  return upper === "AB" || upper === "EX" ? upper : value;
-}
-
-/**
-
- * Parses what the teacher typed in one cell: empty, the "AB"/"EX" token, a
-
- * valid non-negative number (at most 2 decimal places, "." or "," accepted as
-
- * the decimal separator) within [0, max], or invalid (letters other than
-
- * AB/EX, negative values, over-max values).
-
- */
-
-function resolveCell(value: string, max: number): ResolvedCell {
-  const trimmed = value.trim().replace(",", ".").toUpperCase();
-
-  if (trimmed === "") return { kind: "empty" };
-
-  if (trimmed === "AB") return { kind: "status", status: "absent" };
-
-  if (trimmed === "EX") return { kind: "status", status: "exempt" };
-
-  if (/^\d+(\.\d{1,2})?$/.test(trimmed)) {
-    const numeric = Number(trimmed);
-
-    if (Number.isFinite(numeric) && numeric >= 0 && numeric <= max) {
-      return { kind: "number", value: round2(numeric) };
-    }
-  }
-
-  return { kind: "invalid" };
-}
-
-/** "AB"/"EX" typed in any cell of a subject applies to the whole subject. */
-
-function subjectStatusToken(
-  drafts: Record<string, string>,
-
-  studentUid: string,
-
-  column: MarksSubjectColumn,
-): "AB" | "EX" | null {
-  for (const input of column.inputs) {
-    const draft =
-      drafts[CELL_KEY.component(studentUid, column.id, input.component)];
-
-    if (!draft) continue;
-
-    const upper = draft.trim().toUpperCase();
-
-    if (upper === "AB" || upper === "EX") return upper;
-  }
-
-  return null;
-}
-
-/**
-
- * The effective state of one subject from its cell drafts: absent/exempt when
-
- * any cell holds "AB"/"EX", invalid when any cell holds something unusable,
-
- * "clear" when every cell is empty, present otherwise. For present subjects,
-
- * obtained is the sum of the entered components (empty components store null).
-
- */
-
-function resolveSubject(
-  drafts: Record<string, string>,
-
-  studentUid: string,
-
-  column: MarksSubjectColumn,
-): ResolvedSubject {
-  if (column.inputs.length === 0) return { kind: "clear" };
-
-  const cells = column.inputs.map((input) =>
-    resolveCell(
-      drafts[CELL_KEY.component(studentUid, column.id, input.component)] ?? "",
-
-      input.max,
-    ),
-  );
-
-  const statusCell = cells.find((cell) => cell.kind === "status");
-
-  if (statusCell && statusCell.kind === "status") {
-    return { kind: "status", status: statusCell.status };
-  }
-
-  if (cells.some((cell) => cell.kind === "invalid")) {
-    return { kind: "invalid" };
-  }
-
-  if (cells.every((cell) => cell.kind === "empty")) {
-    return { kind: "clear" };
-  }
-
-  const components: Partial<Record<SubjectComponentName, number | null>> = {};
-
-  const componentMax: Partial<Record<SubjectComponentName, number>> = {};
-
-  let obtained = 0;
-
-  let maxMarks = 0;
-
-  cells.forEach((cell, index) => {
-    const input = column.inputs[index];
-
-    maxMarks += input.max;
-
-    if (!input.component) {
-      // Single total input (classes outside the 1-8 scheme).
-
-      if (cell.kind === "number") obtained = cell.value;
-
-      return;
-    }
-
-    componentMax[input.component] = input.max;
-
-    if (cell.kind === "number") {
-      components[input.component] = cell.value;
-
-      obtained += cell.value;
-    } else {
-      components[input.component] = null;
-    }
-  });
-
-  return {
-    kind: "present",
-
-    obtained: round2(obtained),
-
-    maxMarks,
-
-    components,
-
-    componentMax,
-  };
-}
-
-interface StudentDraftPlan {
-  subjectMarks: Record<string, SubjectMarksRecord>;
-
-  clearedSubjectKeys: string[];
-}
-
-/**
-
- * Builds the document-level plan of one student: the fresh subjectMarks map
-
- * plus the keys that must be deleted. Invalid cells keep the last valid saved
-
- * record untouched (neither rewritten nor deleted).
-
- */
-
-function buildStudentDraft(
-  studentUid: string,
-
-  drafts: Record<string, string>,
-
-  savedBySubject: Record<string, SubjectMarksRecord> | undefined,
-
-  columns: MarksSubjectColumn[],
-): StudentDraftPlan {
-  const subjectMarks: Record<string, SubjectMarksRecord> = {};
-
-  const clearedSubjectKeys: string[] = [];
-
-  columns.forEach((column) => {
-    if (column.isGrade) {
-      const gradeKey = CELL_KEY.grade(studentUid, column.id);
-
-      if (drafts[gradeKey] === undefined) {
-        // Grade not being edited: keep the saved record (or nothing).
-
-        if (savedBySubject?.[column.id]) {
-          subjectMarks[column.id] = savedBySubject[column.id];
-        }
-
-        return;
-      }
-
-      const grade = normalizeGrade(drafts[gradeKey]);
-
-      if (grade === "") {
-        if (savedBySubject?.[column.id]) clearedSubjectKeys.push(column.id);
-      } else {
-        subjectMarks[column.id] = {
-          status: "present",
-
-          obtained: null,
-
-          maxMarks: 0,
-
-          grade,
-        };
-      }
-
-      return;
-    }
-
-    // A subject whose cells have no draft at all is not being edited: keep the
-
-    // last saved record untouched instead of treating it as "cleared".
-
-    const hasCellDraft = column.inputs.some(
-      (input) =>
-        drafts[CELL_KEY.component(studentUid, column.id, input.component)] !==
-        undefined,
-    );
-
-    if (!hasCellDraft) {
-      if (savedBySubject?.[column.id]) {
-        subjectMarks[column.id] = savedBySubject[column.id];
-      }
-
-      return;
-    }
-
-    const resolved = resolveSubject(drafts, studentUid, column);
-
-    switch (resolved.kind) {
-      case "clear":
-        if (savedBySubject?.[column.id]) clearedSubjectKeys.push(column.id);
-
-        return;
-
-      case "invalid":
-        // Keep the last valid saved value: leave the existing key untouched.
-
-        if (savedBySubject?.[column.id]) {
-          subjectMarks[column.id] = savedBySubject[column.id];
-        }
-
-        return;
-
-      case "status":
-        subjectMarks[column.id] = {
-          status: resolved.status,
-
-          obtained: null,
-
-          maxMarks: column.inputs.reduce((sum, input) => sum + input.max, 0),
-        };
-
-        return;
-
-      case "present":
-        subjectMarks[column.id] = {
-          status: "present",
-
-          obtained: resolved.obtained,
-
-          maxMarks: resolved.maxMarks,
-
-          ...(Object.keys(resolved.components).length > 0
-            ? {
-                components: resolved.components,
-
-                componentMax: resolved.componentMax,
-              }
-            : {}),
-        };
-
-        return;
-    }
-  });
-
-  return { subjectMarks, clearedSubjectKeys };
-}
-
 /** A queued per-student autosave, with the full context needed to commit. */
 
 interface PendingMarkSave {
@@ -844,7 +277,7 @@ function ExamMarks() {
   const [exams, setExams] = useState<ExamDoc[]>([]);
 
   const [modalOpen, setModalOpen] = useState(false);
-
+    const [uploadOpen, setUploadOpen] = useState(false);
   const [marksYear, setMarksYear] = useState(academicYears[0]?.value ?? "");
 
   const [marksExamId, setMarksExamId] = useState("");
@@ -1320,112 +753,15 @@ function ExamMarks() {
     const unsubscribe = onSnapshot(
       subjectsQuery,
 
-      (snapshot) => {
-        const practicalNames = new Set(
-          snapshot.docs
-
-            .filter((d) => {
-              const data = d.data();
-
-              return (
-                data.type === "Practical" && data.displayInMarksEntry === true
-              );
-            })
-
-            .map((d) =>
-              String(d.data().name ?? "")
-                .trim()
-
-                .toLowerCase(),
-            ),
+            (snapshot) => {
+        const list = buildSubjectColumns(
+          snapshot.docs.map((subjectDoc) => ({
+            id: subjectDoc.id,
+            data: subjectDoc.data(),
+          })),
+          selectedExam,
+          marksClass,
         );
-
-        // Same-named subjects that DO have a non-practical row. A subject of type
-
-        // "Practical" is only the Main-Exam practical paper of its same-named
-
-        // written subject; such sibling rows have no paper in unit tests.
-
-        const nonPracticalNames = new Set(
-          snapshot.docs
-
-            .filter((d) => {
-              const data = d.data();
-
-              return (
-                data.type !== "Practical" && data.displayInMarksEntry === true
-              );
-            })
-
-            .map((d) =>
-              String(d.data().name ?? "")
-                .trim()
-
-                .toLowerCase(),
-            ),
-        );
-
-        // Unit Tests of classes 1-8 never have a practical paper, so the
-
-        // "Practical"-type sibling row is dropped from the marks entry (the
-
-        // parent subject already shows Notebook + Test). Subjects where the
-
-        // "Practical" row is the ONLY row of that name are kept and also get
-
-        // Notebook + Test.
-
-        const isUnitTestScheme =
-          selectedExam?.examCategory === "UNIT_TEST" &&
-          isSchemeClass(marksClass);
-
-        const oralNames = new Set(
-          snapshot.docs
-
-            .filter((d) => {
-              const data = d.data();
-
-              return data.type === "Oral" && data.displayInMarksEntry === true;
-            })
-
-            .map((d) =>
-              String(d.data().name ?? "")
-                .trim()
-
-                .toLowerCase(),
-            ),
-        );
-
-        const list = snapshot.docs
-
-          .map(toSubjectColumn)
-
-          .filter((c): c is SubjectColumnBase => c !== null && Boolean(c.name))
-
-          .sort(sortSubjectColumns)
-
-          .filter(
-            (c) =>
-              !(
-                isUnitTestScheme &&
-                c.type === "Practical" &&
-                nonPracticalNames.has(c.name.trim().toLowerCase())
-              ),
-          )
-
-          .map((c) =>
-            enrichSubjectColumn(
-              c,
-
-              selectedExam,
-
-              marksClass,
-
-              practicalNames.has(c.name.trim().toLowerCase()),
-
-              oralNames.has(c.name.trim().toLowerCase()),
-            ),
-          );
 
         subjectColumnsRef.current = list;
 
@@ -1789,14 +1125,25 @@ function ExamMarks() {
         titleStyle="text-primaryBlue"
         description="Enter student marks for every exam. Marks are saved automatically as you type."
         descriptionStyle="text-gray-500"
-        button={
-          <Button
-            buttonName="Add Marks"
-            variant="primary"
-            size="md"
-            buttonStyle="rounded-full bg-blue-600 hover:bg-blue-700"
-            onClick={openModal}
-          />
+                button={
+          <div className="flex gap-3">
+            {can(PERMISSIONS.MARKS_ENTER) && (
+              <Button
+                buttonName="Upload Excel"
+                variant="success"
+                size="md"
+                buttonStyle="rounded-full"
+                onClick={() => setUploadOpen(true)}
+              />
+            )}
+            <Button
+              buttonName="Add Marks"
+              variant="primary"
+              size="md"
+              buttonStyle="rounded-full bg-blue-600 hover:bg-blue-700"
+              onClick={openModal}
+            />
+          </div>
         }
       />
 
@@ -2314,6 +1661,11 @@ function ExamMarks() {
           </div>
         )}
       </Modal>
+            <MarksUploadModal
+        isOpen={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        exams={exams}
+      />
     </div>
   );
 }
