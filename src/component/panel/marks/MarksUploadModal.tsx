@@ -342,6 +342,23 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
         </p>
       )}
 
+      {rulesState.error && (
+        <div
+          className="mt-4 flex items-center justify-between gap-3 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
+          role="alert"
+        >
+          <span>
+            {rulesState.error} Upload is disabled until the settings load.
+          </span>
+          <Button
+            buttonName="Retry"
+            variant="outline"
+            size="sm"
+            onClick={rulesState.reload}
+          />
+        </div>
+      )}
+
       {/* ---- Step 1: selection --------------------------------------- */}
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div>
