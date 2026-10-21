@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   collection,
   doc,
@@ -27,9 +34,24 @@ import {
 import { db } from "../../../firebase/config";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
 import { generateClassRollNumbers } from "../../../utils/rollNumbers";
+import {
+  allowedClassSections,
+  buildQuerySpecs,
+  pairKey,
+  rowsFromCache,
+  specKey,
+  type EnrollmentQuerySpec,
+} from "../../../utils/studentScope";
+import {
+  NO_SCOPE,
+  PERMISSIONS,
+  scopedClasses,
+  scopedSections,
+} from "../../../permissions";
 import Modal from "../../../custom-components/Modal";
 import PageHeader from "../../../custom-components/PageHeader";
 import Button from "../../../custom-components/Button";
+import { myContext } from "../../context/MyContextProvider";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 75, 100];
 
@@ -87,11 +109,24 @@ function toStudentRow(
   };
 }
 
-/**
- * A student matches the search text when it is a prefix of the full name,
- * of any single word of the name (first or last name), or of the
- * enrollment (admission) number.
- */
+async function fetchEnrollments(
+  year: string,
+  spec: EnrollmentQuerySpec,
+): Promise<StudentListRow[]> {
+  const constraints: QueryConstraint[] = [where("academicYear", "==", year)];
+  if (spec.className) {
+    constraints.push(where("className", "==", spec.className));
+  }
+  if (spec.section) {
+    constraints.push(where("section", "==", spec.section));
+  }
+
+  const snapshot = await getDocs(
+    query(collection(db, COLLECTION.ENROLLMENTS), ...constraints),
+  );
+  return snapshot.docs.map(toStudentRow).filter((row) => !row.isDeleted);
+}
+
 function matchesSearch(student: StudentListRow, searchValue: string): boolean {
   const fullName = (
     student.studentName || `${student.firstName} ${student.lastName}`
@@ -168,6 +203,24 @@ function compareByClassOrder(a: StudentListRow, b: StudentListRow): number {
 
 export default function StudentList() {
   const navigate = useNavigate();
+  const { user, can, profileReady } = useContext(myContext);
+
+  const scope = user?.scope ?? NO_SCOPE;
+  const isAdmin = scope.kind === "all";
+  // Add / edit / delete stay with the roles that may create students.
+  const canManage = can(PERMISSIONS.STUDENT_CREATE);
+  const scopeReady = profileReady && user?.accessState === "ok";
+
+  /** Class + section pairs the user may see; null = every class (admin). */
+  const pairs = useMemo(() => allowedClassSections(scope), [scope]);
+  const allowedSet = useMemo(
+    () =>
+      pairs
+        ? new Set(pairs.map((pair) => pairKey(pair.className, pair.section)))
+        : null,
+    [pairs],
+  );
+
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<StudentListRow | null>(
     null,
@@ -197,6 +250,9 @@ export default function StudentList() {
   /* Ignores the answer of an outdated request (fast filter changes). */
   const requestIdRef = useRef(0);
 
+  /* Rows already read during this visit, so changing the filters is free. */
+  const cacheRef = useRef(new Map<string, StudentListRow[]>());
+
   /* The search box is focused as soon as the page opens. */
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -204,36 +260,67 @@ export default function StudentList() {
     searchInputRef.current?.focus();
   }, []);
 
+  /* Classes and sections offered in the filters. */
+  const classOptions = isAdmin ? CLASSES : scopedClasses(scope, CLASSES);
+  const sectionOptions = isAdmin
+    ? SECTIONS
+    : selectedClass
+      ? scopedSections(scope, selectedClass, SECTIONS)
+      : SECTIONS.filter((section) =>
+          (pairs ?? []).some((pair) => pair.section === section),
+        );
+
   /*
    * -----------------------------------------------------------
    * Data source (the only place that reads enrollments)
    * -----------------------------------------------------------
    *
-   * Enrollments are read once per academic year / class selection.
-   * Search, section, sorting and pagination work on this in-memory
-   * list, so they cost no Firestore reads.
+   * The chosen class / section go into the Firestore query, and a teacher
+   * only ever asks for the class + section pairs assigned to them. Rows that
+   * were already read in this visit answer narrower filters without a read.
+   * Search, sorting and pagination work on the in-memory list.
    */
 
   const loadStudents = useCallback(async () => {
+    if (!scopeReady) return;
+
     const requestId = ++requestIdRef.current;
+    const specs = buildQuerySpecs(pairs, selectedClass, selectedSection);
+
+    if (specs.length === 0) {
+      setRows([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const constraints: QueryConstraint[] = [
-        where("academicYear", "==", selectedYear),
-      ];
+      const parts = await Promise.all(
+        specs.map(async (spec) => {
+          const cached = rowsFromCache(cacheRef.current, selectedYear, spec);
+          if (cached) return cached;
 
-      if (selectedClass) {
-        constraints.push(where("className", "==", selectedClass));
-      }
-
-      const snapshot = await getDocs(
-        query(collection(db, COLLECTION.ENROLLMENTS), ...constraints),
+          const fetched = await fetchEnrollments(selectedYear, spec);
+          cacheRef.current.set(specKey(selectedYear, spec), fetched);
+          return fetched;
+        }),
       );
 
       if (requestId !== requestIdRef.current) return;
 
-      setRows(snapshot.docs.map(toStudentRow).filter((row) => !row.isDeleted));
+      // Defense in depth: a teacher never sees a pair outside the assignment.
+      const byId = new Map<string, StudentListRow>();
+      parts.forEach((part) => {
+        part.forEach((row) => {
+          if (allowedSet && !allowedSet.has(pairKey(row.className, row.section))) {
+            return;
+          }
+          byId.set(row.id, row);
+        });
+      });
+
+      setRows(Array.from(byId.values()));
     } catch (error) {
       console.error("Load students error:", error);
 
@@ -245,7 +332,14 @@ export default function StudentList() {
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, [selectedYear, selectedClass]);
+  }, [
+    scopeReady,
+    pairs,
+    allowedSet,
+    selectedYear,
+    selectedClass,
+    selectedSection,
+  ]);
 
   useEffect(() => {
     void loadStudents();
@@ -343,6 +437,16 @@ export default function StudentList() {
     setPage(currentPage - 1);
   };
 
+  /* Removes a deleted student from every cached result. */
+  const removeFromCache = (id: string) => {
+    cacheRef.current.forEach((list, key) => {
+      cacheRef.current.set(
+        key,
+        list.filter((row) => row.id !== id),
+      );
+    });
+  };
+
   /*
    * -----------------------------------------------------------
    * Delete enrollment (soft delete)
@@ -356,7 +460,7 @@ export default function StudentList() {
    */
 
   const handleDelete = async () => {
-    if (!studentToDelete) {
+    if (!studentToDelete || !canManage) {
       return;
     }
 
@@ -385,6 +489,7 @@ export default function StudentList() {
 
       toast.success("Student enrollment removed.");
 
+      removeFromCache(removedStudent.id);
       setRows((current) =>
         current.filter((row) => row.id !== removedStudent.id),
       );
@@ -420,25 +525,37 @@ export default function StudentList() {
    *
    * Photos live on the students document (students/{studentId}),
    * not on the enrollment row, so they are fetched lazily for the
-   * visible page and cached - turning pages does not refetch.
+   * visible page. Every student is requested at most once per visit,
+   * even when pages are turned quickly.
    */
 
-  const visibleStudentIds = visibleStudents
+  const photoRequestedRef = useRef(new Set<string>());
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const visibleIdsKey = visibleStudents
     .map((student) => student.studentId)
-    .filter((id) => id !== "");
-  const visibleIdsKey = visibleStudentIds.join(",");
+    .filter((id) => id !== "")
+    .join(",");
 
   useEffect(() => {
     if (loading || visibleIdsKey === "") {
       return;
     }
 
-    const missingIds = visibleStudentIds.filter((id) => !(id in studentPhotos));
+    const missingIds = visibleIdsKey
+      .split(",")
+      .filter((id) => !photoRequestedRef.current.has(id));
     if (missingIds.length === 0) {
       return;
     }
-
-    let cancelled = false;
+    missingIds.forEach((id) => photoRequestedRef.current.add(id));
 
     const loadPhotos = async () => {
       const entries = await Promise.all(
@@ -460,7 +577,7 @@ export default function StudentList() {
         }),
       );
 
-      if (cancelled) return;
+      if (!mountedRef.current) return;
 
       setStudentPhotos((prev) => {
         const next = { ...prev };
@@ -472,11 +589,7 @@ export default function StudentList() {
     };
 
     void loadPhotos();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [loading, visibleIdsKey, studentPhotos]);
+  }, [loading, visibleIdsKey]);
 
   const sortIndicator = (field: SortField) => {
     if (!sortActive || field !== sortField) {
@@ -497,21 +610,49 @@ export default function StudentList() {
     </th>
   );
 
+  const columnCount = canManage ? 9 : 8;
+  const noAccess = profileReady && user?.accessState !== "ok";
+  const nothingAssigned = scopeReady && pairs !== null && pairs.length === 0;
+
+  if (noAccess || nothingAssigned) {
+    return (
+      <div className="flex flex-col gap-2">
+        <PageHeader
+          title="Student List"
+          titleStyle="text-primaryBlue"
+          description="Manage students by academic year and class."
+          descriptionStyle="text-gray-500"
+        />
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-6 text-center text-sm font-semibold text-amber-900">
+          {noAccess
+            ? "Your account cannot open the student list."
+            : "No class or section is assigned to you yet."}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-2">
       <PageHeader
         title="Student List"
         titleStyle="text-primaryBlue"
-        description="Manage students by academic year and class."
+        description={
+          isAdmin
+            ? "Manage students by academic year and class."
+            : "Students of your assigned classes and sections."
+        }
         descriptionStyle="text-gray-500"
         button={
-          <Button
-            buttonName="+ Add Student"
-            variant="success"
-            size="md"
-            buttonStyle="rounded-full bg-blue-600 hover:bg-blue-700"
-            onClick={() => navigate(ADD_STUDENT_PATH)}
-          />
+          canManage ? (
+            <Button
+              buttonName="+ Add Student"
+              variant="success"
+              size="md"
+              buttonStyle="rounded-full bg-blue-600 hover:bg-blue-700"
+              onClick={() => navigate(ADD_STUDENT_PATH)}
+            />
+          ) : undefined
         }
       />
 
@@ -560,12 +701,16 @@ export default function StudentList() {
 
           <select
             value={selectedClass}
-            onChange={(event) => setSelectedClass(event.target.value)}
+            onChange={(event) => {
+              setSelectedClass(event.target.value);
+              // Sections differ per class for a teacher, so start over.
+              setSelectedSection("");
+            }}
             className="w-full rounded-md border px-3 py-2"
           >
-            <option value="">All Classes</option>
+            <option value="">{isAdmin ? "All Classes" : "All My Classes"}</option>
 
-            {CLASSES.map((className) => (
+            {classOptions.map((className) => (
               <option key={className} value={className}>
                 {className}
               </option>
@@ -583,9 +728,11 @@ export default function StudentList() {
             onChange={(event) => setSelectedSection(event.target.value)}
             className="w-full rounded-md border px-3 py-2"
           >
-            <option value="">All Sections</option>
+            <option value="">
+              {isAdmin ? "All Sections" : "All My Sections"}
+            </option>
 
-            {SECTIONS.map((section) => (
+            {sectionOptions.map((section) => (
               <option key={section} value={section}>
                 {section}
               </option>
@@ -616,21 +763,21 @@ export default function StudentList() {
 
               {sortableHeader("Phone", "phone")}
 
-              <th className="px-4 py-3">Actions</th>
+              {canManage && <th className="px-4 py-3">Actions</th>}
             </tr>
           </thead>
 
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={9} className="px-4 py-10 text-center">
+                <td colSpan={columnCount} className="px-4 py-10 text-center">
                   Loading students...
                 </td>
               </tr>
             ) : students.length === 0 ? (
               <tr>
                 <td
-                  colSpan={9}
+                  colSpan={columnCount}
                   className="px-4 py-10 text-center text-gray-500"
                 >
                   No students found.
@@ -668,35 +815,37 @@ export default function StudentList() {
 
                   <td className="px-4 py-3">{student.phone || "-"}</td>
 
-                  <td className="px-4 py-3">
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        title="Edit"
-                        aria-label={`Edit ${student.studentName}`}
-                        onClick={() => {
-                          navigate(`${ADD_STUDENT_PATH}?edit=${student.id}`);
-                        }}
-                        className="rounded border p-2 text-sm text-blue-600 hover:bg-blue-50"
-                      >
-                        <FaEdit />
-                      </button>
+                  {canManage && (
+                    <td className="px-4 py-3">
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          title="Edit"
+                          aria-label={`Edit ${student.studentName}`}
+                          onClick={() => {
+                            navigate(`${ADD_STUDENT_PATH}?edit=${student.id}`);
+                          }}
+                          className="rounded border p-2 text-sm text-blue-600 hover:bg-blue-50"
+                        >
+                          <FaEdit />
+                        </button>
 
-                      <button
-                        type="button"
-                        title="Delete"
-                        aria-label={`Delete ${student.studentName}`}
-                        disabled={deletingId === student.id}
-                        onClick={() => {
-                          setStudentToDelete(student);
-                          setIsDeleteModalOpen(true);
-                        }}
-                        className="rounded border p-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
-                      >
-                        <FaTrash />
-                      </button>
-                    </div>
-                  </td>
+                        <button
+                          type="button"
+                          title="Delete"
+                          aria-label={`Delete ${student.studentName}`}
+                          disabled={deletingId === student.id}
+                          onClick={() => {
+                            setStudentToDelete(student);
+                            setIsDeleteModalOpen(true);
+                          }}
+                          className="rounded border p-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+                        >
+                          <FaTrash />
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))
             )}
