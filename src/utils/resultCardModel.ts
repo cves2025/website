@@ -372,11 +372,25 @@ function buildComponentCell(
     return { text: ABSENT_LABEL, obtained: 0, max, counts: true };
   }
 
+    // Component-wise AB / EX (new data): only this paper is absent/exempt.
+  const componentState = record.componentStatus?.[comp];
+  if (componentState === "exempt") {
+    return {
+      text: EXEMPT_LABEL,
+      obtained: 0,
+      max,
+      counts: EXEMPT_COUNTS_IN_MAX && input.marks !== null,
+    };
+  }
+  if (componentState === "absent") {
+    return { text: ABSENT_LABEL, obtained: 0, max, counts: true };
+  }
+
   const parts = record.components ?? {};
   const hasAnyPart = (Object.values(parts) as (number | null)[]).some(
     (value) => typeof value === "number" && Number.isFinite(value)
   );
-  if (hasAnyPart) {
+  if (hasAnyPart || record.componentStatus !== undefined) {
     const value = parts[comp];
     if (typeof value === "number" && Number.isFinite(value)) {
       const num = round2(value);

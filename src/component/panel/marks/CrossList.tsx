@@ -251,6 +251,28 @@ async function fetchFallbackSubjects(className: string): Promise<ExamSheetSubjec
     .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 }
 
+const COMPONENT_SHORT: Record<SubjectComponentName, string> = {
+  notebook: "NB",
+  test: "T",
+  theory: "Th",
+  practical: "Pr",
+  written: "W",
+  oral: "O",
+};
+
+/** e.g. "NB:AB" when one component of a present subject is absent/exempt. */
+function componentFlags(record: SubjectMarksRecord): string {
+  return Object.entries(record.componentStatus ?? {})
+    .filter(([, state]) => state === "absent" || state === "exempt")
+    .map(
+      ([component, state]) =>
+        `${COMPONENT_SHORT[component as SubjectComponentName]}:${
+          state === "absent" ? "AB" : "EX"
+        }`,
+    )
+    .join(" ");
+}
+
 /** Text of one register cell of a subject (or "-" when no marks). */
 function subjectCellText(
   record: SubjectMarksRecord | undefined,
@@ -263,10 +285,15 @@ function subjectCellText(
   if (record.status === "exempt") return "EX";
   if (part === "grade") return "-";
   if (part === "theory" || part === "practical") {
+    const state = record.componentStatus?.[part];
+    if (state === "absent") return "AB";
+    if (state === "exempt") return "EX";
     const value = record.components?.[part];
     return value === null || value === undefined ? "-" : formatMarks(value);
   }
-  return record.obtained === null ? "-" : formatMarks(record.obtained);
+  const base = record.obtained === null ? "-" : formatMarks(record.obtained);
+  const flags = componentFlags(record);
+  return flags ? `${base} (${flags})` : base;
 }
 
 function CrossList() {

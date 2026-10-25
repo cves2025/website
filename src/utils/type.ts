@@ -272,6 +272,7 @@ export interface SubjectMarksRecord {
   maxMarks: number;
   /** Component marks (notebook/test/theory/practical) entered with the mark. */
   components?: Partial<Record<SubjectComponentName, number | null>>;
+  componentStatus?: Partial<Record<SubjectComponentName, SubjectMarkStatus>>;
   /** Maximum marks of every component, copied from the exam scheme. */
   componentMax?: Partial<Record<SubjectComponentName, number>>;
   /** Scholastic grade ("A+", "B", ...). Grade records never count in totals. */

@@ -521,16 +521,16 @@ export interface StudentWrite {
   hasChanges: boolean;
 }
 
-const isNumericText = (value: string): boolean =>
-  value !== "" && value !== "AB" && value !== "EX";
-
 function existingInputText(
   record: SubjectMarksRecord | undefined,
   component: SubjectComponentName | null,
 ): string {
   if (!record) return "";
-  if (record.status === "absent") return "AB";
-  if (record.status === "exempt") return "EX";
+  const componentState = component
+    ? record.componentStatus?.[component]
+    : undefined;
+  if (record.status === "absent" || componentState === "absent") return "AB";
+  if (record.status === "exempt" || componentState === "exempt") return "EX";
   const value = component ? record.components?.[component] : record.obtained;
   return typeof value === "number" ? formatMarks(value) : "";
 }
@@ -596,65 +596,41 @@ export function evaluateStudentWrite(
     const existingTexts = column.inputs.map((input) =>
       existingInputText(savedRecord, input.component),
     );
-    const token = texts
-      .map((text) => text.toUpperCase())
-      .find((text) => text === "AB" || text === "EX");
-
-    // AB / EX in any cell applies to the whole subject (like the grid).
-    if (token) {
-      const state = settle(
-        existingTexts.some((text) => text !== ""),
-        existingTexts.every((text) => text === token),
-      );
-      for (let i = 0; i < column.inputs.length; i += 1) {
-        if (texts[i] === "") continue;
-        const key = TEMPLATE_KEY.mark(column.id, column.inputs[i].component);
-        outcomes[key] = {
-          key,
-          incoming: texts[i].toUpperCase(),
-          existing: existingTexts[i],
-          state,
-        };
-      }
-      if (state === "new" || state === "overwrite") {
-        for (const input of column.inputs) {
-          drafts[
-            CELL_KEY.component(student.studentUid, column.id, input.component)
-          ] = token;
-        }
-        hasChanges = true;
-      }
-      continue;
-    }
-
+    // AB / EX is decided per input: Notebook = AB never hides the Test marks.
+    // A blank cell keeps whatever is saved for that input.
     let anyApplied = false;
     const finalTexts: string[] = [];
-    for (let i = 0; i < column.inputs.length; i += 1) {
-      const input = column.inputs[i];
-      const existing = existingTexts[i];
-      const cell = texts[i] === "" ? null : resolveCell(texts[i], input.max);
-      if (!cell || cell.kind !== "number") {
-        // Blank cell: whatever is saved stays.
-        finalTexts.push(isNumericText(existing) ? existing : "");
-        continue;
+    column.inputs.forEach((input, index) => {
+      const existing = existingTexts[index];
+      const upper = texts[index].toUpperCase();
+
+      let incoming = "";
+      if (upper === "AB" || upper === "EX") {
+        incoming = upper;
+      } else if (texts[index] !== "") {
+        const cell = resolveCell(texts[index], input.max);
+        if (cell.kind === "number") incoming = formatMarks(cell.value);
       }
+
+      if (incoming === "") {
+        finalTexts.push(existing);
+        return;
+      }
+
       const key = TEMPLATE_KEY.mark(column.id, input.component);
-      const incoming = formatMarks(cell.value);
-      const state = settle(
-        existing !== "",
-        isNumericText(existing) && Number(existing) === cell.value,
-      );
+      const state = settle(existing !== "", existing === incoming);
       outcomes[key] = { key, incoming, existing, state };
+
       if (state === "new" || state === "overwrite") {
         finalTexts.push(incoming);
         anyApplied = true;
       } else {
-        finalTexts.push(isNumericText(existing) ? existing : "");
+        finalTexts.push(existing);
       }
-    }
+    });
 
     // The whole subject is rebuilt from its drafts, so the cells that are not
-    // changing are seeded with their saved values (no sibling cell is lost).
+    // changing are seeded with their saved text (number, AB or EX).
     if (anyApplied) {
       column.inputs.forEach((input, index) => {
         if (finalTexts[index] === "") return;

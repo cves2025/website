@@ -10,6 +10,7 @@ import type {
   ExamDoc,
   SubjectComponentName,
   SubjectMarksRecord,
+  SubjectMarkStatus,
 } from "./type";
 
 export const ORAL_MAX_MAIN_EXAM = 20;
@@ -84,6 +85,9 @@ export type ResolvedSubject =
       maxMarks: number;
       components: Partial<Record<SubjectComponentName, number | null>>;
       componentMax: Partial<Record<SubjectComponentName, number>>;
+      componentStatus?: Partial<
+        Record<SubjectComponentName, SubjectMarkStatus>
+      >;
     };
 
 /** Parsed state of one cell's draft. */
@@ -226,7 +230,9 @@ export function enrichSubjectColumn(
 }
 
 const nameKey = (value: unknown): string =>
-  String(value ?? "").trim().toLowerCase();
+  String(value ?? "")
+    .trim()
+    .toLowerCase();
 
 /**
  * The marks entry columns of one class: the subjects shown in marks entry,
@@ -343,30 +349,47 @@ export function subjectStatusToken(
   return null;
 }
 
+/** Text of one cell as it is currently saved (used when the cell has no draft). */
+function savedCellText(
+  saved: SubjectMarksRecord | undefined,
+  input: MarksComponentInput,
+): string {
+  if (!saved) return "";
+  const componentState = input.component
+    ? saved.componentStatus?.[input.component]
+    : undefined;
+  if (saved.status === "absent" || componentState === "absent") return "AB";
+  if (saved.status === "exempt" || componentState === "exempt") return "EX";
+  if (input.component) {
+    const value = saved.components?.[input.component];
+    return typeof value === "number" ? String(value) : "";
+  }
+  return typeof saved.obtained === "number" ? String(saved.obtained) : "";
+}
+
 /**
- * The effective state of one subject from its cell drafts: absent/exempt when
- * any cell holds "AB"/"EX", invalid when any cell holds something unusable,
- * "clear" when every cell is empty, present otherwise. For present subjects,
- * obtained is the sum of the entered components (empty components store null).
+ * The effective state of one subject from its cell drafts (cells without a
+ * draft fall back to the saved value, so editing one cell never wipes the
+ * others). For subjects with several components (Notebook + Test,
+ * Written + Oral) AB/EX apply to that component only: AB counts 0 but keeps
+ * its max, EX drops its max. The whole subject is absent/exempt only when
+ * EVERY component is AB/EX. Single-input subjects: AB/EX = whole subject.
  */
 export function resolveSubject(
   drafts: Record<string, string>,
   studentUid: string,
   column: MarksSubjectColumn,
+  saved?: SubjectMarksRecord,
 ): ResolvedSubject {
   if (column.inputs.length === 0) return { kind: "clear" };
 
   const cells = column.inputs.map((input) =>
     resolveCell(
-      drafts[CELL_KEY.component(studentUid, column.id, input.component)] ?? "",
+      drafts[CELL_KEY.component(studentUid, column.id, input.component)] ??
+        savedCellText(saved, input),
       input.max,
     ),
   );
-
-  const statusCell = cells.find((cell) => cell.kind === "status");
-  if (statusCell && statusCell.kind === "status") {
-    return { kind: "status", status: statusCell.status };
-  }
 
   if (cells.some((cell) => cell.kind === "invalid")) {
     return { kind: "invalid" };
@@ -376,22 +399,53 @@ export function resolveSubject(
     return { kind: "clear" };
   }
 
+  const perComponent =
+    column.inputs.length > 1 &&
+    column.inputs.every((input) => input.component !== null);
+
+  const firstStatus = cells.find((cell) => cell.kind === "status");
+
+  if (!perComponent) {
+    if (firstStatus && firstStatus.kind === "status") {
+      return { kind: "status", status: firstStatus.status };
+    }
+  } else if (cells.every((cell) => cell.kind === "status")) {
+    const allExempt = cells.every(
+      (cell) => cell.kind === "status" && cell.status === "exempt",
+    );
+    return { kind: "status", status: allExempt ? "exempt" : "absent" };
+  }
+
   const components: Partial<Record<SubjectComponentName, number | null>> = {};
   const componentMax: Partial<Record<SubjectComponentName, number>> = {};
+  const componentStatus: Partial<
+    Record<SubjectComponentName, SubjectMarkStatus>
+  > = {};
   let obtained = 0;
   let maxMarks = 0;
 
   cells.forEach((cell, index) => {
     const input = column.inputs[index];
-    maxMarks += input.max;
 
     if (!input.component) {
       // Single total input (classes outside the 1-8 scheme).
+      maxMarks += input.max;
       if (cell.kind === "number") obtained = cell.value;
       return;
     }
 
     componentMax[input.component] = input.max;
+
+    if (cell.kind === "status") {
+      components[input.component] = null;
+      componentStatus[input.component] = cell.status;
+      // AB: scores 0 but its max still counts. EX: excluded from the max.
+      if (cell.status === "absent") maxMarks += input.max;
+      return;
+    }
+
+    componentStatus[input.component] = "present";
+    maxMarks += input.max;
 
     if (cell.kind === "number") {
       components[input.component] = cell.value;
@@ -407,6 +461,7 @@ export function resolveSubject(
     maxMarks,
     components,
     componentMax,
+    ...(perComponent ? { componentStatus } : {}),
   };
 }
 
@@ -466,7 +521,12 @@ export function buildStudentDraft(
       return;
     }
 
-    const resolved = resolveSubject(drafts, studentUid, column);
+    const resolved = resolveSubject(
+      drafts,
+      studentUid,
+      column,
+      savedBySubject?.[column.id],
+    );
 
     switch (resolved.kind) {
       case "clear":
@@ -497,6 +557,9 @@ export function buildStudentDraft(
             ? {
                 components: resolved.components,
                 componentMax: resolved.componentMax,
+                ...(resolved.componentStatus
+                  ? { componentStatus: resolved.componentStatus }
+                  : {}),
               }
             : {}),
         };

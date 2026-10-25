@@ -57,11 +57,7 @@ import {
   type MarksRowSnapshot,
 } from "../../../utils/marksService";
 
-import {
-  ExamDoc,
-  MarksData,
-  MarksDoc,
-} from "../../../utils/type";
+import { ExamDoc, MarksData, MarksDoc } from "../../../utils/type";
 import {
   CELL_KEY,
   GRADE_OPTIONS,
@@ -69,7 +65,6 @@ import {
   buildSubjectColumns,
   normalizeGrade,
   resolveCell,
-  subjectStatusToken,
   toMarkTokenOrRaw,
   type MarksComponentInput,
   type MarksSubjectColumn,
@@ -277,7 +272,7 @@ function ExamMarks() {
   const [exams, setExams] = useState<ExamDoc[]>([]);
 
   const [modalOpen, setModalOpen] = useState(false);
-    const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
   const [marksYear, setMarksYear] = useState(academicYears[0]?.value ?? "");
 
   const [marksExamId, setMarksExamId] = useState("");
@@ -753,7 +748,7 @@ function ExamMarks() {
     const unsubscribe = onSnapshot(
       subjectsQuery,
 
-            (snapshot) => {
+      (snapshot) => {
         const list = buildSubjectColumns(
           snapshot.docs.map((subjectDoc) => ({
             id: subjectDoc.id,
@@ -1125,7 +1120,7 @@ function ExamMarks() {
         titleStyle="text-primaryBlue"
         description="Enter student marks for every exam. Marks are saved automatically as you type."
         descriptionStyle="text-gray-500"
-                button={
+        button={
           <div className="flex gap-3">
             {can(PERMISSIONS.MARKS_ENTER) && (
               <Button
@@ -1520,14 +1515,6 @@ function ExamMarks() {
                           );
                         }
 
-                        const token = subjectStatusToken(
-                          drafts,
-
-                          student.studentUid,
-
-                          column,
-                        );
-
                         const saved =
                           marksMap[student.studentUid]?.subjectMarks[column.id];
 
@@ -1548,11 +1535,20 @@ function ExamMarks() {
 
                               if (draft !== undefined) {
                                 value = draft;
-                              } else if (token) {
-                                value = token;
                               } else if (saved) {
-                                if (saved.status === "absent") value = "AB";
-                                else if (saved.status === "exempt")
+                                const componentState = input.component
+                                  ? saved.componentStatus?.[input.component]
+                                  : undefined;
+
+                                if (
+                                  saved.status === "absent" ||
+                                  componentState === "absent"
+                                )
+                                  value = "AB";
+                                else if (
+                                  saved.status === "exempt" ||
+                                  componentState === "exempt"
+                                )
                                   value = "EX";
                                 else if (input.component) {
                                   const componentValue =
@@ -1661,7 +1657,7 @@ function ExamMarks() {
           </div>
         )}
       </Modal>
-            <MarksUploadModal
+      <MarksUploadModal
         isOpen={uploadOpen}
         onClose={() => setUploadOpen(false)}
         exams={exams}

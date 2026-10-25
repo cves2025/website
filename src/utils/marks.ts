@@ -39,6 +39,8 @@ const COMPONENT_NAMES: SubjectComponentName[] = [
   "test",
   "theory",
   "practical",
+  "written",
+  "oral",
 ];
 
 /**
@@ -54,10 +56,10 @@ function sanitizeDocPart(value: string): string {
 export function buildMarksDocId(
   session: string,
   examId: string,
-  studentUid: string
+  studentUid: string,
 ): string {
   return `${sanitizeDocPart(session)}_${sanitizeDocPart(
-    examId
+    examId,
   )}_${sanitizeDocPart(studentUid)}`;
 }
 
@@ -65,10 +67,10 @@ export function buildMarksDocId(
 export function buildExamSheetId(
   session: string,
   examId: string,
-  className: string
+  className: string,
 ): string {
   return `${sanitizeDocPart(session)}_${sanitizeDocPart(
-    examId
+    examId,
   )}_${sanitizeDocPart(className)}`;
 }
 
@@ -102,7 +104,7 @@ export function normalizeExamType(value: unknown): ExamCategory {
  */
 export function calculateMarksSummary(
   subjectMarks: Record<string, SubjectMarksRecord>,
-  rules: ExamRules = DEFAULT_EXAM_RULES
+  rules: ExamRules = DEFAULT_EXAM_RULES,
 ): MarksSummary {
   let totalMarks = 0;
   let totalMaxMarks = 0;
@@ -134,7 +136,7 @@ export function calculateMarksSummary(
       const passesEverySubject = counted.every(
         (subject) =>
           subject.obtained >=
-          round2((subject.maxMarks * rules.subjectPassPercentage) / 100)
+          round2((subject.maxMarks * rules.subjectPassPercentage) / 100),
       );
       result = passesEverySubject ? "pass" : "fail";
     }
@@ -164,7 +166,7 @@ function readStatus(value: unknown): SubjectMarkStatus | undefined {
 }
 
 function readComponents(
-  value: unknown
+  value: unknown,
 ): Partial<Record<SubjectComponentName, number | null>> | undefined {
   if (!value || typeof value !== "object") return undefined;
   const result: Partial<Record<SubjectComponentName, number | null>> = {};
@@ -173,27 +175,46 @@ function readComponents(
       if (!isComponentName(key)) return;
       if (componentValue === null) {
         result[key] = null;
-      } else if (typeof componentValue === "number" && Number.isFinite(componentValue)) {
+      } else if (
+        typeof componentValue === "number" &&
+        Number.isFinite(componentValue)
+      ) {
         result[key] = round2(componentValue);
       }
-    }
+    },
   );
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
 function readComponentMax(
-  value: unknown
+  value: unknown,
 ): Partial<Record<SubjectComponentName, number>> | undefined {
   if (!value || typeof value !== "object") return undefined;
   const result: Partial<Record<SubjectComponentName, number>> = {};
   Object.entries(value as Record<string, unknown>).forEach(
     ([key, componentValue]) => {
       if (!isComponentName(key)) return;
-      if (typeof componentValue === "number" && Number.isFinite(componentValue)) {
+      if (
+        typeof componentValue === "number" &&
+        Number.isFinite(componentValue)
+      ) {
         result[key] = Math.max(componentValue, 0);
       }
-    }
+    },
   );
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function readComponentStatus(
+  value: unknown,
+): Partial<Record<SubjectComponentName, SubjectMarkStatus>> | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const result: Partial<Record<SubjectComponentName, SubjectMarkStatus>> = {};
+  Object.entries(value as Record<string, unknown>).forEach(([key, state]) => {
+    if (!isComponentName(key)) return;
+    const status = readStatus(state);
+    if (status) result[key] = status;
+  });
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
@@ -224,13 +245,16 @@ function normalizeSubjectRecord(value: unknown): SubjectMarksRecord | null {
   if (status) {
     const components = readComponents(record.components);
     const componentMax = readComponentMax(record.componentMax);
+    const componentStatus = readComponentStatus(record.componentStatus);
     const grade = typeof record.grade === "string" ? record.grade.trim() : "";
     return {
       status,
-      obtained: status === "present" ? toNonNegativeNumber(record.obtained) : null,
+      obtained:
+        status === "present" ? toNonNegativeNumber(record.obtained) : null,
       maxMarks,
       ...(components ? { components } : {}),
       ...(componentMax ? { componentMax } : {}),
+      ...(componentStatus ? { componentStatus } : {}),
       ...(grade ? { grade } : {}),
     };
   }
@@ -253,7 +277,11 @@ function normalizeSubjectRecord(value: unknown): SubjectMarksRecord | null {
     }
     return { status: "present", obtained: null, maxMarks };
   }
-  return { status: "present", obtained: toNonNegativeNumber(obtained), maxMarks };
+  return {
+    status: "present",
+    obtained: toNonNegativeNumber(obtained),
+    maxMarks,
+  };
 }
 /**
  * Reads a (possibly legacy) marks document and returns its current shape.
@@ -268,14 +296,14 @@ function normalizeSubjectRecord(value: unknown): SubjectMarksRecord | null {
 export function normalizeLegacyMarksDoc(
   docId: string,
   data: Record<string, unknown>,
-  rules: ExamRules = DEFAULT_EXAM_RULES
+  rules: ExamRules = DEFAULT_EXAM_RULES,
 ): MarksDoc {
   const subjectMarks: Record<string, SubjectMarksRecord> = {};
   const rawSubjectMarks = data.subjectMarks;
   if (rawSubjectMarks && typeof rawSubjectMarks === "object") {
     const entries = Object.entries(rawSubjectMarks as Record<string, unknown>);
     const hasNewFormat = entries.some(([, value]) =>
-      isNewFormatSubjectRecord(value)
+      isNewFormatSubjectRecord(value),
     );
     entries.forEach(([key, value]) => {
       if (hasNewFormat && !isNewFormatSubjectRecord(value)) return;
@@ -313,8 +341,8 @@ export function normalizeLegacyMarksDoc(
 export function isNewFormatSubjectRecord(value: unknown): boolean {
   return Boolean(
     value &&
-      typeof value === "object" &&
-      typeof (value as Record<string, unknown>).status === "string"
+    typeof value === "object" &&
+    typeof (value as Record<string, unknown>).status === "string",
   );
 }
 
@@ -325,17 +353,18 @@ export function isNewFormatSubjectRecord(value: unknown): boolean {
  */
 export function listLegacySubjectKeys(
   subjectMarks: Record<string, unknown>,
-  currentSubjectIds: readonly string[]
+  currentSubjectIds: readonly string[],
 ): string[] {
   const entries = Object.entries(subjectMarks);
   const hasNewFormat = entries.some(([, value]) =>
-    isNewFormatSubjectRecord(value)
+    isNewFormatSubjectRecord(value),
   );
   if (!hasNewFormat) return [];
   const currentIds = new Set(currentSubjectIds);
   return entries
     .filter(
-      ([key, value]) => !isNewFormatSubjectRecord(value) && !currentIds.has(key)
+      ([key, value]) =>
+        !isNewFormatSubjectRecord(value) && !currentIds.has(key),
     )
     .map(([key]) => key);
 }
@@ -392,7 +421,7 @@ export interface SubjectColumnDef {
  */
 export function isSubjectComplete(
   record: SubjectMarksRecord | undefined,
-  columnDef: SubjectColumnDef
+  columnDef: SubjectColumnDef,
 ): boolean {
   if (!record) return false;
   if (record.status !== "present") return true;
@@ -400,9 +429,11 @@ export function isSubjectComplete(
     return typeof record.grade === "string" && record.grade.trim() !== "";
   }
   if (columnDef.components.length > 0) {
-    return columnDef.components.every(
-      (component) => typeof record.components?.[component] === "number"
-    );
+    return columnDef.components.every((component) => {
+      const state = record.componentStatus?.[component];
+      if (state === "absent" || state === "exempt") return true;
+      return typeof record.components?.[component] === "number";
+    });
   }
   return typeof record.obtained === "number";
 }
@@ -413,10 +444,10 @@ export type SubjectColumnDefMap = Record<string, SubjectColumnDef>;
 /** True when every subject column of one student's marks document is complete. */
 export function isMarksDocComplete(
   doc: MarksDoc,
-  columns: SubjectColumnDefMap
+  columns: SubjectColumnDefMap,
 ): boolean {
   return Object.keys(columns).every((subjectId) =>
-    isSubjectComplete(doc.subjectMarks[subjectId], columns[subjectId])
+    isSubjectComplete(doc.subjectMarks[subjectId], columns[subjectId]),
   );
 }
 
@@ -435,7 +466,7 @@ export interface ClassSectionRollStudent {
  */
 export function compareByClassSectionRoll(
   a: ClassSectionRollStudent,
-  b: ClassSectionRollStudent
+  b: ClassSectionRollStudent,
 ): number {
   return (
     compareClassNames(a.className, b.className) ||

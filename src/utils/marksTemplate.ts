@@ -48,7 +48,12 @@ export interface MarksTemplateParams {
   includeAttendance?: boolean;
 }
 
-const FIXED_HEADERS = ["Enrollment No.", "Student Name", "Father's Name", "Section"];
+const FIXED_HEADERS = [
+  "Enrollment No.",
+  "Student Name",
+  "Father's Name",
+  "Section",
+];
 const FIXED_WIDTHS = [14, 28, 24, 9];
 
 function subjectLabel(column: MarksSubjectColumn): string {
@@ -57,7 +62,7 @@ function subjectLabel(column: MarksSubjectColumn): string {
 }
 
 export function buildMarksTemplateWorkbook(
-  params: MarksTemplateParams
+  params: MarksTemplateParams,
 ): XLSX.WorkBook {
   const {
     session,
@@ -124,7 +129,9 @@ export function buildMarksTemplateWorkbook(
       "1. Fill the marks only in the 'Marks' sheet, below the header row. Do not add, delete or rename columns, and do not touch the hidden first row or the hidden '_meta' sheet.",
     ],
     ["2. The Enrollment No. identifies the student. Do not change it."],
-    ["3. Type AB for absent or EX for exempt in any cell of a subject."],
+    [
+      "3. Type AB for absent or EX for exempt in the cell of that paper only (for example Notebook = AB, Test = 5 keeps the 5 marks). AB counts as 0 marks and its maximum stays in the total; EX is left out of the total. If every cell of a subject is AB (or EX), the whole subject is absent (or exempt).",
+    ],
     [
       "4. Leave a cell empty when the marks are not ready yet: nothing is saved for it.",
     ],
@@ -167,7 +174,7 @@ function filePart(value: string): string {
 
 export function marksTemplateFileName(params: MarksTemplateParams): string {
   return `Marks-Template_Class-${filePart(params.className)}_${filePart(
-    params.exam.examName
+    params.exam.examName,
   )}_${filePart(params.session)}.xlsx`;
 }
 

@@ -56,6 +56,8 @@ const COMPONENT_NAMES: SubjectComponentName[] = [
   "test",
   "theory",
   "practical",
+  "written",
+  "oral",
 ];
 
 function isComponentName(value: string): value is SubjectComponentName {
@@ -119,7 +121,7 @@ export interface SaveStudentMarksParams {
  * which is re-run on the remaining map after cleared keys are removed.
  */
 export async function saveStudentMarks(
-  params: SaveStudentMarksParams
+  params: SaveStudentMarksParams,
 ): Promise<void> {
   const {
     session,
@@ -140,7 +142,18 @@ export async function saveStudentMarks(
   // (setDoc({ merge: true }) merges nested maps, so an explicit delete is the
   // only way to really drop a key). Leftover legacy keys of hybrid docs are
   // deleted the same way, so the document cleans itself on the next save.
-  const mergedSubjectMarks: Record<string, unknown> = { ...subjectMarks };
+  const mergedSubjectMarks: Record<string, unknown> = {};
+  Object.entries(subjectMarks).forEach(([key, record]) => {
+    // A merge-write never removes nested keys, so component fields that this
+    // record no longer carries (e.g. subject became absent as a whole) are
+    // deleted explicitly instead of lingering from an older save.
+    mergedSubjectMarks[key] = {
+      ...record,
+      ...(record.components ? {} : { components: deleteField() }),
+      ...(record.componentMax ? {} : { componentMax: deleteField() }),
+      ...(record.componentStatus ? {} : { componentStatus: deleteField() }),
+    };
+  });
   clearedSubjectKeys.forEach((key) => {
     mergedSubjectMarks[key] = deleteField();
   });
@@ -170,11 +183,15 @@ export async function saveStudentMarks(
       updatedAt: serverTimestamp(),
       ...(existed ? {} : { createdAt: serverTimestamp() }),
     },
-    { merge: true }
+    { merge: true },
   );
 }
 /** Attendance record id is deterministic: one record per student and exam. */
-export function buildAttendanceDocId(session: string, examId: string, studentUid: string): string {
+export function buildAttendanceDocId(
+  session: string,
+  examId: string,
+  studentUid: string,
+): string {
   return `attendance_${encodeURIComponent(session)}_${encodeURIComponent(examId)}_${encodeURIComponent(studentUid)}`;
 }
 
@@ -192,8 +209,14 @@ export interface SaveExamAttendanceParams {
 }
 
 /** Attendance is independent of marks and never changes a marks/result document. */
-export async function saveExamAttendance(params: SaveExamAttendanceParams): Promise<void> {
-  const id = buildAttendanceDocId(params.session, params.examId, params.studentUid);
+export async function saveExamAttendance(
+  params: SaveExamAttendanceParams,
+): Promise<void> {
+  const id = buildAttendanceDocId(
+    params.session,
+    params.examId,
+    params.studentUid,
+  );
   const reference = doc(db, COLLECTION.ATTENDANCE, id);
   if (params.presentDays === null && params.totalDays === null) {
     await deleteDoc(reference);
@@ -211,19 +234,23 @@ export async function saveExamAttendance(params: SaveExamAttendanceParams): Prom
   ) {
     throw new Error("Invalid attendance values.");
   }
-  await setDoc(reference, {
-    session: params.session,
-    examId: params.examId,
-    examName: params.examName,
-    className: params.className,
-    section: params.section,
-    studentUid: params.studentUid,
-    studentName: params.studentName,
-    admissionNumber: params.admissionNumber,
-    presentDays: params.presentDays,
-    totalDays: params.totalDays,
-    updatedAt: serverTimestamp(),
-  }, { merge: true });
+  await setDoc(
+    reference,
+    {
+      session: params.session,
+      examId: params.examId,
+      examName: params.examName,
+      className: params.className,
+      section: params.section,
+      studentUid: params.studentUid,
+      studentName: params.studentName,
+      admissionNumber: params.admissionNumber,
+      presentDays: params.presentDays,
+      totalDays: params.totalDays,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
 }
 
 /** Subject list used to build the frozen examSheets columns. */
@@ -240,7 +267,7 @@ export interface ExamSheetSubjectInput {
 /** Maximum component marks of one subject for the exam category + scheme. */
 function buildComponentMax(
   breakdown: SubjectMarksBreakdown,
-  category: ExamCategory
+  category: ExamCategory,
 ): Partial<Record<SubjectComponentName, number>> | undefined {
   if (category === "UNIT_TEST") {
     // Unit Test = notebook + written test (stored as the "theory" slot).
@@ -259,13 +286,13 @@ function buildComponentMax(
 function toSheetColumn(
   subject: ExamSheetSubjectInput,
   exam: ExamDoc,
-  className: string
+  className: string,
 ): ExamSheetSubjectColumn {
   const scheme = isSchemeClass(className)
     ? subjectMarksBreakdown(
         exam.examCategory,
         exam.marksScheme,
-        subject.type === "Practical"
+        subject.type === "Practical",
       )
     : null;
   const componentMax = scheme
@@ -276,7 +303,9 @@ function toSheetColumn(
     name: subject.name,
     type: subject.type,
     order: subject.order,
-    ...(subject.reportCardOrder ? { reportCardOrder: subject.reportCardOrder } : {}),
+    ...(subject.reportCardOrder
+      ? { reportCardOrder: subject.reportCardOrder }
+      : {}),
     maxMarks: scheme ? scheme.total : exam.maxMarks,
     ...(componentMax ? { componentMax } : {}),
     isGrade: subject.type === "Scholastic",
@@ -304,7 +333,7 @@ export async function ensureExamSheet(
   session: string,
   exam: ExamDoc,
   className: string,
-  subjects: readonly ExamSheetSubjectInput[]
+  subjects: readonly ExamSheetSubjectInput[],
 ): Promise<boolean> {
   const sheetId = buildExamSheetId(session, exam.id, className);
   if (ensuredExamSheets.has(sheetId)) return true;
@@ -351,10 +380,13 @@ function toStoredSheetColumn(value: unknown): ExamSheetSubjectColumn | null {
     Object.entries(rawComponentMax as Record<string, unknown>).forEach(
       ([key, componentValue]) => {
         if (!isComponentName(key)) return;
-        if (typeof componentValue === "number" && Number.isFinite(componentValue)) {
+        if (
+          typeof componentValue === "number" &&
+          Number.isFinite(componentValue)
+        ) {
           componentMax[key] = Math.max(componentValue, 0);
         }
-      }
+      },
     );
   }
 
@@ -379,10 +411,14 @@ function toStoredSheetColumn(value: unknown): ExamSheetSubjectColumn | null {
 export async function getExamSheet(
   session: string,
   examId: string,
-  className: string
+  className: string,
 ): Promise<ExamSheetDoc | null> {
   const snapshot = await getDoc(
-    doc(db, COLLECTION.EXAM_SHEETS, buildExamSheetId(session, examId, className))
+    doc(
+      db,
+      COLLECTION.EXAM_SHEETS,
+      buildExamSheetId(session, examId, className),
+    ),
   );
   if (!snapshot.exists()) return null;
   const data = snapshot.data();
@@ -411,14 +447,14 @@ export async function getExamSheet(
  * is missing/cleared maps to undefined, which places it below the ordered ones.
  */
 export async function loadSubjectReportCardOrders(
-  className: string
+  className: string,
 ): Promise<Record<string, number | undefined>> {
   if (!className) return {};
   const snapshot = await getDocs(
     query(
       collection(db, COLLECTION.SUBJECTS),
-      where("className", "==", className)
-    )
+      where("className", "==", className),
+    ),
   );
   const result: Record<string, number | undefined> = {};
   snapshot.docs.forEach((documentSnapshot) => {
@@ -442,10 +478,15 @@ export interface LiveSubject {
 }
 
 /** Reads the current subjects of a class from the LIVE subjects collection. */
-export async function loadLiveSubjects(className: string): Promise<LiveSubject[]> {
+export async function loadLiveSubjects(
+  className: string,
+): Promise<LiveSubject[]> {
   if (!className) return [];
   const snapshot = await getDocs(
-    query(collection(db, COLLECTION.SUBJECTS), where("className", "==", className))
+    query(
+      collection(db, COLLECTION.SUBJECTS),
+      where("className", "==", className),
+    ),
   );
   return snapshot.docs.map((documentSnapshot) => {
     const data = documentSnapshot.data();
@@ -456,7 +497,9 @@ export async function loadLiveSubjects(className: string): Promise<LiveSubject[]
       type: typeof data.type === "string" ? data.type : "",
       order: typeof data.order === "number" ? data.order : 1,
       reportCardOrder:
-        typeof rawOrder === "number" && rawOrder > 0 ? Math.floor(rawOrder) : undefined,
+        typeof rawOrder === "number" && rawOrder > 0
+          ? Math.floor(rawOrder)
+          : undefined,
       displayInMarksEntry: data.displayInMarksEntry === true,
       hideInReportCard: data.displayInReportCard === false,
     };
@@ -482,18 +525,27 @@ export function syncSheetWithLiveSubjects(params: {
   subjectIdsWithMarks: ReadonlySet<string>;
 }): ExamSheetDoc {
   const { sheet, exam, className, liveSubjects, subjectIdsWithMarks } = params;
-  const liveById = new Map(liveSubjects.map((subject) => [subject.id, subject]));
+  const liveById = new Map(
+    liveSubjects.map((subject) => [subject.id, subject]),
+  );
 
   const columns: ExamSheetSubjectColumn[] = sheet.subjects
     .filter((column) => !liveById.get(column.id)?.hideInReportCard)
     .map((column) => {
       const live = liveById.get(column.id);
-      return live ? { ...column, reportCardOrder: live.reportCardOrder } : column;
+      return live
+        ? { ...column, reportCardOrder: live.reportCardOrder }
+        : column;
     });
 
   const inSheet = new Set(sheet.subjects.map((column) => column.id));
   liveSubjects.forEach((live) => {
-    if (inSheet.has(live.id) || live.hideInReportCard || !live.displayInMarksEntry) return;
+    if (
+      inSheet.has(live.id) ||
+      live.hideInReportCard ||
+      !live.displayInMarksEntry
+    )
+      return;
     if (!live.name) return;
     const isGrade = live.type === "Scholastic";
     if (!isGrade && !subjectIdsWithMarks.has(live.id)) return;
@@ -514,7 +566,7 @@ export async function loadMarksForExam(
   examId: string,
   className?: string,
   section?: string,
-  rules: ExamRules = DEFAULT_EXAM_RULES
+  rules: ExamRules = DEFAULT_EXAM_RULES,
 ): Promise<MarksDoc[]> {
   const constraints: QueryConstraint[] = [
     where("session", "==", session),
@@ -524,7 +576,7 @@ export async function loadMarksForExam(
   if (section) constraints.push(where("section", "==", section));
 
   const snapshot = await getDocs(
-    query(collection(db, COLLECTION.MARKS), ...constraints)
+    query(collection(db, COLLECTION.MARKS), ...constraints),
   );
 
   return snapshot.docs
@@ -532,8 +584,8 @@ export async function loadMarksForExam(
       normalizeLegacyMarksDoc(
         documentSnapshot.id,
         documentSnapshot.data(),
-        rules
-      )
+        rules,
+      ),
     )
     .sort(compareByClassSectionRoll);
 }
@@ -544,7 +596,7 @@ export async function loadMarksForSectionExam(
   examId: string,
   className: string,
   section: string,
-  rules: ExamRules = DEFAULT_EXAM_RULES
+  rules: ExamRules = DEFAULT_EXAM_RULES,
 ): Promise<MarksDoc[]> {
   return loadMarksForExam(session, examId, className, section, rules);
 }
