@@ -8,12 +8,16 @@ import {
   validateExamRules,
 } from "../../../utils/examRules";
 import { saveExamRules } from "../../../utils/examRulesService";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 
 /** Warning shown before the rules are saved (applies to past exams too). */
 const SAVE_WARNING =
   "These rules apply to all exams, including past ones. Results and ranks will be recalculated everywhere.";
 
-/** Simple switch button matching the CustomToggle look used in the Exams module. */
+/** Labelled shadcn Switch row (same pink switch as CustomToggle). */
 function SwitchRow({
   checked,
   onChange,
@@ -43,21 +47,11 @@ function SwitchRow({
         >
           {checked ? onLabel : offLabel}
         </span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={checked}
-          onClick={() => onChange(!checked)}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-            checked ? "bg-blue-600" : "bg-gray-300"
-          }`}
-        >
-          <span
-            className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-              checked ? "translate-x-6" : "translate-x-1"
-            }`}
-          />
-        </button>
+        <Switch
+          checked={checked}
+          onCheckedChange={onChange}
+          aria-label={label}
+        />
       </div>
     </div>
   );
@@ -79,23 +73,21 @@ function PercentageField({
   const invalid = parsed === null;
   return (
     <div className="py-3">
-      <label
-        htmlFor={id}
-        className="mb-1 block text-sm font-semibold text-gray-700"
-      >
+      <Label htmlFor={id} className="mb-1 block font-semibold text-gray-700">
         {label}
-      </label>
-      <input
+      </Label>
+      <Input
         id={id}
         type="text"
         inputMode="decimal"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className={`w-32 rounded-md border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
+        className={cn(
+          "h-auto w-32 bg-white py-2 text-sm focus-visible:ring-2 md:text-sm",
           invalid
-            ? "border-red-500 focus:border-red-500 focus:ring-red-500/40"
-            : "border-gray-300 focus:border-blue-500 focus:ring-blue-500/50"
-        }`}
+            ? "border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500/40"
+            : "border-gray-300 focus-visible:border-blue-500 focus-visible:ring-blue-500/50",
+        )}
       />
       {invalid && value.trim() !== "" && (
         <p className="mt-1 text-xs text-red-600">
@@ -144,6 +136,14 @@ function ExamRulesSection() {
   const totalPass = parsePercentage(totalPassText);
   const subjectPass = parsePercentage(subjectPassText);
   const formValid = totalPass !== null && subjectPass !== null;
+
+  // "Save rules" stays disabled until the draft differs from the saved rules
+  // (percentages are compared as numbers, so "40" and "40.0" are the same).
+  const isDirty =
+    (rankClass ? "class" : "section") !== rules.rankScope ||
+    (passSubject ? "subject" : "total") !== rules.passMode ||
+    totalPass !== rules.totalPassPercentage ||
+    subjectPass !== rules.subjectPassPercentage;
 
   const buildDraft = (): ExamRules => ({
     rankScope: rankClass ? "class" : "section",
@@ -247,7 +247,12 @@ function ExamRulesSection() {
                 saving ? "Saving..." : justSaved ? "Saved" : "Save rules"
               }
               variant={justSaved ? "success" : "primary"}
-              disabled={!formValid || saving}
+              disabled={!formValid || !isDirty || saving}
+              title={
+                formValid && !isDirty
+                  ? "Change a rule to save"
+                  : undefined
+              }
               onClick={() => setConfirmOpen(true)}
               size="md"
             />

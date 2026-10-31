@@ -55,7 +55,6 @@ function CustomToggle<T extends FieldValues = FieldValues>({
           onCheckedChange={(checked) =>
             onChange?.(checked ? activeValue : inactiveValue)
           }
-          className="focus-visible:ring-primaryPink data-[state=checked]:bg-primaryPink data-[state=unchecked]:bg-gray-300"
         />
         <span
           className={`text-sm font-semibold ${
