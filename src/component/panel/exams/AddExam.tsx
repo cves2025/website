@@ -780,7 +780,7 @@ function AddExam({ initialEditId, onClose }: AddExamProps) {
               options={EXAM_NAME_OPTIONS}
               rules={{ required: "Please select an exam name." }}
               wrapperClassName="sm:col-span-2"
-              onChange={(event) => handleExamSelectChange(event.target.value)}
+              onValueChange={handleExamSelectChange}
             />
 
             {watchExamName === "Other" && (

@@ -5,10 +5,12 @@ import {
   FieldPath,
   RegisterOptions,
 } from "react-hook-form";
-import { SelectHTMLAttributes, ChangeEvent } from "react";
+import SelectDropdown from "./SelectDropdown";
+import { cn } from "@/lib/utils";
 
+// h-auto + py-2 keeps the trigger the same height as CustomInput.
 const SELECT_CLASS =
-  "w-full rounded-md border bg-white px-3 py-2 text-sm text-gray-800 shadow-sm transition-colors focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-100";
+  "h-auto w-full bg-white px-3 py-2 text-sm text-gray-800 focus:ring-2 disabled:bg-gray-100 data-[placeholder]:text-gray-400";
 
 function fieldBorder(invalid: boolean): string {
   return invalid
@@ -18,8 +20,7 @@ function fieldBorder(invalid: boolean): string {
 
 export type SelectOption = string | { value: string; label: string };
 
-interface CustomSelectProps<T extends FieldValues = FieldValues>
-  extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "name"> {
+interface CustomSelectProps<T extends FieldValues = FieldValues> {
   control: Control<T>;
   name: FieldPath<T>;
   label?: string;
@@ -27,6 +28,7 @@ interface CustomSelectProps<T extends FieldValues = FieldValues>
   options?: SelectOption[];
   rules?: RegisterOptions<T, FieldPath<T>>;
   required?: boolean;
+  disabled?: boolean;
   wrapperClassName?: string;
   className?: string;
   optionValue?: string;
@@ -35,13 +37,14 @@ interface CustomSelectProps<T extends FieldValues = FieldValues>
    * Extra change handler invoked AFTER the react-hook-form controller handler,
    * so the form value is already updated when this runs.
    */
-  onChange?: (event: ChangeEvent<HTMLSelectElement>) => void;
+  onValueChange?: (value: string) => void;
 }
 
 /**
- * Reusable select/dropdown built on react-hook-form's Controller.
+ * Reusable react-hook-form select/dropdown, built on the app-wide
+ * SelectDropdown (shadcn/ui Select).
  * options can be an array of strings OR objects like { value, label }.
- * Pass placeholder={null} to render no placeholder option.
+ * Pass placeholder={null} to show no placeholder text.
  */
 function CustomSelect<T extends FieldValues = FieldValues>({
   control,
@@ -56,10 +59,17 @@ function CustomSelect<T extends FieldValues = FieldValues>({
   className = "",
   optionValue = "value",
   optionLabel = "label",
-  onChange,
-  ...rest
+  onValueChange,
 }: CustomSelectProps<T>) {
   const isRequired = required || Boolean(rules.required);
+
+  const normalizedOptions = options.map((option) => {
+    if (typeof option === "object" && option !== null) {
+      const obj = option as Record<string, string>;
+      return { value: obj[optionValue], label: obj[optionLabel] };
+    }
+    return { value: option, label: option };
+  });
 
   return (
     <Controller
@@ -79,33 +89,24 @@ function CustomSelect<T extends FieldValues = FieldValues>({
                 {isRequired && <span className="ml-0.5 text-red-500">*</span>}
               </label>
             )}
-            <select
+            <SelectDropdown
               id={name}
+              ref={field.ref}
+              name={field.name}
+              value={field.value ?? ""}
+              onValueChange={(value) => {
+                field.onChange(value);
+                onValueChange?.(value);
+              }}
+              onOpenChange={(open) => {
+                if (!open) field.onBlur();
+              }}
+              options={normalizedOptions}
+              placeholder={placeholder ?? ""}
               disabled={disabled}
               aria-invalid={invalid}
-              className={`${SELECT_CLASS} ${fieldBorder(invalid)} ${className}`}
-              {...field}
-              {...rest}
-              onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-                field.onChange?.(event);
-                onChange?.(event);
-              }}
-            >
-              {placeholder !== null && placeholder !== "" && (
-                <option value="">{placeholder}</option>
-              )}
-              {options.map((option, index) => {
-                const isObject = typeof option === "object" && option !== null;
-                const obj = option as Record<string, string>;
-                const value = isObject ? obj[optionValue] : option;
-                const text = isObject ? obj[optionLabel] : option;
-                return (
-                  <option key={`${value}-${index}`} value={value}>
-                    {text}
-                  </option>
-                );
-              })}
-            </select>
+              className={cn(SELECT_CLASS, fieldBorder(invalid), className)}
+            />
             {fieldState.error && (
               <p className="text-xs font-medium text-red-600">
                 {fieldState.error.message}

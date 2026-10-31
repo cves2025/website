@@ -5,13 +5,7 @@ import {
   FieldPath,
   RegisterOptions,
 } from "react-hook-form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import SelectDropdown, { SelectDropdownOption } from "../SelectDropdown";
 import { cn } from "@/lib/utils";
 
 /**
@@ -19,22 +13,16 @@ import { cn } from "@/lib/utils";
  *
  * Same visual language as AdmissionLineInput — a label (prefix) followed by
  * a bottom-border field, matching the paper form's "write on the line"
- * look — built on the shadcn/ui Select, driven by an `options` array of
- * { label, value } objects.
+ * look — built on the app-wide SelectDropdown (shadcn/ui Select), driven by an
+ * `options` array of { label, value } objects.
  */
-interface AdmissionSelectOption {
-  /** Text shown to the user in the dropdown (e.g. "Male"). */
-  label: string;
-  /** Actual value stored in the form (e.g. "male"). */
-  value: string;
-}
 
 interface AdmissionSelectInputProps<T extends FieldValues = FieldValues> {
   control: Control<T>;
   name: FieldPath<T>;
   rules?: RegisterOptions<T, FieldPath<T>>;
   /** List of selectable options — array of { label, value } objects. */
-  options: AdmissionSelectOption[];
+  options: SelectDropdownOption[];
   /** Label shown left of the underline (e.g. "Gender :"). */
   prefix?: string;
   prefixClassName?: string;
@@ -77,39 +65,25 @@ function AdmissionSelectInput<T extends FieldValues = FieldValues>({
                   {prefix}
                 </span>
               )}
-              <Select
+              <SelectDropdown
+                id={name}
+                ref={field.ref}
                 name={field.name}
                 value={field.value ?? ""}
                 onValueChange={field.onChange}
                 onOpenChange={(open) => {
                   if (!open) field.onBlur();
                 }}
+                options={options}
+                placeholder={placeholder}
                 disabled={disabled}
-              >
-                <SelectTrigger
-                  id={name}
-                  ref={field.ref}
-                  aria-invalid={invalid}
-                  className={cn(
-                    "h-auto gap-1 rounded-none border-0 border-b bg-transparent px-1 py-0.5 text-sm font-semibold text-slate-900 shadow-none focus:ring-0 data-[placeholder]:font-normal data-[placeholder]:text-gray-400",
-                    invalid ? "border-red-500" : underlineClassName,
-                    className || "flex-1"
-                  )}
-                >
-                  <SelectValue placeholder={placeholder} />
-                </SelectTrigger>
-                <SelectContent className="border-primaryPink bg-white text-slate-900">
-                  {options.map((opt) => (
-                    <SelectItem
-                      key={opt.value}
-                      value={opt.value}
-                      className="cursor-pointer focus:bg-primaryPink focus:text-white data-[state=checked]:bg-primaryPink data-[state=checked]:font-semibold data-[state=checked]:text-white"
-                    >
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                aria-invalid={invalid}
+                className={cn(
+                  "h-auto gap-1 rounded-none border-0 border-b bg-transparent px-1 py-0.5 text-sm font-semibold text-slate-900 shadow-none focus:ring-0 data-[placeholder]:font-normal data-[placeholder]:text-gray-400",
+                  invalid ? "border-red-500" : underlineClassName,
+                  className || "flex-1"
+                )}
+              />
             </div>
             {fieldState.error && (
               <p className="text-xs font-medium text-red-600">

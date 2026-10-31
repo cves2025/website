@@ -49,6 +49,9 @@ import {
   scopedSections,
 } from "../../../permissions";
 import Modal from "../../../custom-components/Modal";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import SelectDropdown from "../../../custom-components/SelectDropdown";
 import PageHeader from "../../../custom-components/PageHeader";
 import Button from "../../../custom-components/Button";
 import { myContext } from "../../context/MyContextProvider";
@@ -662,82 +665,82 @@ export default function StudentList() {
         {/* Search */}
 
         <div>
-          <label className="mb-1 block text-sm font-medium">Search</label>
+          <Label htmlFor="student-search" className="mb-1 block font-bold">
+            Search
+          </Label>
 
-          <input
+          <Input
+            id="student-search"
             ref={searchInputRef}
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search by name or enrollment no..."
-            className="w-full rounded-md border px-3 py-2 outline-none"
           />
         </div>
 
         {/* Academic Year */}
 
         <div>
-          <label className="mb-1 block text-sm font-medium">
+          <Label htmlFor="student-year" className="mb-1 block font-bold">
             Academic Year
-          </label>
+          </Label>
 
-          <select
+          <SelectDropdown
+            id="student-year"
             value={selectedYear}
-            onChange={(event) => setSelectedYear(event.target.value)}
-            className="w-full rounded-md border px-3 py-2"
-          >
-            {academicYears.map((year) => (
-              <option key={year.value} value={year.value}>
-                {year.label}
-              </option>
-            ))}
-          </select>
+            onValueChange={setSelectedYear}
+            options={academicYears}
+          />
         </div>
 
         {/* Class */}
 
         <div>
-          <label className="mb-1 block text-sm font-medium">Class</label>
+          <Label htmlFor="student-class" className="mb-1 block font-bold">
+            Class
+          </Label>
 
-          <select
+          <SelectDropdown
+            id="student-class"
             value={selectedClass}
-            onChange={(event) => {
-              setSelectedClass(event.target.value);
+            onValueChange={(value) => {
+              setSelectedClass(value);
               // Sections differ per class for a teacher, so start over.
               setSelectedSection("");
             }}
-            className="w-full rounded-md border px-3 py-2"
-          >
-            <option value="">{isAdmin ? "All Classes" : "All My Classes"}</option>
-
-            {classOptions.map((className) => (
-              <option key={className} value={className}>
-                {className}
-              </option>
-            ))}
-          </select>
+            options={[
+              { label: isAdmin ? "All Classes" : "All My Classes", value: "" },
+              ...classOptions.map((className) => ({
+                label: className,
+                value: className,
+              })),
+            ]}
+          />
         </div>
 
         {/* Section */}
 
         <div>
-          <label className="mb-1 block text-sm font-medium">Section</label>
+          <Label htmlFor="student-section" className="mb-1 block font-bold">
+            Section
+          </Label>
 
-          <select
+          <SelectDropdown
+            id="student-section"
             value={selectedSection}
-            onChange={(event) => setSelectedSection(event.target.value)}
-            className="w-full rounded-md border px-3 py-2"
-          >
-            <option value="">
-              {isAdmin ? "All Sections" : "All My Sections"}
-            </option>
-
-            {sectionOptions.map((section) => (
-              <option key={section} value={section}>
-                {section}
-              </option>
-            ))}
-          </select>
+            onValueChange={setSelectedSection}
+            options={[
+              {
+                label: isAdmin ? "All Sections" : "All My Sections",
+                value: "",
+              },
+              ...sectionOptions.map((section) => ({
+                label: section,
+                value: section,
+              })),
+            ]}
+          />
         </div>
       </div>
 
@@ -859,19 +862,16 @@ export default function StudentList() {
         <div className="flex items-center gap-2 text-sm text-gray-500">
           <span>Show</span>
 
-          <select
-            value={pageSize}
-            onChange={(event) =>
-              handlePageSizeChange(Number(event.target.value))
-            }
-            className="rounded-md border px-2 py-1"
-          >
-            {PAGE_SIZE_OPTIONS.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
+          <SelectDropdown
+            value={String(pageSize)}
+            onValueChange={(value) => handlePageSizeChange(Number(value))}
+            options={PAGE_SIZE_OPTIONS.map((size) => ({
+              label: String(size),
+              value: String(size),
+            }))}
+            className="h-8 w-[72px]"
+            aria-label="Rows per page"
+          />
 
           <span>per page</span>
         </div>
