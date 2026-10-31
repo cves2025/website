@@ -6,6 +6,8 @@ import {
   RegisterOptions,
 } from "react-hook-form";
 import { ChangeEvent, InputHTMLAttributes } from "react";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 /**
  * Admission-form style "underline" input.
@@ -13,7 +15,7 @@ import { ChangeEvent, InputHTMLAttributes } from "react";
  * Renders a label (prefix) followed by a bottom-border field, matching the
  * paper form's "write on the line" look. The prefix span inherits the text
  * colour of the surrounding section (green / pink / indigo) so the original
- * design is preserved.
+ * design is preserved. Built on the shadcn/ui Input.
  */
 interface AdmissionLineInputProps<T extends FieldValues = FieldValues>
   extends Omit<InputHTMLAttributes<HTMLInputElement>, "name"> {
@@ -60,12 +62,14 @@ function AdmissionLineInput<T extends FieldValues = FieldValues>({
                   {prefix}
                 </span>
               )}
-              <input
+              <Input
                 id={name}
                 aria-invalid={invalid}
-                className={`border-0 border-b bg-transparent px-1 py-0.5 text-sm font-semibold text-slate-900 placeholder-gray-400 transition-colors focus:outline-none ${
-                  invalid ? "border-red-500" : underlineClassName
-                } ${className || "flex-1"}`}
+                className={cn(
+                  "h-auto rounded-none border-0 border-b bg-transparent px-1 py-0.5 text-sm font-semibold text-slate-900 shadow-none placeholder:text-gray-400 focus-visible:ring-0 md:text-sm",
+                  invalid ? "border-red-500" : underlineClassName,
+                  className || "flex-1"
+                )}
                 {...field}
                 onChange={
                   numeric

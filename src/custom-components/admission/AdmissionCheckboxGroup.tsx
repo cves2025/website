@@ -5,6 +5,8 @@ import {
   FieldPath,
   RegisterOptions,
 } from "react-hook-form";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 export interface AdmissionCheckboxOption {
   value: string;
@@ -14,7 +16,9 @@ export interface AdmissionCheckboxOption {
 /**
  * Admission-form style radio/check rows (e.g. the GENDER / CATEGORY /
  * NATIONALITY boxes). Each row keeps the exact "red label + green bordered
- * square" design; a light check mark inside the square shows the selection.
+ * square" design; a shadcn/ui Checkbox draws the square and its check mark.
+ * Only one option can be selected at a time (radio behaviour): clicking the
+ * selected box again keeps it selected.
  */
 interface AdmissionCheckboxGroupProps<T extends FieldValues = FieldValues> {
   control: Control<T>;
@@ -44,26 +48,27 @@ function AdmissionCheckboxGroup<T extends FieldValues = FieldValues>({
             <div className={className}>
               {options.map((option) => {
                 const checked = selected === option.value;
+                const id = `${name}-${option.value}`;
                 return (
-                  <button
+                  <Label
                     key={option.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={checked}
-                    onClick={() => field.onChange(option.value)}
-                    className="flex w-full cursor-pointer items-center justify-between gap-2 transition-opacity hover:opacity-80 focus:outline-none"
+                    htmlFor={id}
+                    className="flex w-full cursor-pointer items-center justify-between gap-2 transition-opacity hover:opacity-80"
                   >
                     <span className="text-red-700 font-semibold text-sm">
                       {option.label}
                     </span>
-                    <span
-                      className={`flex h-5 w-5 shrink-0 items-center justify-center border-2 border-green-700 text-green-700 ${
-                        checked ? "bg-green-50" : "bg-transparent"
-                      }`}
-                    >
-                      {checked && <span className="text-xs font-bold">✓</span>}
-                    </span>
-                  </button>
+                    <Checkbox
+                      id={id}
+                      checked={checked}
+                      aria-invalid={Boolean(fieldState.error)}
+                      onCheckedChange={(next) => {
+                        if (next) field.onChange(option.value);
+                      }}
+                      onBlur={field.onBlur}
+                      className="h-5 w-5 rounded-none border-2 border-green-700 text-green-700 shadow-none data-[state=checked]:bg-green-50 data-[state=checked]:text-green-700"
+                    />
+                  </Label>
                 );
               })}
             </div>

@@ -444,6 +444,8 @@ function AddStudent() {
     Record<string, ((file: File | null) => void) | null>
   >({});
   const activePhotoKey = useRef<string>("student");
+  // Student Info page wrapper — used to scroll to the first invalid field.
+  const infoPageRef = useRef<HTMLDivElement>(null);
 
   const registerPhotoPasteTarget = (
     key: string,
@@ -602,9 +604,26 @@ function AddStudent() {
     };
   }, [editEnrollmentId, reset, setSearchParams]);
 
+  /**
+   * Scrolls the Student Info page to a field (centred on screen) and focuses
+   * it. Without a selector it targets the first field marked invalid, in the
+   * order the fields appear on the page. Runs on the next frame so the error
+   * state from trigger() has rendered first.
+   */
+  const scrollToInfoField = (selector = '[aria-invalid="true"]') => {
+    requestAnimationFrame(() => {
+      const target =
+        infoPageRef.current?.querySelector<HTMLElement>(selector);
+      if (!target) return;
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      target.focus({ preventScroll: true });
+    });
+  };
+
   const handleNext = async () => {
     const valid = await trigger(page1RequiredFields);
     if (!valid) {
+      scrollToInfoField();
       return;
     }
 
@@ -613,6 +632,7 @@ function AddStudent() {
       toast.error(
         "Please fill the student's date of birth (DATE / MONTH / YEAR).",
       );
+      scrollToInfoField("#dobYear");
       return;
     }
 
@@ -691,7 +711,7 @@ function AddStudent() {
         );
         setActiveTab("info");
         setTimeout(() => {
-          void trigger(page1RequiredFields);
+          void trigger(page1RequiredFields).then(() => scrollToInfoField());
         }, 0);
         return;
       }
@@ -963,7 +983,10 @@ function AddStudent() {
       {activeTab === "bulk" ? (
         <BulkStudentImport />
       ) : activeTab === "info" ? (
-        <div className="mx-auto max-w-5xl bg-white p-2 sm:p-2 font-serif text-slate-900">
+        <div
+          ref={infoPageRef}
+          className="mx-auto max-w-5xl bg-white p-2 sm:p-2 font-serif text-slate-900"
+        >
           {/* Header */}
           <div className="flex items-start justify-between mb-2">
             <div className="text-xs sm:text-sm font-semibold text-slate-800">

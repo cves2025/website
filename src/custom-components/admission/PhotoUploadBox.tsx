@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { DragEvent } from "react";
+import { Button } from "@/components/ui/button";
 
 interface PhotoUploadBoxProps {
   label: string;
@@ -172,16 +173,18 @@ function PhotoUploadBox({
       </button>
 
       {displayUrl && !disabled && (
-        <button
+        <Button
           type="button"
+          variant="link"
+          size="sm"
           onClick={() => {
             handleFile(null);
             if (inputRef.current) inputRef.current.value = "";
           }}
-          className="text-[11px] font-semibold text-red-600 hover:underline"
+          className="h-auto p-0 text-[11px] font-semibold text-red-600"
         >
           Remove
-        </button>
+        </Button>
       )}
 
       <input
