@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import toast from "react-hot-toast";
-import { FaTrash } from "react-icons/fa";
+import { Trash2 } from "lucide-react";
 import { COLLECTION } from "../../../constants";
 import { db } from "../../../firebase/config";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
@@ -15,7 +15,7 @@ import {
   findScheduleRowProblems,
   formatScheduleDate,
   formatSubjectWithType,
-  inputClass,
+  selectTriggerClass,
   newRowId,
   paperKeyOfRow,
   rowClassScope,
@@ -27,6 +27,11 @@ import {
   useSubjectOptions,
 } from "./examScheduleShared";
 import PageHeader from "../../../custom-components/PageHeader";
+import SelectDropdown from "../../../custom-components/SelectDropdown";
+import { Button as UIButton } from "@/components/ui/button";
+import DatePicker from "../../../custom-components/DatePicker";
+import TimePicker from "../../../custom-components/TimePicker";
+import RadioOptions from "../../../custom-components/RadioOptions";
 import Button from "../../../custom-components/Button";
 
 /**
@@ -369,23 +374,20 @@ function ExamSchedule() {
             >
               Academic Year
             </label>
-            <select
+            <SelectDropdown
               id="scheduleYear"
               value={selectedYear}
-              onChange={(event) => {
-                setSelectedYear(event.target.value);
+              onValueChange={(value) => {
+                setSelectedYear(value);
                 setSelectedExamId("");
                 setScheduleErrors([]);
               }}
-              className={inputClass}
-            >
-              <option value="">All Academic Years</option>
-              {academicYears.map((year) => (
-                <option key={year.value} value={year.value}>
-                  {year.label}
-                </option>
-              ))}
-            </select>
+              options={[
+                { label: "All Academic Years", value: "" },
+                ...academicYears,
+              ]}
+              className={selectTriggerClass}
+            />
           </div>
 
           <div>
@@ -395,25 +397,21 @@ function ExamSchedule() {
             >
               Exam
             </label>
-            <select
+            <SelectDropdown
               id="scheduleExam"
               value={selectedExamId}
-              onChange={(event) => {
-                setSelectedExamId(event.target.value);
+              onValueChange={(value) => {
+                setSelectedExamId(value);
                 setScheduleErrors([]);
               }}
               disabled={loadingExams}
-              className={inputClass}
-            >
-              <option value="">
-                {loadingExams ? "Loading exams..." : "Select Exam"}
-              </option>
-              {yearExams.map((exam) => (
-                <option key={exam.id} value={exam.id}>
-                  {exam.examName}
-                </option>
-              ))}
-            </select>
+              placeholder={loadingExams ? "Loading exams..." : "Select Exam"}
+              options={yearExams.map((exam) => ({
+                label: exam.examName,
+                value: exam.id,
+              }))}
+              className={selectTriggerClass}
+            />
           </div>
         </div>
 
@@ -519,14 +517,17 @@ function ExamSchedule() {
                             </span>
                           )}
                         </span>
-                        <button
+                        <UIButton
                           type="button"
+                          size="icon"
+                          variant="destructive"
                           title="Remove this paper"
+                          aria-label="Remove this paper"
                           onClick={() => handleRemoveRow(row.id)}
-                          className="inline-flex items-center gap-1 rounded bg-red-600 px-2 py-1 text-xs font-bold text-white transition-colors hover:bg-red-700"
+                          className="h-8 w-8 shrink-0 bg-red-600 text-white hover:bg-red-700"
                         >
-                          <FaTrash /> Remove
-                        </button>
+                          <Trash2 className="h-4 w-4" />
+                        </UIButton>
                       </div>
 
                       <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -534,42 +535,33 @@ function ExamSchedule() {
                           <label className="mb-1 block text-xs font-semibold text-gray-600">
                             Subject
                           </label>
-                          <select
+                          <SelectDropdown
                             value={formatSubjectWithType(row.subject, row.subjectType)}
-                            onChange={(event) =>
-                              handleRowChange(row.id, {
-                                subject: event.target.value,
-                              })
+                            onValueChange={(value) =>
+                              handleRowChange(row.id, { subject: value })
                             }
                             disabled={loadingSubjects}
-                            className={inputClass}
-                          >
-                            <option value="">
-                              {loadingSubjects
+                            placeholder={
+                              loadingSubjects
                                 ? "Loading subjects..."
-                                : "Select subject"}
-                            </option>
-                            {subjectChoices.map((choice) => (
-                              <option key={choice.value} value={choice.value}>
-                                {choice.value}
-                              </option>
-                            ))}
-                          </select>
+                                : "Select subject"
+                            }
+                            options={subjectChoices.map((choice) => ({
+                              label: choice.value,
+                              value: choice.value,
+                            }))}
+                            className={selectTriggerClass}
+                          />
                         </div>
 
                         <div>
                           <label className="mb-1 block text-xs font-semibold text-gray-600">
                             Exam Date
                           </label>
-                          <input
-                            type="date"
+                          <DatePicker
                             value={row.date}
-                            onChange={(event) =>
-                              handleRowChange(row.id, {
-                                date: event.target.value,
-                              })
-                            }
-                            className={inputClass}
+                            onChange={(date) => handleRowChange(row.id, { date })}
+                            className="py-2.5"
                           />
                         </div>
 
@@ -577,15 +569,12 @@ function ExamSchedule() {
                           <label className="mb-1 block text-xs font-semibold text-gray-600">
                             From (reporting time)
                           </label>
-                          <input
-                            type="time"
+                          <TimePicker
                             value={row.fromTime}
-                            onChange={(event) =>
-                              handleRowChange(row.id, {
-                                fromTime: event.target.value,
-                              })
+                            onChange={(fromTime) =>
+                              handleRowChange(row.id, { fromTime })
                             }
-                            className={inputClass}
+                            className="py-2.5"
                           />
                         </div>
 
@@ -593,52 +582,42 @@ function ExamSchedule() {
                           <label className="mb-1 block text-xs font-semibold text-gray-600">
                             To (end time)
                           </label>
-                          <input
-                            type="time"
+                          <TimePicker
                             value={row.toTime}
-                            onChange={(event) =>
-                              handleRowChange(row.id, {
-                                toTime: event.target.value,
-                              })
+                            onChange={(toTime) =>
+                              handleRowChange(row.id, { toTime })
                             }
-                            className={inputClass}
+                            className="py-2.5"
                           />
                         </div>
                       </div>
 
                       {/* Applicable classes for this paper */}
                       <div className="mt-3 rounded-md border border-gray-200 bg-white p-3">
-                        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-                          <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                            <input
-                              type="radio"
-                              name={`classes-${row.id}`}
-                              checked={row.allClasses}
-                              onChange={() =>
-                                handleRowChange(row.id, { allClasses: true })
-                              }
-                              className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            All classes
-                            <span className="text-xs font-normal text-gray-500">
-                              {rowClasses.length > 0
-                                ? `(${rowClasses.map(toOrdinalLabel).join(", ")})`
-                                : "(this subject is not added to any class)"}
-                            </span>
-                          </label>
-                          <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                            <input
-                              type="radio"
-                              name={`classes-${row.id}`}
-                              checked={!row.allClasses}
-                              onChange={() =>
-                                handleRowChange(row.id, { allClasses: false })
-                              }
-                              className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            Specific classes
-                          </label>
-                        </div>
+                        <RadioOptions
+                          name={`classes-${row.id}`}
+                          value={row.allClasses ? "all" : "specific"}
+                          onValueChange={(value) =>
+                            handleRowChange(row.id, {
+                              allClasses: value === "all",
+                            })
+                          }
+                          options={[
+                            {
+                              value: "all",
+                              label: "All classes",
+                              hint: (
+                                <span className="text-xs font-normal text-gray-500">
+                                  {rowClasses.length > 0
+                                    ? `(${rowClasses.map(toOrdinalLabel).join(", ")})`
+                                    : "(this subject is not added to any class)"}
+                                </span>
+                              ),
+                            },
+                            { value: "specific", label: "Specific classes" },
+                          ]}
+                          className="flex-row flex-wrap items-center gap-x-6 gap-y-2"
+                        />
 
                         {!row.allClasses && (
                           <div className="mt-2">

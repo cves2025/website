@@ -50,6 +50,10 @@ export const academicYears = generateAcademicYears();
 export const inputClass =
   "w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed";
 
+/** SelectDropdown trigger matching `inputClass` (same height and border). */
+export const selectTriggerClass =
+  "h-auto border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 disabled:bg-gray-100";
+
 export function toExamCategory(value: unknown): ExamCategory {
   return value === "MAIN_EXAM" ? "MAIN_EXAM" : "UNIT_TEST";
 }
