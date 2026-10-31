@@ -14,15 +14,17 @@ export interface LatestRelease {
 }
 
 export const latestRelease: LatestRelease = {
-  id: "2026-10-photo-drag-drop",
-  title: "Photo Upload & Student Updates",
+  id: "2026-11-new-look",
+  title: "A Fresh New Look",
   description:
-    "This release adds drag & drop photo upload to the admission form, alongside the faster student list and smoother admit card workflow.",
+    "The whole panel has a cleaner, consistent design - dropdowns, tables, buttons, toggles and forms now look and work the same on every page. Your data and the way you work stay the same.",
   highlights: [
-    "Admission Form - drag & drop a photo directly onto the Student / Father / Mother photo boxes to attach it faster; click-to-choose and copy-paste still work exactly as before.",
-    "Student List - each student now shows their photo in a new Photo column so you can identify records at a glance.",
-    "Student List - show 25 / 50 / 75 / 100 records per page, sort by any column, and filter by class or section.",
-    "Edit mode - after updating a student the form automatically opens the next student, and a new \"Next Student\" button is available on both pages.",
-    "Admit Cards - cards print alphabetically by student name with a roll number, and you can now generate them section-wise.",
+    "Easier dates & times - Exam Schedule and Result Card Settings now open a calendar to pick a date, and a simple Hour / Minute / AM-PM picker for paper timings.",
+    "Admission Form - pressing Next now scrolls straight to the first required field that is still empty, so nothing is missed.",
+    "Marks Entry & Cross List - a clearer table with the header and student name always visible while scrolling, plus Pass / Fail and percentage badges.",
+    "Student List, Subjects, Exams & Settings - edit and delete are now small icon buttons, and the student list header stays visible while you scroll.",
+    "Safer changes - removing a remark range or deleting saved settings now asks for confirmation, and Save / Update buttons turn on only after you change something.",
+    "Suggested Remarks - the Add Range button hides once your ranges cover 0% to 100%.",
+    "Academic Year lists now start from the current session, 2026-27.",
   ],
 };
