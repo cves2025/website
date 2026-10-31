@@ -11,7 +11,9 @@
     "preview": "vite preview",
     "version:bump": "node scripts/bump-version.mjs",
     "predeploy": "npm run version:bump && npm run build",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist",
+    "build:dev": "tsc && vite build --mode staging",
+    "deploy:dev": "npm run build:dev && firebase deploy --only hosting:dev"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.4.1",

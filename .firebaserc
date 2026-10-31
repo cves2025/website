@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "schoolproject-284dc"
+  },
+  "targets": {
+    "schoolproject-284dc": {
+      "hosting": {
+        "dev": [
+          "schoolproject-284dc"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
