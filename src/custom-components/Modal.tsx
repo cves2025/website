@@ -64,79 +64,81 @@ const Modal: React.FC<ModalProps> = ({
       aria-modal="true"
     >
       <div
-        className={`relative w-full ${modalClassName} max-h-[calc(100vh-2rem)] overflow-y-auto rounded-lg bg-white p-6 shadow-xl`}
+        className={`relative flex w-full ${modalClassName} max-h-[calc(100vh-2rem)] flex-col rounded-lg bg-white shadow-xl`}
       >
-        {/* Close (cross) button — right top corner */}
+        {/* Close (cross) button — right top corner, stays fixed while the body scrolls */}
         <button
           type="button"
           onClick={onClose}
           disabled={loading}
           aria-label="Close"
-          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <FaTimes className="h-5 w-5" />
         </button>
 
-        {/* Title */}
-        <div className={`${titleStyle}`}>
-        <h2 className={`pr-8 text-lg font-semibold text-gray-900`}>
-          {title}
-        </h2>
-        </div>
+        <div className="overflow-y-auto p-6">
+          {/* Title */}
+          <div className={`${titleStyle}`}>
+          <h2 className={`pr-8 text-lg font-semibold text-gray-900`}>
+            {title}
+          </h2>
+          </div>
 
-        {/* Description */}
-        {description && (
-          <p className="mt-2 text-sm text-gray-600">
-            {description}
-          </p>
-        )}
+          {/* Description */}
+          {description && (
+            <p className="mt-2 text-sm text-gray-600">
+              {description}
+            </p>
+          )}
 
-        {/* Body content */}
-        {children}
+          {/* Body content */}
+          {children}
 
-        {/* Actions — the modal closes ONLY through the cross or Cancel button
-            so a half-filled form is never lost by an accidental outside click. */}
-        <div className="mt-6 flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={loading}
-            className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {cancelText}
-          </button>
-
-          {secondaryText && (
+          {/* Actions — the modal closes ONLY through the cross or Cancel button
+              so a half-filled form is never lost by an accidental outside click. */}
+          <div className="mt-6 flex justify-end gap-3">
             <button
               type="button"
-              onClick={() => onSecondarySubmit?.()}
-              disabled={loading || secondaryLoading}
-              className={`rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 ${secondaryClassName}`}
+              onClick={onClose}
+              disabled={loading}
+              className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {secondaryLoading ? "Please wait..." : secondaryText}
+              {cancelText}
             </button>
-          )}
 
-          {!hideSubmit && (
-            <button
-              type="button"
-              onClick={() => onSubmit()}
-              disabled={loading || submitDisabled}
-              className={`rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 ${submitClassName}`}
-            >
-              {loading ? "Please wait..." : submitText}
-            </button>
-          )}
+            {secondaryText && (
+              <button
+                type="button"
+                onClick={() => onSecondarySubmit?.()}
+                disabled={loading || secondaryLoading}
+                className={`rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 ${secondaryClassName}`}
+              >
+                {secondaryLoading ? "Please wait..." : secondaryText}
+              </button>
+            )}
 
-          {onChangeExam && (
-            <Button
-              type="button"
-              buttonName="Change Exam"
-              onClick={onChangeExam}
-              variant="success"
-              size="md"
-            />
-          )}
+            {!hideSubmit && (
+              <button
+                type="button"
+                onClick={() => onSubmit()}
+                disabled={loading || submitDisabled}
+                className={`rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 ${submitClassName}`}
+              >
+                {loading ? "Please wait..." : submitText}
+              </button>
+            )}
+
+            {onChangeExam && (
+              <Button
+                type="button"
+                buttonName="Change Exam"
+                onClick={onChangeExam}
+                variant="success"
+                size="md"
+              />
+            )}
+          </div>
         </div>
       </div>
     </div>
