@@ -22,7 +22,7 @@ import {
 } from "firebase/firestore";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
-import { FaEdit, FaTrash } from "react-icons/fa";
+import { Pencil, Trash2 } from "lucide-react";
 
 import {
   ADD_STUDENT_PATH,
@@ -49,7 +49,16 @@ import {
   scopedSections,
 } from "../../../permissions";
 import Modal from "../../../custom-components/Modal";
+import { Button as UIButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import SelectDropdown from "../../../custom-components/SelectDropdown";
 import PageHeader from "../../../custom-components/PageHeader";
@@ -603,14 +612,14 @@ export default function StudentList() {
   };
 
   const sortableHeader = (label: string, field: SortField) => (
-    <th
-      className="px-4 py-3 cursor-pointer select-none"
+    <TableHead
+      className="cursor-pointer select-none font-bold text-gray-700"
       onClick={() => handleSort(field)}
       title={`Sort by ${label}`}
     >
       {label}
       {sortIndicator(field)}
-    </th>
+    </TableHead>
   );
 
   const columnCount = canManage ? 9 : 8;
@@ -661,7 +670,7 @@ export default function StudentList() {
 
       {/* Filters */}
 
-      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4 bg-white rounded-lg py-2 px-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4 bg-white rounded-lg py-2 px-4">
         {/* Search */}
 
         <div>
@@ -746,13 +755,19 @@ export default function StudentList() {
 
       {/* Table */}
 
-      <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full min-w-[1000px]">
-          <thead>
-            <tr className="border-b bg-gray-50 text-left">
-              <th className="px-4 py-3">Sr. No.</th>
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+        {/* The table scrolls inside its own box (capped to the screen height
+            minus the app header and pagination), so the column header can stay
+            stuck at the top of that box while the rows scroll. */}
+        <Table
+          className="min-w-[1000px]"
+          containerClassName="max-h-[calc(100dvh-8rem)]"
+        >
+          <TableHeader className="sticky top-0 z-10 bg-gray-50 shadow-[0_1px_0_theme(colors.gray.200)]">
+            <TableRow className="bg-gray-50 hover:bg-gray-50">
+              <TableHead className="font-bold text-gray-700">Sr. No.</TableHead>
 
-              <th className="px-4 py-3">Photo</th>
+              <TableHead className="font-bold text-gray-700">Photo</TableHead>
 
               {sortableHeader("Enrollment", "enrollment")}
 
@@ -766,31 +781,35 @@ export default function StudentList() {
 
               {sortableHeader("Phone", "phone")}
 
-              {canManage && <th className="px-4 py-3">Actions</th>}
-            </tr>
-          </thead>
+              {canManage && (
+                <TableHead className="text-center font-bold text-gray-700">
+                  Actions
+                </TableHead>
+              )}
+            </TableRow>
+          </TableHeader>
 
-          <tbody>
+          <TableBody>
             {loading ? (
-              <tr>
-                <td colSpan={columnCount} className="px-4 py-10 text-center">
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={columnCount} className="py-10 text-center">
                   Loading students...
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : students.length === 0 ? (
-              <tr>
-                <td
+              <TableRow className="hover:bg-transparent">
+                <TableCell
                   colSpan={columnCount}
-                  className="px-4 py-10 text-center text-gray-500"
+                  className="py-10 text-center text-gray-500"
                 >
                   No students found.
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : (
               visibleStudents.map((student, index) => (
-                <tr key={student.id} className="border-b last:border-b-0">
-                  <td className="px-4 py-3">{startIndex + index + 1}</td>
-                  <td className="px-4 py-3">
+                <TableRow key={student.id}>
+                  <TableCell className="text-gray-500">{startIndex + index + 1}</TableCell>
+                  <TableCell>
                     {studentPhotos[student.studentId] ? (
                       <img
                         src={studentPhotos[student.studentId]}
@@ -803,38 +822,41 @@ export default function StudentList() {
                         &mdash;
                       </span>
                     )}
-                  </td>
-                  <td className="px-4 py-3">{student.enrollment}</td>
+                  </TableCell>
+                  <TableCell>{student.enrollment}</TableCell>
 
-                  <td className="px-4 py-3 font-medium">
+                  <TableCell className="font-medium text-gray-800">
                     {student.studentName}
-                  </td>
+                  </TableCell>
 
-                  <td className="px-4 py-3">{student.className}</td>
+                  <TableCell>{student.className}</TableCell>
 
-                  <td className="px-4 py-3">{student.section}</td>
+                  <TableCell>{student.section}</TableCell>
 
-                  <td className="px-4 py-3">{student.fatherName || "-"}</td>
+                  <TableCell>{student.fatherName || "-"}</TableCell>
 
-                  <td className="px-4 py-3">{student.phone || "-"}</td>
+                  <TableCell>{student.phone || "-"}</TableCell>
 
                   {canManage && (
-                    <td className="px-4 py-3">
-                      <div className="flex gap-2">
-                        <button
+                    <TableCell>
+                      <div className="flex justify-center gap-2">
+                        <UIButton
                           type="button"
+                          size="icon"
                           title="Edit"
                           aria-label={`Edit ${student.studentName}`}
                           onClick={() => {
                             navigate(`${ADD_STUDENT_PATH}?edit=${student.id}`);
                           }}
-                          className="rounded border p-2 text-sm text-blue-600 hover:bg-blue-50"
+                          className="h-8 w-8 bg-blue-600 text-white hover:bg-blue-700"
                         >
-                          <FaEdit />
-                        </button>
+                          <Pencil className="h-4 w-4" />
+                        </UIButton>
 
-                        <button
+                        <UIButton
                           type="button"
+                          size="icon"
+                          variant="destructive"
                           title="Delete"
                           aria-label={`Delete ${student.studentName}`}
                           disabled={deletingId === student.id}
@@ -842,18 +864,18 @@ export default function StudentList() {
                             setStudentToDelete(student);
                             setIsDeleteModalOpen(true);
                           }}
-                          className="rounded border p-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          className="h-8 w-8 bg-red-600 text-white hover:bg-red-700"
                         >
-                          <FaTrash />
-                        </button>
+                          <Trash2 className="h-4 w-4" />
+                        </UIButton>
                       </div>
-                    </td>
+                    </TableCell>
                   )}
-                </tr>
+                </TableRow>
               ))
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
       {/* Pagination */}

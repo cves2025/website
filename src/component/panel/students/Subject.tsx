@@ -27,6 +27,16 @@ import { CLASSES, COLLECTION } from "../../../constants";
 import { db } from "../../../firebase/config";
 import PageHeader from "../../../custom-components/PageHeader";
 import Button from "../../../custom-components/Button";
+import { Pencil, Trash2 } from "lucide-react";
+import { Button as UIButton } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 type SubjectType =
   | "Written"
@@ -622,11 +632,11 @@ function Subject() {
       {/* Subject management card */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-200 flex flex-wrap items-center justify-between gap-2">
-          <div>
+          <div className="flex w-full items-center justify-between gap-2">
             <h3 className="font-bold text-gray-800">
               Class {selectedClass} Subjects
             </h3>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-xs text-gray-500">
               {loading
                 ? "Loading..."
                 : `${subjects.length} subject${subjects.length === 1 ? "" : "s"}`}
@@ -647,81 +657,89 @@ function Subject() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[640px]">
-              <thead>
-                <tr className="bg-gray-800 text-white text-left">
-                  <th className="px-4 py-3">#</th>
-                  <th className="px-4 py-3">Subject Name</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Order</th>
-                  <th className="px-4 py-3">Report Card Order</th>
-                  <th className="px-4 py-3 text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {subjects.map((subject, index) => (
-                  <tr
-                    key={subject.id}
-                    className={index % 2 ? "bg-gray-50" : "bg-white"}
-                  >
-                    <td className="px-4 py-3 text-gray-500">{index + 1}</td>
-                    <td className="px-4 py-3 font-medium text-gray-800">
-                      {subject.name}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`rounded px-2 py-1 text-xs font-bold ${SUBJECT_TYPE_BADGE[subject.type]}`}
+          <Table className="min-w-[640px]">
+            <TableHeader>
+              <TableRow className="bg-gray-50 hover:bg-gray-50">
+                <TableHead className="font-bold text-gray-700">#</TableHead>
+                <TableHead className="font-bold text-gray-700">
+                  Subject Name
+                </TableHead>
+                <TableHead className="font-bold text-gray-700">Type</TableHead>
+                <TableHead className="font-bold text-gray-700">Order</TableHead>
+                <TableHead className="font-bold text-gray-700">
+                  Report Card Order
+                </TableHead>
+                <TableHead className="text-center font-bold text-gray-700">
+                  Actions
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {subjects.map((subject, index) => (
+                <TableRow key={subject.id}>
+                  <TableCell className="text-gray-500">{index + 1}</TableCell>
+                  <TableCell className="font-medium text-gray-800">
+                    {subject.name}
+                  </TableCell>
+                  <TableCell>
+                    <span
+                      className={`rounded px-2 py-1 text-xs font-bold ${SUBJECT_TYPE_BADGE[subject.type]}`}
+                    >
+                      {subject.type}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <span
+                      className={`rounded px-2 py-1 text-xs font-bold ${SUBJECT_TYPE_BADGE[subject.type]}`}
+                    >
+                      {subject.order}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <span
+                      className={`rounded px-2 py-1 text-xs font-bold ${
+                        subject.reportCardOrder
+                          ? SUBJECT_TYPE_BADGE[subject.type]
+                          : "bg-gray-200 text-gray-500"
+                      }`}
+                      title={
+                        subject.reportCardOrder
+                          ? "Report card order"
+                          : "No report card order - shown at the bottom of the report card"
+                      }
+                    >
+                      {subject.reportCardOrder ?? "—"}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex justify-center gap-2">
+                      <UIButton
+                        type="button"
+                        size="icon"
+                        onClick={() => openEditModal(subject)}
+                        aria-label={`Edit ${subject.name}`}
+                        title="Edit"
+                        className="h-8 w-8 bg-blue-600 text-white hover:bg-blue-700"
                       >
-                        {subject.type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`rounded px-2 py-1 text-xs font-bold ${SUBJECT_TYPE_BADGE[subject.type]}`}
+                        <Pencil className="h-4 w-4" />
+                      </UIButton>
+                      <UIButton
+                        type="button"
+                        size="icon"
+                        variant="destructive"
+                        onClick={() => handleDeleteClick(subject)}
+                        aria-label={`Delete ${subject.name}`}
+                        title="Delete"
+                        className="h-8 w-8 bg-red-600 text-white hover:bg-red-700"
                       >
-                        {subject.order}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`rounded px-2 py-1 text-xs font-bold ${
-                          subject.reportCardOrder
-                            ? SUBJECT_TYPE_BADGE[subject.type]
-                            : "bg-gray-200 text-gray-500"
-                        }`}
-                        title={
-                          subject.reportCardOrder
-                            ? "Report card order"
-                            : "No report card order - shown at the bottom of the report card"
-                        }
-                      >
-                        {subject.reportCardOrder ?? "—"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex justify-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openEditModal(subject)}
-                          className="bg-blue-600 hover:bg-blue-700 text-white rounded px-3 py-1 text-xs font-bold transition-colors"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteClick(subject)}
-                          className="bg-red-600 hover:bg-red-700 text-white rounded px-3 py-1 text-xs font-bold transition-colors"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                        <Trash2 className="h-4 w-4" />
+                      </UIButton>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </div>
       {/* Add / Edit subject modal */}
