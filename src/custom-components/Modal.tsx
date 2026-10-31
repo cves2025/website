@@ -1,6 +1,15 @@
 import React from "react";
-import { FaTimes } from "react-icons/fa";
 import Button from "./Button";
+import { Button as UIButton } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogPortal,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 interface ModalProps {
   isOpen: boolean;
@@ -32,6 +41,14 @@ interface ModalProps {
   onChangeExam?: () => void;
 }
 
+/**
+ * App-wide modal built on the shadcn/ui Dialog.
+ *
+ * The dialog is non-modal in Radix terms (`modal={false}`) and draws its own
+ * backdrop: this keeps the old behaviour of no focus trap / no body
+ * pointer-lock, so dropdowns that portal to document.body (e.g.
+ * SearchableMultiSelect) keep working inside the modal.
+ */
 const Modal: React.FC<ModalProps> = ({
   isOpen,
   onClose,
@@ -53,80 +70,89 @@ const Modal: React.FC<ModalProps> = ({
   modalClassName = "max-w-md",
   onChangeExam,
 }) => {
-  if (!isOpen) {
-    return null;
-  }
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      role="dialog"
-      aria-modal="true"
+    <Dialog
+      open={isOpen}
+      modal={false}
+      onOpenChange={(open) => {
+        // Only the cross reaches here (outside click / Esc are blocked below);
+        // like the old disabled cross, it does nothing while loading.
+        if (!open && !loading) onClose();
+      }}
     >
-      <div
-        className={`relative flex w-full ${modalClassName} max-h-[calc(100vh-2rem)] flex-col rounded-lg bg-white shadow-xl`}
+      {isOpen && (
+        <DialogPortal>
+          <div className="fixed inset-0 z-50 bg-black/50" aria-hidden="true" />
+        </DialogPortal>
+      )}
+      <DialogContent
+        // The modal closes ONLY through the cross or Cancel button so a
+        // half-filled form is never lost by an accidental outside click / Esc.
+        onInteractOutside={(event) => event.preventDefault()}
+        onEscapeKeyDown={(event) => event.preventDefault()}
+        {...(description ? {} : { "aria-describedby": undefined })}
+        className={cn(
+          "flex max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] flex-col gap-0 rounded-lg border-0 bg-white p-0 shadow-xl sm:rounded-lg [&>button:last-child]:right-3 [&>button:last-child]:top-3 [&>button:last-child]:z-10 [&>button:last-child>svg]:h-5 [&>button:last-child>svg]:w-5",
+          modalClassName
+        )}
       >
-        {/* Close (cross) button — right top corner, stays fixed while the body scrolls */}
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={loading}
-          aria-label="Close"
-          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <FaTimes className="h-5 w-5" />
-        </button>
-
         <div className="overflow-y-auto p-6">
           {/* Title */}
-          <div className={`${titleStyle}`}>
-          <h2 className={`pr-8 text-lg font-semibold text-gray-900`}>
-            {title}
-          </h2>
+          <div className={titleStyle}>
+            <DialogTitle className="pr-8 text-lg font-semibold text-gray-900">
+              {title}
+            </DialogTitle>
           </div>
 
           {/* Description */}
           {description && (
-            <p className="mt-2 text-sm text-gray-600">
+            <DialogDescription className="mt-2 text-sm text-gray-600">
               {description}
-            </p>
+            </DialogDescription>
           )}
 
           {/* Body content */}
           {children}
 
-          {/* Actions — the modal closes ONLY through the cross or Cancel button
-              so a half-filled form is never lost by an accidental outside click. */}
-          <div className="mt-6 flex justify-end gap-3">
-            <button
+          {/* Actions */}
+          <DialogFooter className="mt-6 flex-row justify-end gap-3 sm:space-x-0">
+            <UIButton
               type="button"
+              variant="outline"
               onClick={onClose}
               disabled={loading}
-              className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="border-gray-300 text-gray-700 hover:bg-gray-50"
             >
               {cancelText}
-            </button>
+            </UIButton>
 
             {secondaryText && (
-              <button
+              <UIButton
                 type="button"
+                variant="outline"
                 onClick={() => onSecondarySubmit?.()}
                 disabled={loading || secondaryLoading}
-                className={`rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 ${secondaryClassName}`}
+                className={cn(
+                  "border-gray-300 text-gray-700 hover:bg-gray-50",
+                  secondaryClassName
+                )}
               >
                 {secondaryLoading ? "Please wait..." : secondaryText}
-              </button>
+              </UIButton>
             )}
 
             {!hideSubmit && (
-              <button
+              <UIButton
                 type="button"
                 onClick={() => onSubmit()}
                 disabled={loading || submitDisabled}
-                className={`rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 ${submitClassName}`}
+                className={cn(
+                  "bg-blue-600 text-white hover:bg-blue-700",
+                  submitClassName
+                )}
               >
                 {loading ? "Please wait..." : submitText}
-              </button>
+              </UIButton>
             )}
 
             {onChangeExam && (
@@ -138,10 +164,10 @@ const Modal: React.FC<ModalProps> = ({
                 size="md"
               />
             )}
-          </div>
+          </DialogFooter>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
