@@ -6,7 +6,7 @@ import PageHeader from "../../../custom-components/PageHeader";
 import { useExamRules } from "../../../hooks/useExamRules";
 import { useResultCardData } from "../../../hooks/useResultCardData";
 import { useClassRollNumbers } from "../../../hooks/useClassRollNumbers";
-import { compareStudentsByName } from "../../../utils/rollNumber";
+import { compareStudentsByRoll } from "../../../utils/rollNumber";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import { buildResultTable } from "../../../utils/resultCardModel";
 import { ADMIT_CARD_PATH, useExamTemplates } from "./examScheduleShared";
@@ -176,17 +176,11 @@ function GeneratedResultCards() {
     };
   }, [year, effectiveClassName, section, attendanceExam]);
 
-  /* Cards follow the roll number order; students without a generated roll
-     number fall back to alphabetical order. */
   const sortedStudents = useMemo(
     () =>
-      [...students.cards].sort((a, b) => {
-        const rollA = getRollNumber(a.studentId, a.id);
-        const rollB = getRollNumber(b.studentId, b.id);
-
-        if (rollA > 0 && rollB > 0 && rollA !== rollB) return rollA - rollB;
-        return compareStudentsByName(a, b);
-      }),
+      [...students.cards].sort((a, b) =>
+        compareStudentsByRoll(a, b, getRollNumber),
+      ),
     [students.cards, getRollNumber],
   );
 

@@ -28,61 +28,23 @@ export function compareStudentsByName(
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
-/** Minimal student fields needed to order students for roll derivation. */
-export interface RollSortableStudent {
-  studentUid: string;
-  admissionNumber: string;
-  section: string;
-}
-
-/** Enrollment snapshot fields needed by deriveRollNumbers. */
-export interface RollNumberEnrollment extends RollSortableStudent {
-  className: string;
-  isDeleted?: boolean;
-}
-
 /**
- * Orders two students exactly like the marks entry screen: section first, then
- * admission number (numeric-aware). The document id is the final tiebreaker so
- * the order is always stable.
+ * Print order of cards: section first (roll numbers restart in every section),
+ * then the generated roll number. Students without a roll number (0) fall
+ * back to alphabetical order inside their section.
  */
-export function compareRollStudents(
-  a: RollSortableStudent,
-  b: RollSortableStudent,
+export function compareStudentsByRoll(
+  a: CardStudent,
+  b: CardStudent,
+  getRollNumber: (studentId: string, enrollmentId?: string) => number,
 ): number {
-  return (
-    a.section.localeCompare(b.section) ||
-    a.admissionNumber.localeCompare(b.admissionNumber, undefined, {
-      numeric: true,
-    }) ||
-    a.studentUid.localeCompare(b.studentUid)
-  );
-}
-
-/**
- * Frontend roll numbers derived exactly like the marks entry screen: per class,
- * active enrollments are sorted by section then admission number and receive
- * their 1-based position in that sort. Deleted enrollments (`isDeleted`) and
- * rows without a student id are ignored. Returns studentUid -> roll.
- */
-export function deriveRollNumbers(
-  enrollments: readonly RollNumberEnrollment[],
-): Map<string, number> {
-  const byClass = new Map<string, RollNumberEnrollment[]>();
-  enrollments.forEach((student) => {
-    if (student.isDeleted === true) return;
-    if (!student.studentUid) return;
-    const list = byClass.get(student.className) ?? [];
-    list.push(student);
-    byClass.set(student.className, list);
+  const sectionOrder = a.section.localeCompare(b.section, undefined, {
+    numeric: true,
   });
+  if (sectionOrder !== 0) return sectionOrder;
 
-  const rolls = new Map<string, number>();
-  byClass.forEach((classStudents) => {
-    const sorted = [...classStudents].sort(compareRollStudents);
-    sorted.forEach((student, index) => {
-      rolls.set(student.studentUid, index + 1);
-    });
-  });
-  return rolls;
+  const rollA = getRollNumber(a.studentId, a.id);
+  const rollB = getRollNumber(b.studentId, b.id);
+  if (rollA > 0 && rollB > 0 && rollA !== rollB) return rollA - rollB;
+  return compareStudentsByName(a, b);
 }

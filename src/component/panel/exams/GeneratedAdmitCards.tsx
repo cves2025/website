@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { NavLink, useSearchParams } from "react-router-dom";
 import { FaPrint } from "react-icons/fa";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
-import { compareStudentsByName } from "../../../utils/rollNumber";
+import { compareStudentsByRoll } from "../../../utils/rollNumber";
 import { useClassRollNumbers } from "../../../hooks/useClassRollNumbers";
 import { useAdmitCardGenerator } from "./useAdmitCardGenerator";
 import { TEMPLATE_COMPONENTS } from "./exam-settings/admit-card-template/admitCardTemplates";
@@ -57,17 +57,9 @@ function GeneratedAdmitCards() {
     classNames: gen.selectedClass ? [gen.selectedClass] : [],
   });
 
-  /* Cards are printed in roll number order. Students without a generated
-     roll number fall back to alphabetical order. */
   const cards = useMemo(
     () =>
-      [...gen.cards].sort((a, b) => {
-        const rollA = getRollNumber(a.studentId, a.id);
-        const rollB = getRollNumber(b.studentId, b.id);
-
-        if (rollA > 0 && rollB > 0 && rollA !== rollB) return rollA - rollB;
-        return compareStudentsByName(a, b);
-      }),
+      [...gen.cards].sort((a, b) => compareStudentsByRoll(a, b, getRollNumber)),
     [gen.cards, getRollNumber],
   );
 

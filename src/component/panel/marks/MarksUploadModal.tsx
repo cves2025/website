@@ -266,12 +266,12 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
         {
           student: planned.student,
           write,
-          rollNumber: plan.rollNumbers.get(planned.student.studentUid) ?? 1,
+          rollNumber: data.rollNumbers.get(planned.student.studentUid) ?? 0,
           existed: Boolean(data.savedMarks[planned.student.studentUid]),
         },
       ];
     });
-  }, [plan, rows, data.savedMarks]);
+  }, [plan, rows, data.savedMarks, data.rollNumbers]);
 
   const handleSave = async () => {
     const result = await save(saveJobs);

@@ -177,13 +177,16 @@ export interface EnrollmentRecord {
   firstName?: string;
   lastName?: string;
   className?: string;
+  section?: string;
   academicYear?: string;
   isDeleted?: boolean;
 }
 
+/** Roll numbers restart at 1 in every section of a class. */
 export interface RollNumberEntry {
   studentId: string;
   name: string;
+  section: string;
   rollNumber: number;
 }
 

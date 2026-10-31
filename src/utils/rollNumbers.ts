@@ -3,6 +3,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   query,
   serverTimestamp,
@@ -29,30 +30,88 @@ const getStudentName = (student: EnrollmentRecord) =>
       [student.firstName, student.lastName].filter(Boolean).join(" ").trim()
   );
 
+const getSection = (student: EnrollmentRecord) =>
+  String(student.section ?? "").trim();
+
+const compareText = (a: string, b: string) =>
+  a.localeCompare(b, undefined, { sensitivity: "base", numeric: true });
+
 const sortStudents = (students: EnrollmentWithId[]) =>
-  [...students].sort((a, b) => {
-    const nameComparison = getStudentName(a.data).localeCompare(
-      getStudentName(b.data),
-      undefined,
-      { sensitivity: "base", numeric: true }
-    );
+  [...students].sort(
+    (a, b) =>
+      compareText(getStudentName(a.data), getStudentName(b.data)) ||
+      a.id.localeCompare(b.id)
+  );
 
-    return nameComparison || a.id.localeCompare(b.id);
-  });
-
+/**
+ * Roll numbers are section-wise: every section of the class is numbered from 1
+ * in alphabetical order of the student names. Entries come back ordered by
+ * section, then roll number.
+ */
 const buildRollNumberEntries = (
   students: EnrollmentWithId[]
-): RollNumberEntry[] =>
-  sortStudents(students).map(({ id, data }, index) => ({
-    studentId: data.studentId?.trim() || id,
-    name: getStudentName(data),
-    rollNumber: index + 1,
-  }));
+): RollNumberEntry[] => {
+  const bySection = new Map<string, EnrollmentWithId[]>();
+  students.forEach((student) => {
+    const section = getSection(student.data);
+    const list = bySection.get(section) ?? [];
+    list.push(student);
+    bySection.set(section, list);
+  });
+
+  return [...bySection.keys()]
+    .sort(compareText)
+    .flatMap((section) =>
+      sortStudents(bySection.get(section) ?? []).map(({ id, data }, index) => ({
+        studentId: data.studentId?.trim() || id,
+        name: getStudentName(data),
+        section,
+        rollNumber: index + 1,
+      }))
+    );
+};
 
 export const getRollNumberDocumentId = (
   academicYear: string,
   className: string
 ) => `${academicYear}_${className}`;
+
+/**
+ * The generated roll numbers (studentId -> roll) of the given classes - the
+ * single source of roll numbers for the whole app. Costs exactly one document
+ * read per class; a class without generated roll numbers adds nothing.
+ */
+export async function loadRollNumbers(
+  academicYear: string,
+  classNames: readonly string[]
+): Promise<Map<string, number>> {
+  const rollNumbers = new Map<string, number>();
+  if (!academicYear || classNames.length === 0) return rollNumbers;
+
+  const snapshots = await Promise.all(
+    [...new Set(classNames)].map((className) =>
+      getDoc(
+        doc(
+          db,
+          COLLECTION.ROLL_NUMBER,
+          getRollNumberDocumentId(academicYear, className)
+        )
+      )
+    )
+  );
+
+  snapshots.forEach((snapshot) => {
+    if (!snapshot.exists()) return;
+    const data = snapshot.data() as Partial<RollNumberDocument>;
+    (data.students ?? []).forEach((entry) => {
+      if (entry.studentId && typeof entry.rollNumber === "number") {
+        rollNumbers.set(entry.studentId, entry.rollNumber);
+      }
+    });
+  });
+
+  return rollNumbers;
+}
 
 const saveClassRollNumbers = (
   batch: ReturnType<typeof writeBatch>,

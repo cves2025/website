@@ -1,44 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
 
-import { COLLECTION } from "../constants";
-import { db } from "../firebase/config";
-import { getRollNumberDocumentId } from "../utils/rollNumbers";
-import type { RollNumberDocument } from "../utils/type";
-
-/**
- * Reads the roll number document of every requested class (one read per
- * class) and merges them into a `studentId -> rollNumber` map.
- */
-async function fetchRollNumbers(
-  academicYear: string,
-  classNames: string[]
-): Promise<Map<string, number>> {
-  const snapshots = await Promise.all(
-    classNames.map((className) =>
-      getDoc(
-        doc(
-          db,
-          COLLECTION.ROLL_NUMBER,
-          getRollNumberDocumentId(academicYear, className)
-        )
-      )
-    )
-  );
-
-  const rollNumbers = new Map<string, number>();
-
-  snapshots.forEach((snapshot) => {
-    if (!snapshot.exists()) return;
-
-    const data = snapshot.data() as Partial<RollNumberDocument>;
-    (data.students ?? []).forEach((entry) => {
-      rollNumbers.set(entry.studentId, entry.rollNumber);
-    });
-  });
-
-  return rollNumbers;
-}
+import { loadRollNumbers } from "../utils/rollNumbers";
 
 interface Options {
   academicYear: string;
@@ -72,7 +34,7 @@ export function useClassRollNumbers({
     setLoading(true);
     setError(null);
 
-    fetchRollNumbers(academicYear, classKey.split("|"))
+    loadRollNumbers(academicYear, classKey.split("|"))
       .then((data) => {
         if (!cancelled) setRollNumbers(data);
       })

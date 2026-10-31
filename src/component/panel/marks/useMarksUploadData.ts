@@ -8,6 +8,7 @@ import {
   type SubjectDocInput,
 } from "../../../utils/marksEntry";
 import { loadMarksForExam } from "../../../utils/marksService";
+import { loadRollNumbers } from "../../../utils/rollNumbers";
 import type {
   SavedAttendance,
   UploadRosterStudent,
@@ -29,6 +30,8 @@ export interface MarksUploadData {
   columns: MarksSubjectColumn[];
   savedMarks: Record<string, MarksDoc>;
   savedAttendance: Record<string, SavedAttendance>;
+  /** Generated roll numbers of the class (studentUid -> roll). */
+  rollNumbers: Map<string, number>;
   reload: () => void;
 }
 
@@ -37,6 +40,7 @@ interface Loaded {
   subjectDocs: SubjectDocInput[];
   savedMarks: Record<string, MarksDoc>;
   savedAttendance: Record<string, SavedAttendance>;
+  rollNumbers: Map<string, number>;
 }
 
 const EMPTY: Loaded = {
@@ -44,12 +48,14 @@ const EMPTY: Loaded = {
   subjectDocs: [],
   savedMarks: {},
   savedAttendance: {},
+  rollNumbers: new Map(),
 };
 
 /**
  * One-shot load of everything the Excel upload needs for one exam + class:
- * the roster (all sections), the subjects, the saved marks and the saved
- * attendance. Same queries and filters as the Marks page.
+ * the roster (all sections), the subjects, the saved marks, the saved
+ * attendance and the generated roll numbers. Same queries and filters as the
+ * Marks page.
  */
 export function useMarksUploadData({
   session,
@@ -97,8 +103,9 @@ export function useMarksUploadData({
           where("className", "==", className)
         )
       ),
+      loadRollNumbers(session, [className]),
     ])
-      .then(([enrollments, subjects, marksDocs, attendance]) => {
+      .then(([enrollments, subjects, marksDocs, attendance, rollNumbers]) => {
         if (cancelled) return;
 
         const roster: UploadRosterStudent[] = [];
@@ -154,6 +161,7 @@ export function useMarksUploadData({
           })),
           savedMarks,
           savedAttendance,
+          rollNumbers,
         });
         setLoading(false);
       })
@@ -184,6 +192,7 @@ export function useMarksUploadData({
     columns,
     savedMarks: loaded.savedMarks,
     savedAttendance: loaded.savedAttendance,
+    rollNumbers: loaded.rollNumbers,
     reload,
   };
 }

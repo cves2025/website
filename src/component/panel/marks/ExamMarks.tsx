@@ -25,7 +25,7 @@ import { db } from "../../../firebase/config";
 
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
 
-import { deriveRollNumbers } from "../../../utils/rollNumber";
+import { loadRollNumbers } from "../../../utils/rollNumbers";
 
 import { toDateOrNull } from "../../../utils/toDateOrNull";
 
@@ -436,9 +436,8 @@ function ExamMarks() {
 
       section: student.section,
 
-      rollNumber:
-        rollNumbersRef.current.get(student.studentUid) ??
-        Math.max(rowStudentsRef.current.indexOf(student) + 1, 1),
+      // 0 = no roll number generated yet for this student.
+      rollNumber: rollNumbersRef.current.get(student.studentUid) ?? 0,
 
       examId: marksExamId,
 
@@ -712,14 +711,6 @@ function ExamMarks() {
 
         setRowStudents(list);
 
-        // Same pure derivation used by the Cross List, so both screens show
-
-        // identical roll numbers for the same roster.
-
-        rollNumbersRef.current = deriveRollNumbers(
-          list.map((student) => ({ ...student, className: marksClass })),
-        );
-
         setLoadingTable(false);
       },
 
@@ -732,6 +723,24 @@ function ExamMarks() {
 
     return unsubscribe;
   }, [tableReady, marksYear, marksClass, section]);
+
+  // Generated roll numbers of the class: one document read per year + class,
+  // independent of the section / exam selection.
+  useEffect(() => {
+    rollNumbersRef.current = new Map();
+    if (!tableReady) return;
+    let cancelled = false;
+    loadRollNumbers(marksYear, [marksClass])
+      .then((rolls) => {
+        if (!cancelled) rollNumbersRef.current = rolls;
+      })
+      .catch((error) => {
+        console.error("Failed to load roll numbers:", error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tableReady, marksYear, marksClass]);
 
   useEffect(() => {
     if (!tableReady) {

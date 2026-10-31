@@ -20,7 +20,6 @@ import {
   TEMPLATE_KEY,
   TEMPLATE_VERSION,
 } from "./marksTemplate";
-import { deriveRollNumbers } from "./rollNumber";
 import type {
   ExamDoc,
   MarksDoc,
@@ -201,8 +200,6 @@ export interface UploadPlan {
   students: PlannedStudent[];
   /** Students of the class (that the user may write) missing from the file. */
   notInFile: UploadRosterStudent[];
-  /** Roll numbers the Marks page itself would store (studentUid -> roll). */
-  rollNumbers: Map<string, number>;
   context: UploadContext;
 }
 
@@ -465,22 +462,11 @@ export function buildUploadPlan(params: UploadPlanParams): UploadPlan {
       editableFor(student.section).length > 0,
   );
 
-  // Same derivation the Marks page uses for the rollNumber of a marks document.
-  const rollNumbers = deriveRollNumbers(
-    roster.map((student) => ({
-      studentUid: student.studentUid,
-      admissionNumber: student.admissionNumber,
-      section: student.section,
-      className,
-    })),
-  );
-
   return {
     fileProblems,
     ignoredColumns,
     students,
     notInFile,
-    rollNumbers,
     context,
   };
 }

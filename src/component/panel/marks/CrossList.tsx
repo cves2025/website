@@ -28,7 +28,7 @@ import {
   syncSheetWithLiveSubjects,
   type LiveSubject,
 } from "../../../utils/marksService";
-import { deriveRollNumbers } from "../../../utils/rollNumber";
+import { loadRollNumbers } from "../../../utils/rollNumbers";
 import { useExamRules } from "../../../hooks/useExamRules";
 import type {
   ExamDoc,
@@ -346,6 +346,10 @@ function CrossList() {
   const [sheetsByClass, setSheetsByClass] = useState<
     Record<string, ExamSheetDoc | null>
   >({});
+  /** Generated roll numbers of each class of the selected session. */
+  const [rollsByClass, setRollsByClass] = useState<
+    Record<string, Map<string, number>>
+  >({});
   /** Live subjects of each class (Subjects page), cached per class. */
   const [liveByClass, setLiveByClass] = useState<
     Record<string, LiveSubject[]>
@@ -659,12 +663,36 @@ function CrossList() {
     allowedClasses.join(","),
   ]);
 
-  // Live roll numbers derived from the session roster exactly like the marks
-  // entry screen (per class: section, then admission number).
-  const rollsByStudent = useMemo(
-    () => deriveRollNumbers(currentEnrollments),
-    [currentEnrollments]
-  );
+  // Generated roll numbers (rollNumber collection) - one document read per
+  // class of the view, cached per session; Refresh reads them again.
+  useEffect(() => {
+    setRollsByClass({});
+  }, [session, refreshNonce]);
+
+  useEffect(() => {
+    if (!readyToLoad) return;
+    blockClasses.forEach((className) => {
+      if (className in rollsByClass) return;
+      void loadRollNumbers(session, [className])
+        .catch((error) => {
+          console.error("Failed to load roll numbers:", error);
+          return new Map<string, number>();
+        })
+        .then((rolls) => {
+          setRollsByClass((prev) =>
+            className in prev ? prev : { ...prev, [className]: rolls }
+          );
+        });
+    });
+  }, [readyToLoad, session, blockClasses, rollsByClass]);
+
+  const rollsByStudent = useMemo(() => {
+    const merged = new Map<string, number>();
+    Object.values(rollsByClass).forEach((rolls) =>
+      rolls.forEach((roll, studentUid) => merged.set(studentUid, roll))
+    );
+    return merged;
+  }, [rollsByClass]);
 
   // Build the class-section blocks of the current view. Class order follows
   // the CLASSES constant, sections are alphabetical, rows sort by student
@@ -684,9 +712,7 @@ function CrossList() {
       };
       entry.rows.push({
         studentUid: marks.studentUid,
-        // Live roll from the roster; the stored rollNumber is only a fallback
-        // for students who left the class (deleted / no longer enrolled).
-        rollNumber: rollsByStudent.get(marks.studentUid) ?? marks.rollNumber,
+        rollNumber: rollsByStudent.get(marks.studentUid) ?? null,
         admissionNumber: marks.admissionNumber,
         studentName: marks.studentName,
         fatherName: marks.fatherName,
