@@ -8,7 +8,9 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { FaCheck, FaChevronDown, FaSearch, FaTimes } from "react-icons/fa";
+import { FaCheck, FaSearch, FaTimes } from "react-icons/fa";
+import { ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export interface SearchableOption {
   /** Value stored in the parent state. */
@@ -67,6 +69,8 @@ function defaultEmptyMessage(query: string): string {
  *   as removable chips; `multiple={false}` behaves like a normal dropdown.
  * - "Select shown" only affects the rows matching the current search.
  * - Escape or a click outside closes the dropdown.
+ * - Styled like SelectDropdown / CustomSelect: grey trigger, white list with a
+ *   pink border, pink hover and pink selected rows.
  */
 function SearchableMultiSelect({
   options,
@@ -297,15 +301,18 @@ function SearchableMultiSelect({
           onClick={() => setOpen((prev) => !prev)}
           aria-haspopup="listbox"
           aria-expanded={open}
-          className={`flex h-10 w-full items-center justify-between gap-2 rounded-md border bg-white px-2.5 py-1 text-left text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-100 ${
+          className={cn(
+            // Same look and height as CustomSelect's trigger.
+            "flex min-h-[38px] w-full items-center justify-between gap-2 rounded-md border bg-white px-3 py-1 text-left text-sm text-gray-800 shadow-sm transition-colors focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:opacity-50",
             open
-              ? "border-blue-500 ring-2 ring-blue-500/40"
-              : "border-gray-300 focus:border-blue-500 focus:ring-blue-500/50"
-          } ${className}`}
+              ? "border-blue-500 ring-2 ring-blue-500/50"
+              : "border-gray-300 focus:border-blue-500 focus:ring-blue-500/50",
+            className,
+          )}
         >
           <span className="flex flex-1 flex-nowrap items-center gap-1 overflow-hidden">
             {selectedOptions.length === 0 ? (
-              <span className="truncate px-1 py-0.5 text-gray-400">
+              <span className="truncate py-0.5 text-gray-400">
                 {loading ? loadingLabel : placeholder}
               </span>
             ) : (
@@ -313,7 +320,7 @@ function SearchableMultiSelect({
                 {selectedOptions.slice(0, maxChips).map((option) => (
                   <span
                     key={option.value}
-                    className="inline-flex shrink-0 max-w-[9rem] items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-800"
+                    className="inline-flex shrink-0 max-w-[9rem] items-center gap-1 rounded-full bg-primaryPink px-2 py-1 text-xs font-semibold text-white transition-colors hover:bg-pink-700"
                   >
                     <span className="truncate">{option.label}</span>
                     <span
@@ -324,7 +331,7 @@ function SearchableMultiSelect({
                         event.stopPropagation();
                         removeValue(option.value);
                       }}
-                      className="shrink-0 text-blue-700 hover:text-red-600"
+                      className="shrink-0 text-white/80 hover:text-white"
                     >
                       <FaTimes className="text-[10px]" />
                     </span>
@@ -338,14 +345,17 @@ function SearchableMultiSelect({
               </>
             )}
           </span>
-          <span className="flex shrink-0 items-center gap-2 text-gray-400">
+          <span className="flex shrink-0 items-center gap-2">
             {selectedOptions.length > 0 && (
               <span className="rounded bg-gray-100 px-1.5 text-xs font-bold text-gray-600">
                 {selectedOptions.length}
               </span>
             )}
-            <FaChevronDown
-              className={`transition-transform ${open ? "rotate-180" : ""}`}
+            <ChevronDown
+              className={cn(
+                "h-4 w-4 opacity-50 transition-transform",
+                open && "rotate-180",
+              )}
             />
           </span>
         </button>
@@ -364,7 +374,7 @@ function SearchableMultiSelect({
                 /* Hidden only until the first layout pass positions it. */
                 visibility: panelRect ? "visible" : "hidden",
               }}
-              className="flex flex-col overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg"
+              className="flex flex-col overflow-hidden rounded-md border border-primaryPink bg-white text-slate-900 shadow-md"
             >
               {/* Search box */}
               <div className="flex shrink-0 items-center gap-2 border-b border-gray-200 px-3 py-2">
@@ -389,7 +399,7 @@ function SearchableMultiSelect({
               </div>
 
               {/* Options */}
-              <div className="min-h-0 flex-1 overflow-y-auto py-1">
+              <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-1">
                 {filteredOptions.length === 0 ? (
                   <p className="px-3 py-4 text-center text-sm text-gray-500">
                     {emptyMessage || defaultEmptyMessage(query)}
@@ -402,27 +412,36 @@ function SearchableMultiSelect({
                         key={option.value}
                         type="button"
                         onClick={() => toggleOption(option)}
-                        className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors ${
+                        aria-pressed={checked}
+                        className={cn(
+                          "group flex w-full shrink-0 items-center gap-3 rounded-md px-2 py-2 text-left text-sm transition-colors focus:outline-none",
                           option.disabled
                             ? "cursor-not-allowed opacity-50"
-                            : "hover:bg-blue-50"
-                        }`}
+                            : "cursor-pointer hover:bg-primaryPink hover:text-white focus-visible:bg-primaryPink focus-visible:text-white",
+                          checked && "bg-primaryPink font-semibold text-white",
+                        )}
                       >
                         <span
-                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                          className={cn(
+                            "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border",
                             checked
-                              ? "border-blue-600 bg-blue-600 text-white"
-                              : "border-gray-300 bg-white"
-                          }`}
+                              ? "border-white bg-white text-primaryPink"
+                              : "border-gray-400 bg-white group-hover:border-white group-focus-visible:border-white",
+                          )}
                         >
                           {checked && <FaCheck className="text-[9px]" />}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate font-medium text-gray-800">
-                            {option.label}
-                          </span>
+                          <span className="block truncate">{option.label}</span>
                           {option.hint && (
-                            <span className="block truncate text-xs text-gray-500">
+                            <span
+                              className={cn(
+                                "block truncate text-xs font-normal",
+                                checked
+                                  ? "text-white/80"
+                                  : "text-gray-500 group-hover:text-white/80 group-focus-visible:text-white/80",
+                              )}
+                            >
                               {option.hint}
                             </span>
                           )}
@@ -443,7 +462,7 @@ function SearchableMultiSelect({
                   <button
                     type="button"
                     onClick={toggleAllFiltered}
-                    className="rounded border border-gray-300 bg-white px-2 py-1 font-bold text-gray-700 hover:bg-gray-100"
+                    className="rounded border border-primaryPink bg-white px-2 py-1 font-bold text-primaryPink hover:bg-primaryPink hover:text-white"
                   >
                     {allFilteredSelected ? "Unselect all" : "Select all"}
                   </button>
@@ -451,7 +470,7 @@ function SearchableMultiSelect({
                     type="button"
                     onClick={() => onChange([])}
                     disabled={values.length === 0}
-                    className="rounded border border-gray-300 bg-white px-2 py-1 font-bold text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded border border-primaryPink bg-white px-2 py-1 font-bold text-primaryPink hover:bg-primaryPink hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white disabled:hover:text-primaryPink"
                   >
                     Clear
                   </button>
