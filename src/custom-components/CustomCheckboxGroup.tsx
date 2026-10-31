@@ -1,4 +1,3 @@
-import { ChangeEvent } from "react";
 import {
   useController,
   Control,
@@ -6,6 +5,11 @@ import {
   FieldPath,
   RegisterOptions,
 } from "react-hook-form";
+import { Checkbox } from "@/components/ui/checkbox";
+
+// shadcn Checkbox in the app's pink, matching the toggles and dropdowns.
+const CHECKBOX_CLASS =
+  "h-4 w-4 border-gray-400 data-[state=checked]:border-primaryPink data-[state=checked]:bg-primaryPink data-[state=checked]:text-white focus-visible:ring-primaryPink";
 
 export interface CheckboxOption {
   label: string;
@@ -28,8 +32,8 @@ interface CustomCheckboxGroupProps<T extends FieldValues = FieldValues> {
 }
 
 /**
- * Reusable checkbox group for an array-of-strings field, built on
- * react-hook-form's useController. The field is registered so validation
+ * Reusable checkbox group (shadcn/ui Checkbox) for an array-of-strings field,
+ * built on react-hook-form's useController. The field is registered so validation
  * rules run on submit (empty array fails `required`). Value writes are
  * delegated to the parent form via `onChange(next)` because the public
  * Control API does not expose setValue.
@@ -86,13 +90,10 @@ function CustomCheckboxGroup<T extends FieldValues = FieldValues>({
       )}
       <div className={`rounded-lg border border-gray-200 bg-gray-50 p-4 ${className}`}>
         <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-gray-800">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={allSelected}
-            onChange={(event: ChangeEvent<HTMLInputElement>) =>
-              toggleAll(event.target.checked)
-            }
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            onCheckedChange={(checked) => toggleAll(checked === true)}
+            className={CHECKBOX_CLASS}
           />
           Select All
           <span className="text-xs font-medium text-gray-500">
@@ -107,15 +108,14 @@ function CustomCheckboxGroup<T extends FieldValues = FieldValues>({
           {options.map((option) => (
             <label
               key={option.value}
-              className={`flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 cursor-pointer hover:border-blue-300 ${optionClassName}`}
+              className={`flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 cursor-pointer transition-colors hover:border-primaryPink has-[[data-state=checked]]:border-primaryPink has-[[data-state=checked]]:bg-pink-50 ${optionClassName}`}
             >
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={selected.includes(option.value)}
-                onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                  toggleOption(option.value, event.target.checked)
+                onCheckedChange={(checked) =>
+                  toggleOption(option.value, checked === true)
                 }
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className={CHECKBOX_CLASS}
               />
               {option.label}
             </label>

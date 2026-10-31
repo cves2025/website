@@ -1,4 +1,4 @@
-import { useEffect, useState, ChangeEvent } from "react";
+import { useEffect, useState } from "react";
 import {
   collection,
   doc,
@@ -11,7 +11,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import toast from "react-hot-toast";
-import { FaEdit } from "react-icons/fa";
+import { Archive, ArchiveRestore, Loader2, Pencil } from "lucide-react";
 import { CLASSES, COLLECTION } from "../../../constants";
 import { db } from "../../../firebase/config";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
@@ -24,7 +24,18 @@ import {
 } from "../../../utils/examMarksScheme";
 import PageHeader from "../../../custom-components/PageHeader";
 import Modal from "../../../custom-components/Modal";
+import SelectDropdown from "../../../custom-components/SelectDropdown";
 import AddExam from "./AddExam";
+import { Button as UIButton } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 type ExamStatus = "active" | "archived";
 
@@ -83,9 +94,6 @@ function toExamDoc(snapshot: QueryDocumentSnapshot<DocumentData>): ExamDoc {
     status: toExamStatus(data.status),
   };
 }
-
-const inputClass =
-  "w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 function ExamList() {
   const [exams, setExams] = useState<ExamDoc[]>([]);
@@ -177,57 +185,45 @@ function ExamList() {
         }
         descriptionStyle="text-gray-500"
         button={
-          <button
+          <UIButton
             type="button"
             onClick={openAddModal}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-md px-4 py-2 text-sm transition-colors"
+            className="bg-primaryGreen font-bold text-white hover:bg-green-700"
           >
             + Add Exam
-          </button>
+          </UIButton>
         }
       />      
 
       {/* Filters */}
       <div className="mb-4 bg-white mt-2 rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label htmlFor="filterYear" className="block text-sm font-semibold text-gray-700 mb-1">
+          <Label htmlFor="filterYear" className="mb-1 block font-bold">
             Academic Year
-          </label>
-          <select
+          </Label>
+          <SelectDropdown
             id="filterYear"
             value={selectedYear}
-            onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-              setSelectedYear(event.target.value)
-            }
-            className={inputClass}
-          >
-            <option value="">All Years</option>
-            {academicYears.map((year) => (
-              <option key={year.value} value={year.value}>
-                {year.label}
-              </option>
-            ))}
-          </select>
+            onValueChange={setSelectedYear}
+            options={[{ label: "All Years", value: "" }, ...academicYears]}
+          />
         </div>
         <div>
-          <label htmlFor="filterClass" className="block text-sm font-semibold text-gray-700 mb-1">
+          <Label htmlFor="filterClass" className="mb-1 block font-bold">
             Class
-          </label>
-          <select
+          </Label>
+          <SelectDropdown
             id="filterClass"
             value={selectedClass}
-            onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-              setSelectedClass(event.target.value)
-            }
-            className={inputClass}
-          >
-            <option value="">All Classes</option>
-            {CLASSES.map((className) => (
-              <option key={className} value={className}>
-                {toOrdinalLabel(className)}
-              </option>
-            ))}
-          </select>
+            onValueChange={setSelectedClass}
+            options={[
+              { label: "All Classes", value: "" },
+              ...CLASSES.map((className) => ({
+                label: toOrdinalLabel(className),
+                value: className,
+              })),
+            ]}
+          />
         </div>
       </div>
 
@@ -247,87 +243,104 @@ function ExamList() {
           </button>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
-          <table className="w-full text-sm min-w-[1000px]">
-            <thead>
-              <tr className="bg-gray-100 text-gray-700 text-left">
-                <th className="px-4 py-3">Exam Name</th>
-                <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3">Max Marks</th>
-                <th className="px-4 py-3">Marks Breakup</th>
-                <th className="px-4 py-3">Applicable Classes</th>
-                <th className="px-4 py-3">Sequence</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredExams.map((exam, index) => (
-                <tr
-                  key={exam.id}
-                  className={index % 2 ? "bg-gray-50" : "bg-white"}
-                >
-                  <td className="px-4 py-3 font-semibold">{exam.examName}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`rounded px-2 py-1 text-xs font-bold ${CATEGORY_BADGE[exam.examCategory]}`}
-                    >
-                      {CATEGORY_LABEL[exam.examCategory]}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">{exam.maxMarks}</td>
-                  <td className="px-4 py-3">
-                    <span className="text-xs font-semibold text-gray-700">
-                      {marksSchemeBadge(exam.examCategory, exam.marksScheme)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    {exam.applicableClasses.map(toOrdinalLabel).join(", ")}
-                  </td>
-                  <td className="px-4 py-3">{exam.sequence}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`rounded px-2 py-1 text-xs font-bold ${
-                        exam.status === "active"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-200 text-gray-600"
-                      }`}
-                    >
-                      {exam.status === "active" ? "Active" : "Archived"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <div className="flex justify-center gap-2">
-                      <button
-                        type="button"
-                        title={`Edit ${exam.examName}`}
-                        onClick={() => openEditModal(exam.id)}
-                        className="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white rounded px-3 py-1 text-xs font-bold transition-colors"
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <Table className="min-w-[1000px]">
+            <TableHeader>
+              <TableRow className="bg-gray-50 hover:bg-gray-50">
+                <TableHead className="font-bold text-gray-700">Exam Name</TableHead>
+                <TableHead className="font-bold text-gray-700">Category</TableHead>
+                <TableHead className="font-bold text-gray-700">Max Marks</TableHead>
+                <TableHead className="font-bold text-gray-700">
+                  Marks Breakup
+                </TableHead>
+                <TableHead className="font-bold text-gray-700">
+                  Applicable Classes
+                </TableHead>
+                <TableHead className="font-bold text-gray-700">Sequence</TableHead>
+                <TableHead className="font-bold text-gray-700">Status</TableHead>
+                <TableHead className="text-center font-bold text-gray-700">
+                  Actions
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredExams.map((exam) => {
+                const isActive = exam.status === "active";
+                const isUpdating = updatingId === exam.id;
+                const statusAction = isActive ? "Archive" : "Activate";
+                return (
+                  <TableRow key={exam.id}>
+                    <TableCell className="font-semibold text-gray-800">
+                      {exam.examName}
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`rounded px-2 py-1 text-xs font-bold ${CATEGORY_BADGE[exam.examCategory]}`}
                       >
-                        <FaEdit /> Edit
-                      </button>
-                      <button
-                        type="button"
-                        disabled={updatingId === exam.id}
-                        onClick={() => void handleToggleStatus(exam)}
-                        className={`rounded px-3 py-1 text-xs font-bold transition-colors disabled:opacity-50 ${
-                          exam.status === "active"
-                            ? "bg-amber-500 hover:bg-amber-600 text-white"
-                            : "bg-green-600 hover:bg-green-700 text-white"
+                        {CATEGORY_LABEL[exam.examCategory]}
+                      </span>
+                    </TableCell>
+                    <TableCell>{exam.maxMarks}</TableCell>
+                    <TableCell>
+                      <span className="text-xs font-semibold text-gray-700">
+                        {marksSchemeBadge(exam.examCategory, exam.marksScheme)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      {exam.applicableClasses.map(toOrdinalLabel).join(", ")}
+                    </TableCell>
+                    <TableCell>{exam.sequence}</TableCell>
+                    <TableCell>
+                      <span
+                        className={`rounded px-2 py-1 text-xs font-bold ${
+                          isActive
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-200 text-gray-600"
                         }`}
                       >
-                        {updatingId === exam.id
-                          ? "Updating..."
-                          : exam.status === "active"
-                            ? "Archive"
-                            : "Activate"}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                        {isActive ? "Active" : "Archived"}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-center gap-2">
+                        <UIButton
+                          type="button"
+                          size="icon"
+                          title="Edit"
+                          aria-label={`Edit ${exam.examName}`}
+                          onClick={() => openEditModal(exam.id)}
+                          className="h-8 w-8 bg-blue-600 text-white hover:bg-blue-700"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </UIButton>
+                        <UIButton
+                          type="button"
+                          size="icon"
+                          title={isUpdating ? "Updating..." : statusAction}
+                          aria-label={`${statusAction} ${exam.examName}`}
+                          disabled={isUpdating}
+                          onClick={() => void handleToggleStatus(exam)}
+                          className={`h-8 w-8 text-white ${
+                            isActive
+                              ? "bg-amber-500 hover:bg-amber-600"
+                              : "bg-green-600 hover:bg-green-700"
+                          }`}
+                        >
+                          {isUpdating ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : isActive ? (
+                            <Archive className="h-4 w-4" />
+                          ) : (
+                            <ArchiveRestore className="h-4 w-4" />
+                          )}
+                        </UIButton>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         </div>
       )}
 
