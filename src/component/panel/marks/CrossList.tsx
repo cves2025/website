@@ -1,4 +1,4 @@
-import { ChangeEvent, useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import {
   collection,
   getDocs,
@@ -40,14 +40,21 @@ import type {
   SubjectMarksRecord,
 } from "../../../utils/type";
 import PageHeader from "../../../custom-components/PageHeader";
+import SelectDropdown from "../../../custom-components/SelectDropdown";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import Button from "../../../custom-components/Button";
 import { myContext } from "../../context/MyContextProvider";
 import { NO_SCOPE, scopedClasses, scopedSections } from "../../../permissions";
 
 const academicYears = generateAcademicYears();
-
-const inputClass =
-  "w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500";
 
 /**
  * Print CSS rendered ONLY by this page: A4 landscape + official-register cell
@@ -61,10 +68,11 @@ const CROSS_LIST_PRINT_CSS = `
   .cross-list-register { font-size: 10px; }
   .cross-list-register th,
   .cross-list-register td { padding: 2px 4px; }
+  .cross-list-register thead th { border-color: #4b5563; }
 }
 .cross-list-register th,
-.cross-list-register td { border: 1px solid #d1d5db; }
-.cross-list-register thead th { border-color: #4b5563; }
+.cross-list-register td { border: 1px solid #e5e7eb; }
+.cross-list-register thead th { border-color: rgba(255, 255, 255, 0.15); }
 `;
 
 /** Draft row of the register: a saved marks doc, or an enrolled student without one. */
@@ -954,22 +962,16 @@ function CrossList() {
           >
             Session
           </label>
-          <select
+          <SelectDropdown
             id="crossListSession"
             value={session}
-            onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-              setSession(event.target.value);
+            onValueChange={(value) => {
+              setSession(value);
               setExamId("");
             }}
-            className={inputClass}
-          >
-            <option value="">Select Session</option>
-            {academicYears.map((year) => (
-              <option key={year.value} value={year.value}>
-                {year.label}
-              </option>
-            ))}
-          </select>
+            placeholder="Select Session"
+            options={academicYears}
+          />
         </div>
         <div>
           <label
@@ -978,22 +980,17 @@ function CrossList() {
           >
             Exam
           </label>
-          <select
+          <SelectDropdown
             id="crossListExam"
             value={examId}
-            onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-              setExamId(event.target.value)
-            }
+            onValueChange={setExamId}
             disabled={!session || loadingExams}
-            className={inputClass}
-          >
-            <option value="">Select Exam</option>
-            {sessionExams.map((exam) => (
-              <option key={exam.id} value={exam.id}>
-                {exam.examName}
-              </option>
-            ))}
-          </select>
+            placeholder="Select Exam"
+            options={sessionExams.map((exam) => ({
+              label: exam.examName,
+              value: exam.id,
+            }))}
+          />
         </div>
         <div>
           <label
@@ -1002,21 +999,18 @@ function CrossList() {
           >
             Class
           </label>
-          <select
+          <SelectDropdown
             id="crossListClass"
             value={selectedClass}
-            onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-              setSelectedClass(event.target.value)
-            }
-            className={inputClass}
-          >
-            {isAdmin && <option value="all">All Classes</option>}
-            {allowedClasses.map((className) => (
-              <option key={className} value={className}>
-                {toOrdinalLabel(className)}
-              </option>
-            ))}
-          </select>
+            onValueChange={setSelectedClass}
+            options={[
+              ...(isAdmin ? [{ label: "All Classes", value: "all" }] : []),
+              ...allowedClasses.map((className) => ({
+                label: toOrdinalLabel(className),
+                value: className,
+              })),
+            ]}
+          />
         </div>
         <div>
           <label
@@ -1025,21 +1019,18 @@ function CrossList() {
           >
             Section
           </label>
-          <select
+          <SelectDropdown
             id="crossListSection"
             value={selectedSection}
-            onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-              setSelectedSection(event.target.value)
-            }
-            className={inputClass}
-          >
-            <option value="all">All Sections</option>
-            {(isAdmin ? SECTIONS : allowedSections).map((section) => (
-              <option key={section} value={section}>
-                Section {section}
-              </option>
-            ))}
-          </select>
+            onValueChange={setSelectedSection}
+            options={[
+              { label: "All Sections", value: "all" },
+              ...(isAdmin ? SECTIONS : allowedSections).map((section) => ({
+                label: `Section ${section}`,
+                value: section,
+              })),
+            ]}
+          />
         </div>
       </div>
 
@@ -1179,162 +1170,167 @@ function CrossListBlock({
 
       {/* A real scroll box (height capped) so the sticky header has something to
           stick to - an overflow-x-only wrapper would swallow position: sticky. */}
-      <div className="max-h-[75vh] overflow-auto print:max-h-none print:overflow-visible">
-        <table className="w-full text-sm min-w-[900px] cross-list-register print:min-w-0">
-          <thead className="sticky top-0 z-30 print:static">
-            <tr className="bg-gray-800 text-white">
-              <th
-                rowSpan={headerRows}
-                className="sticky left-0 z-20 w-16 px-2 py-2 text-center print:static print:left-auto print:z-auto"
+      <Table
+        className="min-w-[900px] cross-list-register print:min-w-0"
+        containerClassName="max-h-[75vh] print:max-h-none print:overflow-visible"
+      >
+        <TableHeader className="sticky top-0 z-30 print:static">
+          <TableRow className="bg-primaryBlue text-white hover:bg-primaryBlue">
+            <TableHead
+              rowSpan={headerRows}
+              className="sticky left-0 z-20 w-16 bg-primaryBlue px-2 py-2.5 text-center h-auto font-semibold text-white print:static print:left-auto print:z-auto"
+            >
+              Roll No
+            </TableHead>
+            <TableHead
+              rowSpan={headerRows}
+              className="w-24 px-2 py-2.5 text-center whitespace-nowrap h-auto font-semibold text-white"
+            >
+              Adm. No
+            </TableHead>
+            <TableHead
+              rowSpan={headerRows}
+              className="sticky left-16 z-20 w-44 bg-primaryBlue px-2 py-2.5 text-left h-auto font-semibold text-white print:static print:left-auto print:z-auto"
+            >
+              Student Name
+            </TableHead>
+            <TableHead
+              rowSpan={headerRows}
+              className="min-w-[9rem] px-2 py-2.5 text-left h-auto font-semibold text-white"
+            >
+              Father Name
+            </TableHead>
+            {groups.map((group) => (
+              <TableHead
+                key={group.subjectId}
+                colSpan={group.parts.length}
+                rowSpan={group.parts.length > 1 ? 1 : headerRows}
+                className="px-2 py-2.5 text-center whitespace-nowrap h-auto font-semibold text-white"
               >
-                Roll No
-              </th>
-              <th
-                rowSpan={headerRows}
-                className="w-24 px-2 py-2 text-center whitespace-nowrap"
-              >
-                Adm. No
-              </th>
-              <th
-                rowSpan={headerRows}
-                className="sticky left-16 z-20 w-44 px-2 py-2 text-left print:static print:left-auto print:z-auto"
-              >
-                Student Name
-              </th>
-              <th
-                rowSpan={headerRows}
-                className="min-w-[9rem] px-2 py-2 text-left"
-              >
-                Father Name
-              </th>
-              {groups.map((group) => (
-                <th
-                  key={group.subjectId}
-                  colSpan={group.parts.length}
-                  rowSpan={group.parts.length > 1 ? 1 : headerRows}
-                  className="px-2 py-2 text-center whitespace-nowrap"
+                {group.name}
+                {group.type && (
+                  <span className="block text-[10px] font-normal text-indigo-200 whitespace-nowrap">
+                    {group.type}
+                  </span>
+                )}
+              </TableHead>
+            ))}
+            {["Total", "Max", "Percentage", "Result", rankLabel].map(
+              (label) => (
+                <TableHead
+                  key={label}
+                  rowSpan={headerRows}
+                  className="px-2 py-2.5 text-center h-auto font-semibold text-white"
                 >
-                  {group.name}
-                  {group.type && (
-                    <span className="block text-[10px] text-blue-200 whitespace-nowrap">
-                      {group.type}
+                  {label}
+                </TableHead>
+              )
+            )}
+          </TableRow>
+          {headerRows > 1 && (
+            <TableRow className="bg-indigo-900 text-white hover:bg-indigo-900">
+              {groups
+                .filter((group) => group.parts.length > 1)
+                .flatMap((group) =>
+                  group.parts.map(({ part, label }) => (
+                    <TableHead
+                      key={`${group.subjectId}-${part}`}
+                      className="h-auto px-2 py-1 text-center text-xs font-semibold text-indigo-100"
+                    >
+                      {label}
+                    </TableHead>
+                  ))
+                )}
+            </TableRow>
+          )}
+        </TableHeader>
+        <TableBody>
+          {block.rows.map((row, index) => {
+            const incomplete =
+              row.doc === null || !isMarksDocComplete(row.doc, columnDefs);
+            const failed = row.doc?.result === "fail";
+            const rank = row.doc ? ranks[row.studentUid] : undefined;
+            return (
+              <TableRow
+                key={row.studentUid}
+                // Opaque row colours; the sticky cells use bg-inherit so they
+                // follow the zebra / incomplete / hover colour of the row.
+                className={cn(
+                  incomplete
+                    ? "bg-amber-50 hover:bg-amber-100"
+                    : index % 2
+                      ? "bg-slate-50 hover:bg-pink-50"
+                      : "bg-white hover:bg-pink-50",
+                )}
+              >
+                <TableCell className="sticky left-0 z-10 bg-inherit px-2 py-1.5 text-center font-semibold text-gray-500 whitespace-nowrap print:static print:left-auto print:z-auto">
+                  {row.rollNumber && row.rollNumber > 0 ? row.rollNumber : "-"}
+                </TableCell>
+                <TableCell className="px-2 py-1.5 text-center text-gray-600 whitespace-nowrap">
+                  {row.admissionNumber || "-"}
+                </TableCell>
+                <TableCell className="sticky left-16 z-10 bg-inherit px-2 py-1.5 font-medium text-gray-800 whitespace-nowrap print:static print:left-auto print:z-auto">
+                  <span>{row.studentName}</span>
+                  {incomplete && (
+                    <span className="ml-1.5 rounded bg-red-100 px-1 py-0.5 text-[9px] font-bold uppercase text-red-700">
+                      Incomplete
                     </span>
                   )}
-                </th>
-              ))}
-              {["Total", "Max", "Percentage", "Result", rankLabel].map(
-                (label) => (
-                  <th
-                    key={label}
-                    rowSpan={headerRows}
-                    className="px-2 py-2 text-center"
-                  >
-                    {label}
-                  </th>
-                )
-              )}
-            </tr>
-            {headerRows > 1 && (
-              <tr className="bg-gray-700 text-white">
-                {groups
-                  .filter((group) => group.parts.length > 1)
-                  .flatMap((group) =>
-                    group.parts.map(({ part, label }) => (
-                      <th
-                        key={`${group.subjectId}-${part}`}
-                        className="px-2 py-1 text-center text-xs"
-                      >
-                        {label}
-                      </th>
-                    ))
+                </TableCell>
+                <TableCell className="px-2 py-1.5 text-gray-600 whitespace-nowrap">
+                  {row.fatherName}
+                </TableCell>
+                {groups.flatMap((group) => {
+                  const record = row.doc?.subjectMarks[group.subjectId];
+                  return group.parts.map(({ part }) => (
+                    <TableCell
+                      key={`${group.subjectId}-${part}`}
+                      className="px-2 py-1.5 text-center whitespace-nowrap"
+                    >
+                      {subjectCellText(record, part)}
+                    </TableCell>
+                  ));
+                })}
+                <TableCell className="px-2 py-1.5 text-center font-bold text-gray-800">
+                  {row.doc ? formatMarks(row.doc.totalMarks) : "-"}
+                </TableCell>
+                <TableCell className="px-2 py-1.5 text-center text-gray-500">
+                  {row.doc ? formatMarks(row.doc.totalMaxMarks) : "-"}
+                </TableCell>
+                <TableCell className="px-2 py-1.5 text-center whitespace-nowrap">
+                  {row.doc ? (
+                    <span className="inline-block min-w-[56px] rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-bold text-primaryBlue">
+                      {`${formatMarks(row.doc.percentage)}%`}
+                    </span>
+                  ) : (
+                    <span className="font-semibold text-amber-700">
+                      Marks not entered
+                    </span>
                   )}
-              </tr>
-            )}
-          </thead>
-          <tbody>
-            {block.rows.map((row, index) => {
-              const rowBg = index % 2 ? "bg-gray-50" : "bg-white";
-              const incomplete =
-                row.doc === null || !isMarksDocComplete(row.doc, columnDefs);
-              const stickyBg = incomplete ? "bg-amber-50" : rowBg;
-              const failed = row.doc?.result === "fail";
-              const rank = row.doc ? ranks[row.studentUid] : undefined;
-              return (
-                <tr
-                  key={row.studentUid}
-                  className={incomplete ? "bg-amber-50" : rowBg}
-                >
-                  <td
-                    className={`sticky left-0 z-10 px-2 py-1.5 text-center whitespace-nowrap print:static print:left-auto print:z-auto ${stickyBg}`}
-                  >
-                    {row.rollNumber && row.rollNumber > 0 ? row.rollNumber : "-"}
-                  </td>
-                  <td className="px-2 py-1.5 text-center whitespace-nowrap">
-                    {row.admissionNumber || "-"}
-                  </td>
-                  <td
-                    className={`sticky left-16 z-10 px-2 py-1.5 whitespace-nowrap print:static print:left-auto print:z-auto ${stickyBg}`}
-                  >
-                    <span>{row.studentName}</span>
-                    {incomplete && (
-                      <span className="ml-1.5 rounded bg-red-100 px-1 py-0.5 text-[9px] font-bold uppercase text-red-700">
-                        Incomplete
+                </TableCell>
+                <TableCell className="px-2 py-1.5 text-center">
+                  {row.doc && !incomplete ? (
+                    failed ? (
+                      <span className="inline-block rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-bold text-red-700">
+                        Fail
                       </span>
-                    )}
-                  </td>
-                  <td className="px-2 py-1.5 whitespace-nowrap">
-                    {row.fatherName}
-                  </td>
-                  {groups.flatMap((group) => {
-                    const record = row.doc?.subjectMarks[group.subjectId];
-                    return group.parts.map(({ part }) => (
-                      <td
-                        key={`${group.subjectId}-${part}`}
-                        className="px-2 py-1.5 text-center whitespace-nowrap"
-                      >
-                        {subjectCellText(record, part)}
-                      </td>
-                    ));
-                  })}
-                  <td className="px-2 py-1.5 text-center">
-                    {row.doc ? formatMarks(row.doc.totalMarks) : "-"}
-                  </td>
-                  <td className="px-2 py-1.5 text-center">
-                    {row.doc ? formatMarks(row.doc.totalMaxMarks) : "-"}
-                  </td>
-                  <td className="px-2 py-1.5 text-center whitespace-nowrap">
-                    {row.doc ? (
-                      `${formatMarks(row.doc.percentage)}%`
                     ) : (
-                      <span className="font-semibold text-amber-700">
-                        Marks not entered
+                      <span className="inline-block rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-bold text-green-700">
+                        Pass
                       </span>
-                    )}
-                  </td>
-                  <td className="px-2 py-1.5 text-center">
-                    {row.doc && !incomplete ? (
-                      failed ? (
-                        <span className="font-semibold text-red-600">
-                          Fail
-                        </span>
-                      ) : (
-                        <span className="font-semibold text-green-600">
-                          Pass
-                        </span>
-                      )
-                    ) : (
-                      "-"
-                    )}
-                  </td>
-                  <td className="px-2 py-1.5 text-center">
-                    {row.doc ? (failed ? "-" : String(rank ?? "-")) : "-"}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                    )
+                  ) : (
+                    "-"
+                  )}
+                </TableCell>
+                <TableCell className="px-2 py-1.5 text-center font-semibold text-gray-700">
+                  {row.doc ? (failed ? "-" : String(rank ?? "-")) : "-"}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
 
       {/* Print-only signature line. */}
       <div className="hidden print:flex mt-8 items-end justify-between px-10 text-xs">
