@@ -21,7 +21,13 @@ import {
   isMarksDocComplete,
   type SubjectColumnDefMap,
 } from "../../../utils/marks";
-import { getExamSheet, loadMarksForExam } from "../../../utils/marksService";
+import {
+  getExamSheet,
+  loadLiveSubjects,
+  loadMarksForExam,
+  syncSheetWithLiveSubjects,
+  type LiveSubject,
+} from "../../../utils/marksService";
 import { deriveRollNumbers } from "../../../utils/rollNumber";
 import { useExamRules } from "../../../hooks/useExamRules";
 import type {
@@ -81,6 +87,8 @@ interface ClassSectionBlock {
   sheetLoading: boolean;
   /** Current SubjectDoc fallback columns when no examSheet exists. */
   fallbackSubjects: ExamSheetSubjectColumn[];
+  /** Live subjects created after the sheet was frozen (display only). */
+  extraSubjects: ExamSheetSubjectColumn[];
 }
 
 /** Active enrollment snapshot of the selected session (rolls + missing rows). */
@@ -228,28 +236,20 @@ function sortDocumentRows(rows: CrossListRow[]): CrossListRow[] {
   });
 }
 
-const SUBJECTS_PER_CLASS_QUERY = (className: string) =>
-  query(collection(db, COLLECTION.SUBJECTS), where("className", "==", className));
-
-/** Current non-hidden subjects of a class, shaped like examSheet columns. */
-async function fetchFallbackSubjects(className: string): Promise<ExamSheetSubjectColumn[]> {
-  const snapshot = await getDocs(SUBJECTS_PER_CLASS_QUERY(className));
-  return snapshot.docs
-    .map((documentSnapshot) => {
-      const data = documentSnapshot.data();
-      if (data.displayInMarksEntry === false) return null;
-      const name = typeof data.name === "string" ? data.name : "";
-      if (!name) return null;
-      return {
-        id: documentSnapshot.id,
-        name,
-        type: typeof data.type === "string" ? data.type : "",
-        order: typeof data.order === "number" ? data.order : 1,
-        maxMarks: 0,
-        isGrade: data.type === "Scholastic",
-      };
-    })
-    .filter((column): column is ExamSheetSubjectColumn => column !== null)
+/** Subjects shown in marks entry, shaped like examSheet columns (no examSheet yet). */
+function toFallbackColumns(
+  liveSubjects: readonly LiveSubject[]
+): ExamSheetSubjectColumn[] {
+  return liveSubjects
+    .filter((subject) => subject.displayInMarksEntry && subject.name)
+    .map((subject) => ({
+      id: subject.id,
+      name: subject.name,
+      type: subject.type,
+      order: subject.order,
+      maxMarks: 0,
+      isGrade: subject.type === "Scholastic",
+    }))
     .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 }
 
@@ -346,9 +346,9 @@ function CrossList() {
   const [sheetsByClass, setSheetsByClass] = useState<
     Record<string, ExamSheetDoc | null>
   >({});
-  /** Fallback subject columns cached per class (no examSheet for that class). */
-  const [fallbackByClass, setFallbackByClass] = useState<
-    Record<string, ExamSheetSubjectColumn[]>
+  /** Live subjects of each class (Subjects page), cached per class. */
+  const [liveByClass, setLiveByClass] = useState<
+    Record<string, LiveSubject[]>
   >({});
   /** Session enrollments cached per `${session}`; the Refresh button clears it. */
   const [enrollmentsBySession, setEnrollmentsBySession] = useState<
@@ -491,6 +491,13 @@ function CrossList() {
     return Array.from(classes);
   }, [filteredMarks, selectedClass]);
 
+  // Sheets belong to one session + exam, and Refresh must pick up subjects
+  // added since, so both caches start over on any of these changes.
+  useEffect(() => {
+    setSheetsByClass({});
+    setLiveByClass({});
+  }, [session, examId, refreshNonce]);
+
   // Load one examSheet snapshot per class of the current view (cached).
   useEffect(() => {
     if (!readyToLoad) return;
@@ -519,27 +526,66 @@ function CrossList() {
     };
   }, [readyToLoad, session, examId, blockClasses, sheetsByClass]);
 
-  // Fallback: the current Subjects of a class when no examSheet exists yet.
+  // Live Subjects of each class: the columns when no examSheet exists yet, and
+  // the subjects added after the sheet was frozen otherwise.
   useEffect(() => {
     if (!readyToLoad) return;
     blockClasses.forEach((className) => {
-      if (!(className in sheetsByClass)) return; // sheet lookup still pending
-      if (sheetsByClass[className] !== null) return; // frozen sheet exists
-      if (className in fallbackByClass) return;
-      void fetchFallbackSubjects(className)
-        .then((columns) => {
-          setFallbackByClass((prev) =>
-            className in prev ? prev : { ...prev, [className]: columns }
+      if (className in liveByClass) return;
+      void loadLiveSubjects(className)
+        .then((subjects) => {
+          setLiveByClass((prev) =>
+            className in prev ? prev : { ...prev, [className]: subjects }
           );
         })
         .catch((error) => {
-          console.error("Failed to load fallback subjects:", error);
-          setFallbackByClass((prev) =>
+          console.error("Failed to load subjects:", error);
+          setLiveByClass((prev) =>
             className in prev ? prev : { ...prev, [className]: [] }
           );
         });
     });
-  }, [readyToLoad, blockClasses, sheetsByClass, fallbackByClass]);
+  }, [readyToLoad, blockClasses, liveByClass]);
+
+  const fallbackByClass = useMemo(() => {
+    const result: Record<string, ExamSheetSubjectColumn[]> = {};
+    Object.entries(liveByClass).forEach(([className, subjects]) => {
+      result[className] = toFallbackColumns(subjects);
+    });
+    return result;
+  }, [liveByClass]);
+
+  // Subjects shown in marks entry but missing from the frozen sheet (e.g. a
+  // Scholastic subject created later). They only add display columns; ranks
+  // and completeness still follow the frozen sheet, so old totals never change.
+  const extraByClass = useMemo(() => {
+    const result: Record<string, ExamSheetSubjectColumn[]> = {};
+    if (!selectedExam) return result;
+    Object.entries(sheetsByClass).forEach(([className, sheet]) => {
+      const liveSubjects = liveByClass[className];
+      if (!sheet || !liveSubjects) return;
+      const subjectIdsWithMarks = new Set<string>();
+      currentMarks.forEach((marks) => {
+        if (marks.className !== className) return;
+        Object.keys(marks.subjectMarks ?? {}).forEach((id) =>
+          subjectIdsWithMarks.add(id)
+        );
+      });
+      const inSheet = new Set(sheet.subjects.map((column) => column.id));
+      result[className] = syncSheetWithLiveSubjects({
+        sheet,
+        exam: selectedExam,
+        className,
+        // The cross list is a marks register, not a report card.
+        liveSubjects: liveSubjects.map((subject) => ({
+          ...subject,
+          hideInReportCard: false,
+        })),
+        subjectIdsWithMarks,
+      }).subjects.filter((column) => !inSheet.has(column.id));
+    });
+    return result;
+  }, [selectedExam, sheetsByClass, liveByClass, currentMarks]);
 
   // Enrollments of the selected session load ONCE (equality filter on
   // academicYear only) and are cached per session together with the exam data.
@@ -690,6 +736,7 @@ function CrossList() {
         sheet: sheetsByClass[entry.className] ?? null,
         sheetLoading: !(entry.className in sheetsByClass),
         fallbackSubjects: fallbackByClass[entry.className] ?? [],
+        extraSubjects: extraByClass[entry.className] ?? [],
       }))
       .filter((block) => block.rows.length > 0);
   }, [
@@ -700,6 +747,7 @@ function CrossList() {
     selectedSection,
     sheetsByClass,
     fallbackByClass,
+    extraByClass,
   ]);
 
   // Class-wide ranks, used when rankScope is "class". They are computed over
@@ -987,7 +1035,10 @@ function CrossListBlock({
   rulesSummary: string;
 }) {
   const sheetSubjects = block.sheet ? block.sheet.subjects : block.fallbackSubjects;
-  const groups = buildCrossListGroups(examCategory, sheetSubjects);
+  const displaySubjects = [...sheetSubjects, ...block.extraSubjects].sort(
+    (a, b) => a.order - b.order || a.name.localeCompare(b.name)
+  );
+  const groups = buildCrossListGroups(examCategory, displaySubjects);
   const columnDefs = buildColumnDefs(sheetSubjects);
 
   const incompleteCount = block.rows.filter(
