@@ -1012,7 +1012,8 @@ function AddStudent() {
               <h1 className="font-cancun text-xl sm:text-2xl font-extrabold tracking-tight">
                 <span className="text-green-700">CHILDREN&apos;S </span>
                 <span className="text-indigo-800">VALLEY </span>
-                <span className="text-red-600">ENGLISH SCHOOL</span>
+                <span className="text-red-600">ENGLISH </span>
+                <span className="text-pink-600">SCHOOL</span>
               </h1>
               <p className="italic text-indigo-900 text-xs sm:text-base mt-1">
                 D 59/295 A, Mahmoorganj, Varanasi : 0542-2220107, 9336576690
