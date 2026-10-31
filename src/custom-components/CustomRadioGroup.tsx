@@ -5,6 +5,7 @@ import {
   FieldPath,
   RegisterOptions,
 } from "react-hook-form";
+import RadioOptions from "./RadioOptions";
 
 interface RadioOption {
   value: string;
@@ -26,7 +27,8 @@ interface CustomRadioGroupProps<T extends FieldValues = FieldValues> {
 }
 
 /**
- * Reusable radio group built on react-hook-form's useController. The field is
+ * Reusable react-hook-form radio group, rendered with the app-wide
+ * RadioOptions (shadcn/ui RadioGroup). Built on react-hook-form's useController. The field is
  * registered so it participates in validation and submit values. Value writes
  * are delegated to the parent form via `onChange(value)` because the public
  * Control API does not expose setValue.
@@ -61,26 +63,19 @@ function CustomRadioGroup<T extends FieldValues = FieldValues>({
           {isRequired && <span className="ml-0.5 text-red-500">*</span>}
         </span>
       )}
-      <div className={`flex flex-col gap-2 ${className}`}>
-        {options.map((option) => (
-          <label
-            key={option.value}
-            className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700"
-          >
-            <input
-              type="radio"
-              name={name}
-              checked={current === option.value}
-              onChange={() => onChange?.(option.value)}
-              className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            <span>{option.label}</span>
-            {option.hint && (
-              <span className="text-xs text-gray-500">({option.hint})</span>
-            )}
-          </label>
-        ))}
-      </div>
+      <RadioOptions
+        name={name}
+        value={current}
+        onValueChange={(value) => onChange?.(value)}
+        options={options.map((option) => ({
+          value: option.value,
+          label: option.label,
+          hint: option.hint && (
+            <span className="text-xs text-gray-500">({option.hint})</span>
+          ),
+        }))}
+        className={className}
+      />
       {fieldState.error && (
         <p className="text-xs font-medium text-red-600">
           {fieldState.error.message}
