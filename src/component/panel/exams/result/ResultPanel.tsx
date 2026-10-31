@@ -1,420 +1,181 @@
-import { useEffect, useState, FormEvent, Fragment } from "react";
-import {
-  collection,
-  DocumentData,
-  onSnapshot,
-  orderBy,
-  query,
-  QueryDocumentSnapshot,
-} from "firebase/firestore";
-import { CLASSES, COLLECTION } from "../../../../constants";
-import { db } from "../../../../firebase/config";
-import { generateAcademicYears } from "../../../../utils/generateAcademicYears";
-import { toOrdinalLabel } from "../../../../utils/toOrdinalLabel";
-import { class_1_to_8 } from "../../../admin/subjectDefined";
-import {
-  ExamCategory,
-  MarksScheme,
-  SubjectMarksBreakdown,
-  defaultMarksScheme,
-  isPracticalSubject,
-  isSchemeClass,
-  marksCellLabel,
-  marksSchemeBadge,
-  marksSchemeFromDoc,
-  subjectMarksBreakdown,
-} from "../../../../utils/examMarksScheme";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import PageHeader from "../../../../custom-components/PageHeader";
+import Button from "../../../../custom-components/Button";
+import SearchableMultiSelect, {
+  type SearchableOption,
+} from "../../../../custom-components/SearchableMultiSelect";
+import { CLASSES, SECTIONS } from "../../../../constants";
+import { toOrdinalLabel } from "../../../../utils/toOrdinalLabel";
+import {
+  GENERATED_RESULT_CARDS_PATH,
+  academicYears,
+  inputClass,
+} from "../examScheduleShared";
+import { useAdmitCardGenerator } from "../useAdmitCardGenerator";
 
-const academicYears = generateAcademicYears();
-
-/** Fallback subject list for classes outside 1 to 8. */
-const OTHER_CLASS_SUBJECTS: string[] = ["English", "Hindi", "Math", "Science"];
-
-const selectClassName =
-  "w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed";
-
-interface ExamDoc {
-  id: string;
-  examName: string;
-  examCategory: ExamCategory;
-  maxMarks: number;
-  /** Class 1-8 split saved on the Add Exam page. */
-  marksScheme: MarksScheme;
-  applicableClasses: string[];
-  academicYear: string;
-  status: "active" | "archived";
-}
-
-function toExamCategory(value: unknown): ExamCategory {
-  return value === "MAIN_EXAM" ? "MAIN_EXAM" : "UNIT_TEST";
-}
-
-function toExamStatus(value: unknown): "active" | "archived" {
-  return value === "archived" ? "archived" : "active";
-}
-
-function toExamDoc(snapshot: QueryDocumentSnapshot<DocumentData>): ExamDoc {
-  const data = snapshot.data();
-  const maxMarks = typeof data.maxMarks === "number" ? data.maxMarks : 0;
-  return {
-    id: snapshot.id,
-    examName: typeof data.examName === "string" ? data.examName : "",
-    examCategory: toExamCategory(data.examCategory),
-    maxMarks,
-    // Older documents only stored maxMarks; this fills the class 1-8 split.
-    marksScheme: marksSchemeFromDoc(data, maxMarks || undefined),
-    applicableClasses: Array.isArray(data.applicableClasses)
-      ? data.applicableClasses.filter(
-          (cls): cls is string => typeof cls === "string"
-        )
-      : [],
-    academicYear: typeof data.academicYear === "string" ? data.academicYear : "",
-    status: toExamStatus(data.status),
-  };
-}
-
-/**
- * Demo students. Marks entry is not built yet, so the result sheet is filled
- * with deterministic sample marks; the Test/Theory, Notebook and Practical
- * split always comes from the exam template saved on the Add Exam page.
- */
-interface SampleStudent {
-  enrollment: string;
-  name: string;
-  /** 0-1 share of the maximum marks this demo student scores. */
-  factor: number;
-}
-
-const SAMPLE_STUDENTS: SampleStudent[] = [
-  { enrollment: "1001", name: "Aarav Sharma", factor: 0.9 },
-  { enrollment: "1002", name: "Diya Verma", factor: 0.84 },
-  { enrollment: "1003", name: "Rohan Gupta", factor: 0.76 },
-  { enrollment: "1004", name: "Ananya Singh", factor: 0.93 },
-];
-
-interface ResultCell {
-  /** Test / theory marks obtained. */
-  theory: number;
-  /** Notebook / practical marks obtained (null when the paper does not apply). */
-  secondary: number | null;
-  /** True for Science & Computer in Half Yearly / Annual. */
-  hasPractical: boolean;
-}
-
-function buildCell(breakdown: SubjectMarksBreakdown, factor: number): ResultCell {
-  // Unit tests use the notebook paper, main exams the Science/Computer one.
-  const secondaryMax =
-    breakdown.notebook > 0 ? breakdown.notebook : breakdown.practical;
-  return {
-    theory: Math.round(factor * breakdown.theory),
-    secondary:
-      secondaryMax > 0 ? Math.max(1, Math.round(factor * secondaryMax)) : null,
-    hasPractical: breakdown.hasPractical,
-  };
-}
-
-function toGrade(percentage: number): string {
-  if (percentage >= 90) return "A+";
-  if (percentage >= 75) return "A";
-  if (percentage >= 60) return "B";
-  if (percentage >= 45) return "C";
-  return "D";
-}
+/** Year + exams (many) + class + section + students -> generated result cards. */
 function ResultPanel() {
-  const [exams, setExams] = useState<ExamDoc[]>([]);
-  const [loadingExams, setLoadingExams] = useState(true);
-  const [selectedYear, setSelectedYear] = useState(
-    academicYears[0]?.value ?? ""
-  );
-  const [selectedClass, setSelectedClass] = useState("");
-  const [selectedExamId, setSelectedExamId] = useState("");
-  const [showResult, setShowResult] = useState(false);
+  // Reused only for year / class / section / students; the exam list is separate.
+  const gen = useAdmitCardGenerator({});
+  const navigate = useNavigate();
+  const [examIds, setExamIds] = useState<string[]>([]);
 
-  /* Real-time listener: exam templates created on the Add Exam page. */
-  useEffect(() => {
-    const examsQuery = query(
-      collection(db, COLLECTION.EXAMS),
-      orderBy("sequence", "asc")
-    );
+  const examOptions: SearchableOption[] = gen.yearExams
+    .filter(
+      (exam) =>
+        !gen.selectedClass ||
+        exam.applicableClasses.length === 0 ||
+        exam.applicableClasses.includes(gen.selectedClass),
+    )
+    .map((exam) => ({
+      value: exam.id,
+      label: exam.examName,
+      hint: exam.academicYear,
+    }));
 
-    const unsubscribe = onSnapshot(
-      examsQuery,
-      (snapshot) => {
-        setExams(snapshot.docs.map(toExamDoc));
-        setLoadingExams(false);
-      },
-      (error) => {
-        console.error("Failed to load exams:", error);
-        setLoadingExams(false);
-      }
-    );
-
-    return unsubscribe;
-  }, []);
-
-  const classExams = exams.filter(
-    (exam) =>
-      exam.status === "active" &&
-      (!selectedYear || exam.academicYear === selectedYear) &&
-      (!selectedClass || exam.applicableClasses.includes(selectedClass))
+  const validExamIds = examIds.filter((id) =>
+    examOptions.some((option) => option.value === id),
   );
 
-  const selectedExam =
-    classExams.find((exam) => exam.id === selectedExamId) ?? null;
+  const studentCount = gen.allStudents
+    ? gen.visibleStudents.length
+    : gen.selectedEnrollments.length;
 
-  // Classes 1 to 8 follow the notebook / Science & Computer practical scheme.
-  const usesMarksScheme = isSchemeClass(selectedClass);
-  const examCategory: ExamCategory = selectedExam?.examCategory ?? "UNIT_TEST";
-  const examScheme: MarksScheme =
-    selectedExam?.marksScheme ?? defaultMarksScheme();
-  const isUnitTest = examCategory === "UNIT_TEST";
-  const secondaryLabel = isUnitTest ? "Notebook" : "Practical";
+  const canGenerate =
+    validExamIds.length > 0 && Boolean(gen.selectedClass) && studentCount > 0;
 
-  const subjectColumns = (
-    usesMarksScheme ? class_1_to_8 : OTHER_CLASS_SUBJECTS
-  ).map((subject) => ({
-    subject,
-    breakdown: subjectMarksBreakdown(
-      examCategory,
-      examScheme,
-      isPracticalSubject(subject)
-    ),
-  }));
-
-  const resultRows = selectedExam
-    ? SAMPLE_STUDENTS.map((student) => {
-        const cells = subjectColumns.map((column) =>
-          buildCell(column.breakdown, student.factor)
-        );
-        const obtained = cells.reduce(
-          (sum, cell) => sum + cell.theory + (cell.secondary ?? 0),
-          0
-        );
-        const maximum = subjectColumns.reduce(
-          (sum, column) => sum + column.breakdown.total,
-          0
-        );
-        return {
-          ...student,
-          cells,
-          obtained,
-          maximum,
-          percentage: maximum > 0 ? (obtained / maximum) * 100 : 0,
-        };
-      })
-    : [];
-
-  const handleLoad = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!selectedClass || !selectedExam) return;
-    setShowResult(true);
+  const handleSubmit = () => {
+    if (!canGenerate) return;
+    const params = new URLSearchParams();
+    params.set("exams", validExamIds.join(","));
+    params.set("year", gen.selectedYear);
+    params.set("class", gen.selectedClass);
+    if (gen.selectedSection) params.set("section", gen.selectedSection);
+    params.set(
+      "students",
+      gen.allStudents ? "all" : gen.selectedEnrollments.join(","),
+    );
+    navigate(`${GENERATED_RESULT_CARDS_PATH}?${params.toString()}`);
   };
 
   return (
     <div>
       <PageHeader
-        title="Results"
+        title="Generate Result Card"
         titleStyle="text-primaryBlue"
-        description="View student results by class and exam. Test/Theory, Notebook and
-        Practical columns come from the exam template saved on the Add Exam
-        page."
-        descriptionStyle="text-gray-500"        
+        description="Select the academic year, exam(s), class, section and students to generate their result card."
+        descriptionStyle="text-gray-500"
       />
-      <form
-        onSubmit={handleLoad}
-        className="mb-6 mt-2 bg-white rounded-lg px-4 py-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"
-      >
-        <select
-          value={selectedYear}
-          onChange={(event) => {
-            setSelectedYear(event.target.value);
-            setSelectedExamId("");
-            setShowResult(false);
-          }}
-          className={selectClassName}
-        >
-          <option value="">All Academic Years</option>
-          {academicYears.map((year) => (
-            <option key={year.value} value={year.value}>
-              {year.label}
-            </option>
-          ))}
-        </select>
 
-        <select
-          value={selectedClass}
-          onChange={(event) => {
-            setSelectedClass(event.target.value);
-            setSelectedExamId("");
-            setShowResult(false);
-          }}
-          className={selectClassName}
-        >
-          <option value="">Select Class</option>
-          {CLASSES.map((className) => (
-            <option key={className} value={className}>
-              {toOrdinalLabel(className)}
-            </option>
-          ))}
-        </select>
+      <div className="mt-4 flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <label className="flex flex-col gap-1 text-sm font-semibold text-gray-700">
+          Academic Year
+          <select
+            className={inputClass}
+            value={gen.selectedYear}
+            onChange={(event) => {
+              gen.handleYearChange(event.target.value);
+              setExamIds([]);
+            }}
+          >
+            {academicYears.map((year) => (
+              <option key={year.value} value={year.value}>
+                {year.label}
+              </option>
+            ))}
+          </select>
+        </label>
 
-        <select
-          value={selectedExamId}
-          onChange={(event) => {
-            setSelectedExamId(event.target.value);
-            setShowResult(false);
-          }}
-          disabled={!selectedClass || loadingExams}
-          className={selectClassName}
-        >
-          <option value="">
-            {loadingExams ? "Loading exams..." : "Select Exam"}
-          </option>
-          {classExams.map((exam) => (
-            <option key={exam.id} value={exam.id}>
-              {exam.examName}
-            </option>
-          ))}
-        </select>
+        <label className="flex flex-col gap-1 text-sm font-semibold text-gray-700">
+          Class
+          <select
+            className={inputClass}
+            value={gen.selectedClass}
+            onChange={(event) => gen.handleClassChange(event.target.value)}
+          >
+            <option value="">Select class</option>
+            {CLASSES.map((className) => (
+              <option key={className} value={className}>
+                {toOrdinalLabel(className)}
+              </option>
+            ))}
+          </select>
+        </label>
 
-        <button
-          type="submit"
-          disabled={!selectedClass || !selectedExam}
-          className="bg-pink-600 hover:bg-pink-700 text-white font-bold rounded-md px-6 py-2 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Load Result
-        </button>
-      </form>
+        <SearchableMultiSelect
+          label="Exams"
+          required
+          options={examOptions}
+          values={validExamIds}
+          onChange={setExamIds}
+          placeholder="Select one or more exams"
+          searchPlaceholder="Search exam..."
+          emptyMessage="No exam found for this year and class"
+          maxChips={2}
+        />
 
-      {!loadingExams && !selectedClass && (
-        <p className="text-sm text-gray-500">
-          Select a class and an exam to load the result sheet.
-        </p>
-      )}
+        <label className="flex flex-col gap-1 text-sm font-semibold text-gray-700">
+          Section
+          <select
+            className={inputClass}
+            value={gen.selectedSection}
+            onChange={(event) => gen.handleSectionChange(event.target.value)}
+            disabled={!gen.selectedClass}
+          >
+            <option value="">All Sections</option>
+            {SECTIONS.map((section) => (
+              <option key={section} value={section}>
+                {section}
+              </option>
+            ))}
+          </select>
+        </label>
 
-      {!loadingExams && selectedClass && classExams.length === 0 && (
-        <p className="rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800">
-          No active exam template found for {toOrdinalLabel(selectedClass)}
-          {selectedYear ? ` in ${selectedYear}` : ""}. Add one from the Add Exam
-          page first.
-        </p>
-      )}
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+            <input
+              type="checkbox"
+              checked={gen.allStudents}
+              disabled={!gen.selectedClass}
+              onChange={(event) =>
+                gen.handleSelectAllStudents(event.target.checked)
+              }
+            />
+            All students of the class
+            {gen.selectedClass ? ` (${gen.visibleStudents.length})` : ""}
+          </label>
 
-      {showResult && selectedExam && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
-          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-gray-200">
-            <h3 className="font-bold text-gray-800">
-              {selectedExam.examName} Result — Class{" "}
-              {toOrdinalLabel(selectedClass)}
-            </h3>
-            <span className="rounded bg-gray-100 px-2 py-1 text-xs font-bold text-gray-700">
-              {marksSchemeBadge(
-                selectedExam.examCategory,
-                selectedExam.marksScheme
-              )}
-            </span>
-          </div>
-
-          <table className="w-full text-sm min-w-[900px]">
-            <thead>
-              <tr className="bg-gray-800 text-white text-left">
-                <th rowSpan={usesMarksScheme ? 2 : 1} className="px-4 py-2">
-                  Enrollment
-                </th>
-                <th rowSpan={usesMarksScheme ? 2 : 1} className="px-4 py-2">
-                  Student Name
-                </th>
-                {subjectColumns.map((column) => (
-                  <th
-                    key={column.subject}
-                    colSpan={usesMarksScheme ? 2 : 1}
-                    className="px-3 py-2 text-center border-l border-gray-600"
-                  >
-                    {column.subject} ({column.breakdown.total})
-                  </th>
-                ))}
-                <th
-                  rowSpan={usesMarksScheme ? 2 : 1}
-                  className="px-4 py-2 border-l border-gray-600"
-                >
-                  Total
-                </th>
-                <th rowSpan={usesMarksScheme ? 2 : 1} className="px-4 py-2">
-                  Grade
-                </th>
-              </tr>
-              {usesMarksScheme && (
-                <tr className="bg-gray-700 text-white">
-                  {subjectColumns.map((column) => (
-                    <Fragment key={column.subject}>
-                      <th className="px-3 py-1.5 text-xs font-semibold border-l border-gray-600">
-                        {isUnitTest ? "Test" : "Theory"}
-                      </th>
-                      <th className="px-3 py-1.5 text-xs font-semibold">
-                        {secondaryLabel}
-                      </th>
-                    </Fragment>
-                  ))}
-                </tr>
-              )}
-            </thead>
-            <tbody>
-              {resultRows.map((row, index) => (
-                <tr
-                  key={row.enrollment}
-                  className={index % 2 ? "bg-gray-50" : "bg-white"}
-                >
-                  <td className="px-4 py-2">{row.enrollment}</td>
-                  <td className="px-4 py-2 font-semibold">{row.name}</td>
-                  {usesMarksScheme
-                    ? row.cells.map((cell, cellIndex) => (
-                        <Fragment key={subjectColumns[cellIndex].subject}>
-                          <td className="px-3 py-2 text-center border-l border-gray-200">
-                            {cell.theory}
-                          </td>
-                          <td
-                            className={`px-3 py-2 text-center ${
-                              cell.hasPractical
-                                ? "font-bold text-amber-700"
-                                : "text-gray-400"
-                            }`}
-                          >
-                            {marksCellLabel(
-                              cell.secondary,
-                              cell.secondary !== null
-                            )}
-                          </td>
-                        </Fragment>
-                      ))
-                    : row.cells.map((cell, cellIndex) => (
-                        <td
-                          key={subjectColumns[cellIndex].subject}
-                          className="px-3 py-2 text-center border-l border-gray-200"
-                        >
-                          {cell.theory}
-                        </td>
-                      ))}
-                  <td className="px-4 py-2 font-bold border-l border-gray-200">
-                    {row.obtained} / {row.maximum}
-                  </td>
-                  <td className="px-4 py-2">
-                    <span className="bg-green-100 text-green-700 rounded px-2 py-1 font-bold">
-                      {toGrade(row.percentage)}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <p className="px-4 py-3 text-xs text-gray-500 border-t border-gray-200">
-            Practical is shown as &quot;NA&quot; for subjects without a
-            practical paper. Sample marks are displayed until the Marks Entry
-            page is available.
-          </p>
+          {!gen.allStudents && (
+            <SearchableMultiSelect
+              label="Students"
+              options={gen.studentOptions}
+              values={gen.selectedEnrollments}
+              onChange={gen.setSelectedEnrollments}
+              placeholder="Select student(s)"
+              searchPlaceholder="Search name, father, enrollment..."
+              loading={gen.loadingStudents}
+              disabled={!gen.selectedClass}
+              emptyMessage="No student found"
+            />
+          )}
         </div>
-      )}
+
+        <div className="flex justify-end">
+          <Button
+            buttonName={
+              studentCount > 1
+                ? `Generate ${studentCount} Result Cards`
+                : "Generate Result Card"
+            }
+            variant="success"
+            size="md"
+            buttonStyle="rounded-full bg-amber-600 hover:bg-amber-700"
+            disabled={!canGenerate}
+            onClick={handleSubmit}
+          />
+        </div>
+      </div>
     </div>
   );
 }
