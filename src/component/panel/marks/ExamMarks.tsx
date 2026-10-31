@@ -76,6 +76,16 @@ import {
 
 import PageHeader from "../../../custom-components/PageHeader";
 import SelectDropdown from "../../../custom-components/SelectDropdown";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 import Button from "../../../custom-components/Button";
 
@@ -95,8 +105,12 @@ const academicYears = generateAcademicYears();
 
 const AUTO_SAVE_DELAY = 600;
 
+// Overrides for the shadcn Input inside the marks grid.
 const marksInputClass =
-  "w-20 rounded-md border border-gray-300 bg-white px-1.5 py-1.5 text-center text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500";
+  "mx-auto h-8 w-20 border-gray-300 bg-white px-1.5 text-center text-sm font-medium text-gray-800 focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/50 md:text-sm";
+
+const attendanceInputClass =
+  "h-7 w-[64px] border-gray-300 bg-white px-1 text-center text-xs focus-visible:border-blue-500 focus-visible:ring-1 focus-visible:ring-blue-500/40 md:text-xs";
 
 /** Read-only cells (subjects of other teachers, or no marks.enter permission). */
 
@@ -105,7 +119,7 @@ const readOnlyInputClass = "!bg-gray-100 !text-gray-500 cursor-not-allowed";
 /** Extra classes applied to a cell whose draft does not parse to a valid value. */
 
 const invalidInputClass =
-  "border-red-500 focus:ring-red-500/40 focus:border-red-500";
+  "border-red-500 bg-red-50 focus-visible:ring-red-500/40 focus-visible:border-red-500";
 
 interface AttendanceDraft {
   presentDays: string;
@@ -1264,342 +1278,378 @@ function ExamMarks() {
             No subject is assigned to you for this class and section.
           </div>
         ) : (
-          <div className="mt-4 max-h-[65vh] overflow-auto">
-            <table className="w-full text-sm min-w-[980px]">
-              <thead className="sticky top-0 z-40">
-                <tr className="bg-gray-800 text-white text-left">
-                  <th className="sticky left-0 z-30 px-3 py-2.5" rowSpan={2}>
-                    #
-                  </th>
-
-                  <th
-                    className="sticky left-[48px] z-30 px-3 py-2.5"
-                    rowSpan={2}
-                  >
-                    Student Name
-                  </th>
-
-                  <th className="px-3 py-2.5" rowSpan={2}>
-                    Father's Name
-                  </th>
-                  <th className="px-3 py-2.5 text-center" rowSpan={2}>
-                    Attendance
-                    <span className="block text-[10px] font-normal">
-                      Present / Total
-                    </span>
-                  </th>
-
-                  {visibleColumns.map((column) => (
-                    <th
-                      key={column.id}
-                      colSpan={Math.max(column.inputs.length, 1)}
-                      className="px-2 py-2.5 text-center"
+          <div className="mt-4">
+            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+              {/* The table scrolls inside its own box so the header row and the
+                  # / Student Name columns can stay stuck while scrolling. */}
+              <Table
+                className="min-w-[980px]"
+                containerClassName="max-h-[65vh]"
+              >
+                <TableHeader className="sticky top-0 z-40 [&_tr]:border-b-0">
+                  <TableRow className="bg-primaryBlue text-left hover:bg-primaryBlue">
+                    <TableHead
+                      className="sticky left-0 z-30 h-auto w-[48px] min-w-[48px] bg-primaryBlue px-3 py-3 font-semibold text-white"
+                      rowSpan={2}
                     >
-                      <span className="whitespace-nowrap">{column.name}</span>
+                      #
+                    </TableHead>
 
-                      {column.type && (
-                        <span className="block text-[10px] text-blue-200 whitespace-nowrap">
-                          {column.type}
-                        </span>
-                      )}
-                    </th>
-                  ))}
+                    <TableHead
+                      className="sticky left-[48px] z-30 h-auto bg-primaryBlue px-3 py-3 font-semibold text-white shadow-[inset_-1px_0_0_rgba(255,255,255,0.2)]"
+                      rowSpan={2}
+                    >
+                      Student Name
+                    </TableHead>
 
-                  {showTotals && (
-                    <>
-                      <th className="px-3 py-2.5 text-center" rowSpan={2}>
-                        Total Marks
-                      </th>
+                    <TableHead
+                      className="h-auto px-3 py-3 font-semibold text-white"
+                      rowSpan={2}
+                    >
+                      Father's Name
+                    </TableHead>
+                    <TableHead
+                      className="h-auto px-3 py-3 text-center font-semibold text-white"
+                      rowSpan={2}
+                    >
+                      Attendance
+                      <span className="block text-[10px] font-normal text-indigo-200">
+                        Present / Total
+                      </span>
+                    </TableHead>
 
-                      <th className="px-3 py-2.5 text-center" rowSpan={2}>
-                        Marks Obtained
-                      </th>
-
-                      <th className="px-3 py-2.5 text-center" rowSpan={2}>
-                        Percentage
-                      </th>
-                    </>
-                  )}
-                </tr>
-
-                <tr className="bg-gray-700 text-white">
-                  {visibleColumns.map((column) =>
-                    column.isGrade ? (
-                      <th
-                        key={`${column.id}-grade`}
-                        className="px-2 py-1.5 text-center text-[10px] font-semibold whitespace-nowrap"
+                    {visibleColumns.map((column) => (
+                      <TableHead
+                        key={column.id}
+                        colSpan={Math.max(column.inputs.length, 1)}
+                        className="h-auto border-l border-white/15 px-2 py-3 text-center font-semibold text-white"
                       >
-                        Grade
-                      </th>
-                    ) : (
-                      column.inputs.map((input) => (
-                        <th
-                          key={`${column.id}-${input.component ?? "marks"}`}
-                          className="px-2 py-1.5 text-center text-[10px] font-semibold whitespace-nowrap"
+                        <span className="whitespace-nowrap">{column.name}</span>
+
+                        {column.type && (
+                          <span className="block text-[10px] font-normal text-indigo-200 whitespace-nowrap">
+                            {column.type}
+                          </span>
+                        )}
+                      </TableHead>
+                    ))}
+
+                    {showTotals && (
+                      <>
+                        <TableHead
+                          className="h-auto border-l border-white/15 px-3 py-3 text-center font-semibold text-white"
+                          rowSpan={2}
                         >
-                          {input.label} ({input.max})
-                        </th>
-                      ))
-                    ),
-                  )}
-                </tr>
-              </thead>
+                          Total Marks
+                        </TableHead>
 
-              <tbody>
-                {rowStudents.map((student, index) => {
-                  const summary = summaryOf(student.studentUid);
+                        <TableHead
+                          className="h-auto px-3 py-3 text-center font-semibold text-white"
+                          rowSpan={2}
+                        >
+                          Marks Obtained
+                        </TableHead>
 
-                  return (
-                    <tr
-                      key={student.studentUid}
-                      className={index % 2 ? "bg-gray-50" : "bg-white"}
-                    >
-                      <td className="sticky left-0 z-20 bg-white px-3 py-2 text-gray-500">
-                        {index + 1}
-                      </td>
+                        <TableHead
+                          className="h-auto px-3 py-3 text-center font-semibold text-white"
+                          rowSpan={2}
+                        >
+                          Percentage
+                        </TableHead>
+                      </>
+                    )}
+                  </TableRow>
 
-                      <td className="sticky left-[48px] z-20  md:bg-white px-3 py-2 font-normal text-gray-800">
-                        {student.studentName}
-                      </td>
+                  <TableRow className="bg-indigo-900 hover:bg-indigo-900">
+                    {visibleColumns.map((column) =>
+                      column.isGrade ? (
+                        <TableHead
+                          key={`${column.id}-grade`}
+                          className="h-auto border-l border-white/15 px-2 py-1.5 text-center text-[10px] font-semibold text-indigo-100 whitespace-nowrap"
+                        >
+                          Grade
+                        </TableHead>
+                      ) : (
+                        column.inputs.map((input) => (
+                          <TableHead
+                            key={`${column.id}-${input.component ?? "marks"}`}
+                            className="h-auto border-l border-white/15 px-2 py-1.5 text-center text-[10px] font-semibold text-indigo-100 whitespace-nowrap"
+                          >
+                            {input.label} ({input.max})
+                          </TableHead>
+                        ))
+                      ),
+                    )}
+                  </TableRow>
+                </TableHeader>
 
-                      <td className="px-3 py-2 text-gray-600">
-                        {student.fatherName}
-                      </td>
+                <TableBody>
+                  {rowStudents.map((student, index) => {
+                    const summary = summaryOf(student.studentUid);
 
-                      <td className="px-2 py-2 text-center">
-                        <div className="flex min-w-[142px] items-center justify-center gap-1">
-                          <input
-                            aria-label={`${student.studentName} present days`}
-                            type="number"
-                            min={0}
-                            step={1}
-                            inputMode="numeric"
-                            placeholder="Present"
-                            value={
-                              attendanceDrafts[student.studentUid]
-                                ?.presentDays ?? ""
-                            }
-                            readOnly={
-                              !can(PERMISSIONS.MARKS_ENTER) || attendanceLoading
-                            }
-                            onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                              handleAttendanceChange(
-                                student.studentUid,
-                                "presentDays",
-                                event.target.value,
-                              )
-                            }
-                            onBlur={() =>
-                              void saveAttendanceForStudent(student)
-                            }
-                            className="w-[64px] rounded border border-gray-300 px-1 py-1 text-center text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/40"
-                          />
-                          <span className="text-gray-400">/</span>
-                          <input
-                            aria-label={`${student.studentName} total days`}
-                            type="number"
-                            min={0}
-                            step={1}
-                            inputMode="numeric"
-                            placeholder="Total"
-                            value={
-                              attendanceDrafts[student.studentUid]?.totalDays ??
-                              ""
-                            }
-                            readOnly={
-                              !can(PERMISSIONS.MARKS_ENTER) || attendanceLoading
-                            }
-                            onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                              handleAttendanceChange(
-                                student.studentUid,
-                                "totalDays",
-                                event.target.value,
-                              )
-                            }
-                            onBlur={() =>
-                              void saveAttendanceForStudent(student)
-                            }
-                            className="w-[64px] rounded border border-gray-300 px-1 py-1 text-center text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/40"
-                          />
-                        </div>
-                      </td>
-                      {visibleColumns.map((column) => {
-                        const readOnly = accessOf(column) === "view";
+                    return (
+                      <TableRow
+                        key={student.studentUid}
+                        // Opaque row colours so the sticky cells (bg-inherit)
+                        // follow the zebra / hover colour without see-through.
+                        className={cn(
+                          "hover:bg-pink-50",
+                          index % 2 ? "bg-slate-50" : "bg-white",
+                        )}
+                      >
+                        <TableCell className="sticky left-0 z-20 w-[48px] min-w-[48px] bg-inherit px-3 py-2 text-xs font-semibold text-gray-400">
+                          {index + 1}
+                        </TableCell>
 
-                        if (column.isGrade) {
-                          const cellKey = CELL_KEY.grade(
-                            student.studentUid,
+                        <TableCell className="sticky left-[48px] z-20 bg-inherit px-3 py-2 font-medium text-gray-800 shadow-[inset_-1px_0_0_theme(colors.gray.200)]">
+                          {student.studentName}
+                        </TableCell>
 
-                            column.id,
-                          );
+                        <TableCell className="px-3 py-2 text-gray-600">
+                          {student.fatherName}
+                        </TableCell>
 
-                          const savedGrade = gradeCellText(
-                            marksMap[student.studentUid]?.subjectMarks[
-                              column.id
-                            ],
-                          );
+                        <TableCell className="px-2 py-2 text-center">
+                          <div className="flex min-w-[142px] items-center justify-center gap-1">
+                            <Input
+                              aria-label={`${student.studentName} present days`}
+                              type="number"
+                              min={0}
+                              step={1}
+                              inputMode="numeric"
+                              placeholder="Present"
+                              value={
+                                attendanceDrafts[student.studentUid]
+                                  ?.presentDays ?? ""
+                              }
+                              readOnly={
+                                !can(PERMISSIONS.MARKS_ENTER) || attendanceLoading
+                              }
+                              onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                handleAttendanceChange(
+                                  student.studentUid,
+                                  "presentDays",
+                                  event.target.value,
+                                )
+                              }
+                              onBlur={() =>
+                                void saveAttendanceForStudent(student)
+                              }
+                              className={attendanceInputClass}
+                            />
+                            <span className="text-gray-300">/</span>
+                            <Input
+                              aria-label={`${student.studentName} total days`}
+                              type="number"
+                              min={0}
+                              step={1}
+                              inputMode="numeric"
+                              placeholder="Total"
+                              value={
+                                attendanceDrafts[student.studentUid]?.totalDays ??
+                                ""
+                              }
+                              readOnly={
+                                !can(PERMISSIONS.MARKS_ENTER) || attendanceLoading
+                              }
+                              onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                handleAttendanceChange(
+                                  student.studentUid,
+                                  "totalDays",
+                                  event.target.value,
+                                )
+                              }
+                              onBlur={() =>
+                                void saveAttendanceForStudent(student)
+                              }
+                              className={attendanceInputClass}
+                            />
+                          </div>
+                        </TableCell>
+                        {visibleColumns.map((column) => {
+                          const readOnly = accessOf(column) === "view";
 
-                          const gradeDraft = drafts[cellKey];
+                          if (column.isGrade) {
+                            const cellKey = CELL_KEY.grade(
+                              student.studentUid,
 
-                          const invalid =
-                            gradeDraft !== undefined &&
-                            gradeDraft !== "" &&
-                            !isValidGrade(gradeDraft);
+                              column.id,
+                            );
+
+                            const savedGrade = gradeCellText(
+                              marksMap[student.studentUid]?.subjectMarks[
+                                column.id
+                              ],
+                            );
+
+                            const gradeDraft = drafts[cellKey];
+
+                            const invalid =
+                              gradeDraft !== undefined &&
+                              gradeDraft !== "" &&
+                              !isValidGrade(gradeDraft);
+
+                            return (
+                              <TableCell
+                                key={column.id}
+                                className="border-l border-gray-100 px-2 py-2 text-center"
+                              >
+                                <Input
+                                  type="text"
+                                  list="marksSubjectGrades"
+                                  maxLength={GRADE_MAX_LENGTH}
+                                  title={`Grade: ${GRADE_CELL_OPTIONS.join(", ")}`}
+                                  value={gradeDraft ?? savedGrade}
+                                  readOnly={readOnly}
+                                  onChange={(
+                                    event: ChangeEvent<HTMLInputElement>,
+                                  ) =>
+                                    handleGradeChange(
+                                      student,
+
+                                      column,
+
+                                      event.target.value,
+                                    )
+                                  }
+                                  onBlur={() =>
+                                    flushStudentWrite(student.studentUid)
+                                  }
+                                  className={cn(
+                                    marksInputClass,
+                                    readOnly && readOnlyInputClass,
+                                    invalid && invalidInputClass,
+                                  )}
+                                />
+                              </TableCell>
+                            );
+                          }
+
+                          const saved =
+                            marksMap[student.studentUid]?.subjectMarks[column.id];
 
                           return (
-                            <td
-                              key={column.id}
-                              className="px-2 py-2 text-center"
-                            >
-                              <input
-                                type="text"
-                                list="marksSubjectGrades"
-                                maxLength={GRADE_MAX_LENGTH}
-                                title={`Grade: ${GRADE_CELL_OPTIONS.join(", ")}`}
-                                value={gradeDraft ?? savedGrade}
-                                readOnly={readOnly}
-                                onChange={(
-                                  event: ChangeEvent<HTMLInputElement>,
-                                ) =>
-                                  handleGradeChange(
-                                    student,
+                            <Fragment key={column.id}>
+                              {column.inputs.map((input) => {
+                                const cellKey = CELL_KEY.component(
+                                  student.studentUid,
 
-                                    column,
+                                  column.id,
 
-                                    event.target.value,
+                                  input.component,
+                                );
+
+                                const draft = drafts[cellKey];
+
+                                let value: string;
+
+                                if (draft !== undefined) {
+                                  value = draft;
+                                } else if (saved) {
+                                  const componentState = input.component
+                                    ? saved.componentStatus?.[input.component]
+                                    : undefined;
+
+                                  if (
+                                    saved.status === "absent" ||
+                                    componentState === "absent"
                                   )
-                                }
-                                onBlur={() =>
-                                  flushStudentWrite(student.studentUid)
-                                }
-                                className={`${marksInputClass}${
-                                  readOnly ? ` ${readOnlyInputClass}` : ""
-                                }${invalid ? ` ${invalidInputClass}` : ""}`}
-                              />
-                            </td>
-                          );
-                        }
+                                    value = "AB";
+                                  else if (
+                                    saved.status === "exempt" ||
+                                    componentState === "exempt"
+                                  )
+                                    value = "EX";
+                                  else if (input.component) {
+                                    const componentValue =
+                                      saved.components?.[input.component];
 
-                        const saved =
-                          marksMap[student.studentUid]?.subjectMarks[column.id];
-
-                        return (
-                          <Fragment key={column.id}>
-                            {column.inputs.map((input) => {
-                              const cellKey = CELL_KEY.component(
-                                student.studentUid,
-
-                                column.id,
-
-                                input.component,
-                              );
-
-                              const draft = drafts[cellKey];
-
-                              let value: string;
-
-                              if (draft !== undefined) {
-                                value = draft;
-                              } else if (saved) {
-                                const componentState = input.component
-                                  ? saved.componentStatus?.[input.component]
-                                  : undefined;
-
-                                if (
-                                  saved.status === "absent" ||
-                                  componentState === "absent"
-                                )
-                                  value = "AB";
-                                else if (
-                                  saved.status === "exempt" ||
-                                  componentState === "exempt"
-                                )
-                                  value = "EX";
-                                else if (input.component) {
-                                  const componentValue =
-                                    saved.components?.[input.component];
-
-                                  value =
-                                    componentValue === null ||
-                                    componentValue === undefined
-                                      ? ""
-                                      : formatMarks(componentValue);
+                                    value =
+                                      componentValue === null ||
+                                      componentValue === undefined
+                                        ? ""
+                                        : formatMarks(componentValue);
+                                  } else {
+                                    value =
+                                      saved.obtained === null
+                                        ? ""
+                                        : formatMarks(saved.obtained);
+                                  }
                                 } else {
-                                  value =
-                                    saved.obtained === null
-                                      ? ""
-                                      : formatMarks(saved.obtained);
+                                  value = "";
                                 }
-                              } else {
-                                value = "";
-                              }
 
-                              const invalid =
-                                draft !== undefined &&
-                                resolveCell(value, input.max).kind ===
-                                  "invalid";
+                                const invalid =
+                                  draft !== undefined &&
+                                  resolveCell(value, input.max).kind ===
+                                    "invalid";
 
-                              return (
-                                <td
-                                  key={`${column.id}-${
-                                    input.component ?? "marks"
-                                  }`}
-                                  className="px-2 py-2 text-center"
-                                >
-                                  <input
-                                    type="text"
-                                    inputMode="decimal"
-                                    maxLength={6}
-                                    title={input.label}
-                                    value={value}
-                                    readOnly={readOnly}
-                                    onChange={(
-                                      event: ChangeEvent<HTMLInputElement>,
-                                    ) =>
-                                      handleCellChange(
-                                        student,
+                                return (
+                                  <TableCell
+                                    key={`${column.id}-${
+                                      input.component ?? "marks"
+                                    }`}
+                                    className="border-l border-gray-100 px-2 py-2 text-center"
+                                  >
+                                    <Input
+                                      type="text"
+                                      inputMode="decimal"
+                                      maxLength={6}
+                                      title={input.label}
+                                      value={value}
+                                      readOnly={readOnly}
+                                      onChange={(
+                                        event: ChangeEvent<HTMLInputElement>,
+                                      ) =>
+                                        handleCellChange(
+                                          student,
 
-                                        column,
+                                          column,
 
-                                        input,
+                                          input,
 
-                                        event.target.value,
-                                      )
-                                    }
-                                    onBlur={() =>
-                                      flushStudentWrite(student.studentUid)
-                                    }
-                                    className={`${marksInputClass}${
-                                      invalid ? ` ${invalidInputClass}` : ""
-                                    }${readOnly ? ` ${readOnlyInputClass}` : ""}`}
-                                  />
-                                </td>
-                              );
-                            })}
-                          </Fragment>
-                        );
-                      })}
+                                          event.target.value,
+                                        )
+                                      }
+                                      onBlur={() =>
+                                        flushStudentWrite(student.studentUid)
+                                      }
+                                      className={cn(
+                                        marksInputClass,
+                                        invalid && invalidInputClass,
+                                        readOnly && readOnlyInputClass,
+                                      )}
+                                    />
+                                  </TableCell>
+                                );
+                              })}
+                            </Fragment>
+                          );
+                        })}
 
-                      {showTotals && (
-                        <>
-                          <td className="px-3 py-2 text-gray-700 text-center">
-                            {formatMarks(summary.totalMaxMarks)}
-                          </td>
+                        {showTotals && (
+                          <>
+                            <TableCell className="border-l border-gray-100 px-3 py-2 text-center text-gray-500">
+                              {formatMarks(summary.totalMaxMarks)}
+                            </TableCell>
 
-                          <td className="px-3 py-2 font-semibold text-gray-800 text-center">
-                            {formatMarks(summary.totalMarks)}
-                          </td>
+                            <TableCell className="px-3 py-2 text-center font-bold text-gray-800">
+                              {formatMarks(summary.totalMarks)}
+                            </TableCell>
 
-                          <td className="px-3 py-2 font-semibold text-gray-800 text-center">
-                            {formatMarks(summary.percentage)}%
-                          </td>
-                        </>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                            <TableCell className="px-3 py-2 text-center">
+                              <span className="inline-block min-w-[64px] rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-bold text-primaryBlue">
+                                {formatMarks(summary.percentage)}%
+                              </span>
+                            </TableCell>
+                          </>
+                        )}
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
 
             <p className="mt-2 text-xs text-gray-500">
               Marks are saved automatically as you type. You can type AB
