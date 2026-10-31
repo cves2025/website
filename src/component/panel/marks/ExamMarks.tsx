@@ -75,6 +75,7 @@ import {
 } from "../../../utils/marksEntry";
 
 import PageHeader from "../../../custom-components/PageHeader";
+import SelectDropdown from "../../../custom-components/SelectDropdown";
 
 import Button from "../../../custom-components/Button";
 
@@ -93,9 +94,6 @@ import MarksUploadModal from "./MarksUploadModal";
 const academicYears = generateAcademicYears();
 
 const AUTO_SAVE_DELAY = 600;
-
-const inputClass =
-  "w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500";
 
 const marksInputClass =
   "w-20 rounded-md border border-gray-300 bg-white px-1.5 py-1.5 text-center text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500";
@@ -1161,20 +1159,12 @@ function ExamMarks() {
               Academic Year
             </label>
 
-            <select
+            <SelectDropdown
               id="marksYear"
               value={marksYear}
-              onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-                setMarksYear(event.target.value)
-              }
-              className={inputClass}
-            >
-              {academicYears.map((year) => (
-                <option key={year.value} value={year.value}>
-                  {year.label}
-                </option>
-              ))}
-            </select>
+              onValueChange={setMarksYear}
+              options={academicYears}
+            />
           </div>
 
           <div>
@@ -1185,22 +1175,16 @@ function ExamMarks() {
               Exam
             </label>
 
-            <select
+            <SelectDropdown
               id="marksExam"
               value={marksExamId}
-              onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-                setMarksExamId(event.target.value)
-              }
-              className={inputClass}
-            >
-              <option value="">Select Exam</option>
-
-              {yearExams.map((exam) => (
-                <option key={exam.id} value={exam.id}>
-                  {exam.examName}
-                </option>
-              ))}
-            </select>
+              onValueChange={setMarksExamId}
+              placeholder="Select Exam"
+              options={yearExams.map((exam) => ({
+                label: exam.examName,
+                value: exam.id,
+              }))}
+            />
           </div>
 
           <div>
@@ -1211,26 +1195,22 @@ function ExamMarks() {
               Class Name
             </label>
 
-            <select
+            <SelectDropdown
               id="marksClass"
               value={marksClass}
-              onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-                setMarksClass(event.target.value);
+              onValueChange={(value) => {
+                setMarksClass(value);
 
                 // Sections differ per class for a teacher, so start over.
 
                 setSection("");
               }}
-              className={inputClass}
-            >
-              <option value="">Select Class</option>
-
-              {allowedClasses.map((className) => (
-                <option key={className} value={className}>
-                  {toOrdinalLabel(className)}
-                </option>
-              ))}
-            </select>
+              placeholder="Select Class"
+              options={allowedClasses.map((className) => ({
+                label: toOrdinalLabel(className),
+                value: className,
+              }))}
+            />
           </div>
 
           <div>
@@ -1241,25 +1221,17 @@ function ExamMarks() {
               Section
             </label>
 
-            <select
+            <SelectDropdown
               id="marksSection"
               value={section}
               disabled={!marksClass}
-              onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-                setSection(event.target.value)
-              }
-              className={inputClass}
-            >
-              <option value="">Select Section</option>
-
-              {isAdmin && <option value="all">All Sections</option>}
-
-              {allowedSections.map((sec) => (
-                <option key={sec} value={sec}>
-                  {sec}
-                </option>
-              ))}
-            </select>
+              onValueChange={setSection}
+              placeholder="Select Section"
+              options={[
+                ...(isAdmin ? [{ label: "All Sections", value: "all" }] : []),
+                ...allowedSections.map((sec) => ({ label: sec, value: sec })),
+              ]}
+            />
           </div>
         </div>
 

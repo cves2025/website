@@ -11,10 +11,6 @@ import DeskSlipCard from "./DeskSlipCard";
 import { myContext } from "../../../context/MyContextProvider";
 import { NO_SCOPE, scopedClasses } from "../../../../permissions";
 
-// SelectDropdown trigger with the same look and height as the old selects.
-const selectTriggerClass =
-  "h-auto border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 disabled:bg-gray-100";
-
 const DeskSlip: React.FC = () => {
   // A teacher only sees students of the classes they are assigned to.
   const { user } = useContext(myContext);
@@ -90,7 +86,6 @@ const DeskSlip: React.FC = () => {
             }}
             placeholder="Select Session"
             options={academicYears}
-            className={selectTriggerClass}
           />
         </div>
 
@@ -111,7 +106,6 @@ const DeskSlip: React.FC = () => {
               label: exam.examName,
               value: exam.id,
             }))}
-            className={selectTriggerClass}
           />
         </div>
 
@@ -133,7 +127,6 @@ const DeskSlip: React.FC = () => {
                 value: className,
               })),
             ]}
-            className={selectTriggerClass}
           />
         </div>
 
@@ -155,7 +148,6 @@ const DeskSlip: React.FC = () => {
                 value: section,
               })),
             ]}
-            className={selectTriggerClass}
           />
         </div>
       </div>

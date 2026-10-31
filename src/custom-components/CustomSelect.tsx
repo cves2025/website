@@ -8,10 +8,6 @@ import {
 import SelectDropdown from "./SelectDropdown";
 import { cn } from "@/lib/utils";
 
-// h-auto + py-2 keeps the trigger the same height as CustomInput.
-const SELECT_CLASS =
-  "h-auto w-full bg-white px-3 py-2 text-sm text-gray-800 focus:ring-2 disabled:bg-gray-100 data-[placeholder]:text-gray-400";
-
 function fieldBorder(invalid: boolean): string {
   return invalid
     ? "border-red-400 focus:border-red-500 focus:ring-red-500/40"
@@ -105,7 +101,7 @@ function CustomSelect<T extends FieldValues = FieldValues>({
               placeholder={placeholder ?? ""}
               disabled={disabled}
               aria-invalid={invalid}
-              className={cn(SELECT_CLASS, fieldBorder(invalid), className)}
+              className={cn(fieldBorder(invalid), className)}
             />
             {fieldState.error && (
               <p className="text-xs font-medium text-red-600">

@@ -13,10 +13,6 @@ import {
 } from "./examScheduleShared";
 import type { AdmitCardGenerator } from "./useAdmitCardGenerator";
 
-// Same look and height as CustomSelect / SearchableMultiSelect triggers.
-const SELECT_TRIGGER =
-  "h-auto border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 disabled:bg-gray-100";
-
 interface SelectExamStepProps {
   generator: AdmitCardGenerator;
 }
@@ -58,7 +54,6 @@ function SelectExamStep({ generator }: SelectExamStepProps) {
               { label: "All Academic Years", value: "" },
               ...academicYears,
             ]}
-            className={SELECT_TRIGGER}
           />
         </div>
 
@@ -79,7 +74,6 @@ function SelectExamStep({ generator }: SelectExamStepProps) {
               label: exam.examName,
               value: exam.id,
             }))}
-            className={SELECT_TRIGGER}
           />
         </div>
       </div>
@@ -218,7 +212,6 @@ function GenerateAdmitCardStep({ generator }: GenerateAdmitCardStepProps) {
               label: toOrdinalLabel(className),
               value: className,
             }))}
-            className={SELECT_TRIGGER}
           />
           {selectedExam && scheduledClasses.length === 0 && (
             <p className="mt-1 text-xs font-semibold text-amber-700">
@@ -243,7 +236,6 @@ function GenerateAdmitCardStep({ generator }: GenerateAdmitCardStepProps) {
               { label: "All Sections", value: "" },
               ...SECTIONS.map((section) => ({ label: section, value: section })),
             ]}
-            className={SELECT_TRIGGER}
           />
         </div>
 

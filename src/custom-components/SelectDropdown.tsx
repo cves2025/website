@@ -33,6 +33,11 @@ interface SelectDropdownProps {
   "aria-invalid"?: boolean;
 }
 
+// Default trigger look, shared by every dropdown in the app: same height
+// (38px), border and focus ring as the text inputs. Pass className to adjust.
+const TRIGGER_CLASS =
+  "h-auto border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 disabled:bg-gray-100 data-[placeholder]:text-gray-400";
+
 // Radix Select items cannot use "" as a value, so an option with value ""
 // is mapped to this sentinel internally; callers always see "".
 const EMPTY_VALUE = "__empty__";
@@ -74,7 +79,12 @@ const SelectDropdown = forwardRef<HTMLButtonElement, SelectDropdownProps>(
         onOpenChange={onOpenChange}
         disabled={disabled}
       >
-        <SelectTrigger id={id} ref={ref} className={className} {...aria}>
+        <SelectTrigger
+          id={id}
+          ref={ref}
+          className={cn(TRIGGER_CLASS, className)}
+          {...aria}
+        >
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent
