@@ -66,7 +66,7 @@ function AdmissionCheckboxGroup<T extends FieldValues = FieldValues>({
                         if (next) field.onChange(option.value);
                       }}
                       onBlur={field.onBlur}
-                      className="h-5 w-5 rounded-none border-2 border-green-700 text-green-700 shadow-none data-[state=checked]:bg-green-50 data-[state=checked]:text-green-700"
+                      className="h-5 w-5 rounded-none border-2 border-green-700 text-green-700 shadow-none focus-visible:ring-green-700 data-[state=checked]:border-green-700 data-[state=checked]:bg-green-50 data-[state=checked]:text-green-700"
                     />
                   </Label>
                 );

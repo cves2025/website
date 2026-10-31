@@ -7,10 +7,12 @@ import SearchableMultiSelect, {
 } from "../../../../custom-components/SearchableMultiSelect";
 import { SECTIONS } from "../../../../constants";
 import { toOrdinalLabel } from "../../../../utils/toOrdinalLabel";
+import SelectDropdown from "../../../../custom-components/SelectDropdown";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   GENERATED_RESULT_CARDS_PATH,
   academicYears,
-  inputClass,
 } from "../examScheduleShared";
 import { useAdmitCardGenerator } from "../useAdmitCardGenerator";
 
@@ -69,39 +71,36 @@ function ResultPanel() {
       />
 
       <div className="mt-4 flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <label className="flex flex-col gap-1 text-sm font-semibold text-gray-700">
-          Academic Year
-          <select
-            className={inputClass}
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="resultYear" className="font-semibold text-gray-700">
+            Academic Year
+          </Label>
+          <SelectDropdown
+            id="resultYear"
             value={gen.selectedYear}
-            onChange={(event) => {
-              gen.handleYearChange(event.target.value);
+            onValueChange={(value) => {
+              gen.handleYearChange(value);
               setExamIds([]);
             }}
-          >
-            {academicYears.map((year) => (
-              <option key={year.value} value={year.value}>
-                {year.label}
-              </option>
-            ))}
-          </select>
-        </label>
+            options={academicYears}
+          />
+        </div>
 
-        <label className="flex flex-col gap-1 text-sm font-semibold text-gray-700">
-          Class
-          <select
-            className={inputClass}
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="resultClass" className="font-semibold text-gray-700">
+            Class
+          </Label>
+          <SelectDropdown
+            id="resultClass"
             value={gen.selectedClass}
-            onChange={(event) => gen.handleClassChange(event.target.value)}
-          >
-            <option value="">Select class</option>
-            {gen.allowedClasses.map((className) => (
-              <option key={className} value={className}>
-                {toOrdinalLabel(className)}
-              </option>
-            ))}
-          </select>
-        </label>
+            onValueChange={gen.handleClassChange}
+            placeholder="Select class"
+            options={gen.allowedClasses.map((className) => ({
+              label: toOrdinalLabel(className),
+              value: className,
+            }))}
+          />
+        </div>
 
         <SearchableMultiSelect
           label="Exams"
@@ -115,31 +114,29 @@ function ResultPanel() {
           maxChips={2}
         />
 
-        <label className="flex flex-col gap-1 text-sm font-semibold text-gray-700">
-          Section
-          <select
-            className={inputClass}
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="resultSection" className="font-semibold text-gray-700">
+            Section
+          </Label>
+          <SelectDropdown
+            id="resultSection"
             value={gen.selectedSection}
-            onChange={(event) => gen.handleSectionChange(event.target.value)}
+            onValueChange={gen.handleSectionChange}
             disabled={!gen.selectedClass}
-          >
-            <option value="">All Sections</option>
-            {SECTIONS.map((section) => (
-              <option key={section} value={section}>
-                {section}
-              </option>
-            ))}
-          </select>
-        </label>
+            options={[
+              { label: "All Sections", value: "" },
+              ...SECTIONS.map((section) => ({ label: section, value: section })),
+            ]}
+          />
+        </div>
 
         <div className="flex flex-col gap-2">
-          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-            <input
-              type="checkbox"
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-gray-700">
+            <Checkbox
               checked={gen.allStudents}
               disabled={!gen.selectedClass}
-              onChange={(event) =>
-                gen.handleSelectAllStudents(event.target.checked)
+              onCheckedChange={(checked) =>
+                gen.handleSelectAllStudents(checked === true)
               }
             />
             All students of the class

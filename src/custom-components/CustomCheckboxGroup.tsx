@@ -7,10 +7,6 @@ import {
 } from "react-hook-form";
 import { Checkbox } from "@/components/ui/checkbox";
 
-// shadcn Checkbox in the app's pink, matching the toggles and dropdowns.
-const CHECKBOX_CLASS =
-  "h-4 w-4 border-gray-400 data-[state=checked]:border-primaryPink data-[state=checked]:bg-primaryPink data-[state=checked]:text-white focus-visible:ring-primaryPink";
-
 export interface CheckboxOption {
   label: string;
   value: string;
@@ -93,7 +89,6 @@ function CustomCheckboxGroup<T extends FieldValues = FieldValues>({
           <Checkbox
             checked={allSelected}
             onCheckedChange={(checked) => toggleAll(checked === true)}
-            className={CHECKBOX_CLASS}
           />
           Select All
           <span className="text-xs font-medium text-gray-500">
@@ -115,7 +110,6 @@ function CustomCheckboxGroup<T extends FieldValues = FieldValues>({
                 onCheckedChange={(checked) =>
                   toggleOption(option.value, checked === true)
                 }
-                className={CHECKBOX_CLASS}
               />
               {option.label}
             </label>
