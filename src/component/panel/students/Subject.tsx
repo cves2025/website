@@ -6,6 +6,7 @@ import {
   deleteField,
   doc,
   DocumentData,
+  getDocs,
   onSnapshot,
   query,
   QueryDocumentSnapshot,
@@ -120,19 +121,159 @@ const toSubjectDoc = (
   };
 };
 
+/** Values of the subject being saved, already normalized. */
+interface SubjectDraft {
+  name: string;
+  type: SubjectType;
+  order: number;
+  reportCardOrder?: number;
+  displayInMarksEntry: boolean;
+  displayInReportCard: boolean;
+}
+
+/** Conflict messages per form field; empty arrays mean no conflict. */
+interface SubjectConflicts {
+  name: string[];
+  order: string[];
+  reportCardOrder: string[];
+}
+
+const subjectNameKey = (value: string) =>
+  value.trim().replace(/\s+/g, " ").toLowerCase();
+
+/**
+ * Checks the subject against the existing subjects of every class it will be
+ * saved for. Inside one class:
+ *  - Name + Type must be unique (so "Science" Theory and "Science" Practical
+ *    may coexist);
+ *  - Order is the position in Marks Entry, so it clashes only between two
+ *    subjects that are both shown in Marks Entry;
+ *  - Report Card Order clashes only between two subjects that are both shown
+ *    in the Report Card.
+ * `ignoreId` is the subject being edited - its old values never conflict with
+ * its new ones.
+ */
+function findSubjectConflicts(
+  draft: SubjectDraft,
+  classes: readonly string[],
+  subjectsByClass: ReadonlyMap<string, readonly SubjectDoc[]>,
+  ignoreId: string | null,
+): SubjectConflicts {
+  const conflicts: SubjectConflicts = {
+    name: [],
+    order: [],
+    reportCardOrder: [],
+  };
+  const draftName = subjectNameKey(draft.name);
+
+  classes.forEach((className) => {
+    const others = (subjectsByClass.get(className) ?? []).filter(
+      (subject) => subject.id !== ignoreId,
+    );
+    const label = `Class ${className}`;
+
+    const sameName = others.find(
+      (subject) =>
+        subjectNameKey(subject.name) === draftName &&
+        subject.type === draft.type,
+    );
+    if (sameName) {
+      conflicts.name.push(
+        `${label} already has "${sameName.name}" (${sameName.type}).`,
+      );
+    }
+
+    const sameOrder = draft.displayInMarksEntry
+      ? others.find(
+          (subject) =>
+            subject.displayInMarksEntry === true &&
+            subject.order === draft.order,
+        )
+      : undefined;
+    if (sameOrder) {
+      conflicts.order.push(
+        `${label}: order ${draft.order} is used by "${sameOrder.name}" (${sameOrder.type}) in Marks Entry.`,
+      );
+    }
+
+    if (draft.displayInReportCard && draft.reportCardOrder !== undefined) {
+      const sameReportOrder = others.find(
+        (subject) =>
+          subject.displayInReportCard !== false &&
+          subject.reportCardOrder === draft.reportCardOrder,
+      );
+      if (sameReportOrder) {
+        conflicts.reportCardOrder.push(
+          `${label}: report card order ${draft.reportCardOrder} is used by "${sameReportOrder.name}" (${sameReportOrder.type}) in the Report Card.`,
+        );
+      }
+    }
+  });
+
+  return conflicts;
+}
+
+/** Subjects of the given classes in one query (className "in", max 30 values). */
+async function loadSubjectsOfClasses(
+  classNames: readonly string[],
+): Promise<Map<string, SubjectDoc[]>> {
+  const result = new Map<string, SubjectDoc[]>(
+    classNames.map((className) => [className, []]),
+  );
+  if (classNames.length === 0) return result;
+
+  const snapshot = await getDocs(
+    query(
+      collection(db, COLLECTION.SUBJECTS),
+      where("className", "in", [...classNames]),
+    ),
+  );
+  snapshot.docs.forEach((documentSnapshot) => {
+    const subject = toSubjectDoc(documentSnapshot, "");
+    result.get(subject.className)?.push(subject);
+  });
+  return result;
+}
+
 function Subject() {
   const [selectedClass, setSelectedClass] = useState(CLASSES[0]);
   const [subjects, setSubjects] = useState<SubjectDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const { control, handleSubmit, reset, setValue, watch } =
-    useForm<SubjectFormValues>({
-      defaultValues: DEFAULT_FORM,
-    });
+  const {
+    control,
+    handleSubmit,
+    reset,
+    setValue,
+    watch,
+    setError,
+    clearErrors,
+  } = useForm<SubjectFormValues>({
+    defaultValues: DEFAULT_FORM,
+  });
 
   const subjectName = watch("name");
+  const subjectType = watch("type");
   const subjectClasses = watch("classes");
+
+  const showInMarksEntry = watch("displayInMarksEntry");
+  const showInReportCard = watch("displayInReportCard");
+
+  // A conflict also depends on the type, the classes and the display toggles,
+  // so changing any of them drops the old messages; the next save re-checks.
+  const subjectClassesKey = Array.isArray(subjectClasses)
+    ? subjectClasses.join("|")
+    : "";
+  useEffect(() => {
+    clearErrors(["name", "order", "reportCardOrder"]);
+  }, [
+    subjectType,
+    subjectClassesKey,
+    showInMarksEntry,
+    showInReportCard,
+    clearErrors,
+  ]);
   const [saving, setSaving] = useState(false);
   const [subjectToDelete, setSubjectToDelete] = useState<SubjectDoc | null>(
     null,
@@ -258,6 +399,43 @@ function Subject() {
 
     setSaving(true);
     try {
+      // Validate against every class the subject will be saved in. The open
+      // class is already live in `subjects`; only the other selected classes
+      // are read, in a single query.
+      const targetClasses = Array.isArray(data.classes) ? data.classes : [];
+      const subjectsByClass = await loadSubjectsOfClasses(
+        targetClasses.filter((className) => className !== selectedClass),
+      );
+      subjectsByClass.set(selectedClass, subjects);
+
+      const conflicts = findSubjectConflicts(
+        {
+          name,
+          type: data.type,
+          order,
+          reportCardOrder,
+          displayInMarksEntry,
+          displayInReportCard,
+        },
+        targetClasses,
+        subjectsByClass,
+        editingId,
+      );
+      const fields = ["name", "order", "reportCardOrder"] as const;
+      const conflictFields = fields.filter(
+        (field) => conflicts[field].length > 0,
+      );
+      if (conflictFields.length > 0) {
+        conflictFields.forEach((field) =>
+          setError(field, {
+            type: "conflict",
+            message: conflicts[field].join(" "),
+          }),
+        );
+        toast.error("This subject conflicts with an existing subject.");
+        return;
+      }
+
       if (editingId) {
         const classes = Array.isArray(data.classes) ? data.classes : [];
         if (classes.length === 0) return;
@@ -552,10 +730,12 @@ function Subject() {
         onClose={closeModal}
         title={editingId ? "Edit Subject" : "Add Subject"}
         description={`Class: ${selectedClass}`}
+        modalClassName="max-w-2xl"
         cancelText="Cancel"
         submitText={editingId ? "Update" : "Add Subject"}
         loading={saving}
         submitDisabled={
+          loading ||
           !subjectName?.trim() ||
           !Array.isArray(subjectClasses) ||
           subjectClasses.length === 0
@@ -603,9 +783,9 @@ function Subject() {
             placeholder="e.g. 1"
           />
           <p className="-mt-2 text-xs text-gray-400">
-            Report card mein subject kis position par dikhega. Khali chhodne par
-            subject report card mein sabse neeche (ordered subjects ke baad)
-            dikhega.
+            The position of this subject on the report card. Leave it empty to
+            show the subject at the bottom of the report card, after the
+            ordered subjects.
           </p>
           <Controller
             control={control}
