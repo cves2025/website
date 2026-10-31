@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import { marksSchemeBadge } from "../../../utils/examMarksScheme";
 import SearchableMultiSelect from "../../../custom-components/SearchableMultiSelect";
+import SelectDropdown from "../../../custom-components/SelectDropdown";
 import { SECTIONS } from "../../../constants";
 import {
   ADD_EXAM_PATH,
@@ -9,9 +10,12 @@ import {
   academicYears,
   examPageLink,
   formatScheduleDate,
-  inputClass,
 } from "./examScheduleShared";
 import type { AdmitCardGenerator } from "./useAdmitCardGenerator";
+
+// Same look and height as CustomSelect / SearchableMultiSelect triggers.
+const SELECT_TRIGGER =
+  "h-auto border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 disabled:bg-gray-100";
 
 interface SelectExamStepProps {
   generator: AdmitCardGenerator;
@@ -46,19 +50,16 @@ function SelectExamStep({ generator }: SelectExamStepProps) {
           >
             Academic Year
           </label>
-          <select
+          <SelectDropdown
             id="modalCardYear"
             value={selectedYear}
-            onChange={(event) => handleYearChange(event.target.value)}
-            className={inputClass}
-          >
-            <option value="">All Academic Years</option>
-            {academicYears.map((year) => (
-              <option key={year.value} value={year.value}>
-                {year.label}
-              </option>
-            ))}
-          </select>
+            onValueChange={handleYearChange}
+            options={[
+              { label: "All Academic Years", value: "" },
+              ...academicYears,
+            ]}
+            className={SELECT_TRIGGER}
+          />
         </div>
 
         <div>
@@ -68,22 +69,18 @@ function SelectExamStep({ generator }: SelectExamStepProps) {
           >
             Exam
           </label>
-          <select
+          <SelectDropdown
             id="modalCardExam"
             value={selectedExamId}
-            onChange={(event) => handleExamChange(event.target.value)}
+            onValueChange={handleExamChange}
             disabled={loadingExams}
-            className={inputClass}
-          >
-            <option value="">
-              {loadingExams ? "Loading exams..." : "Select Exam"}
-            </option>
-            {yearExams.map((exam) => (
-              <option key={exam.id} value={exam.id}>
-                {exam.examName}
-              </option>
-            ))}
-          </select>
+            placeholder={loadingExams ? "Loading exams..." : "Select Exam"}
+            options={yearExams.map((exam) => ({
+              label: exam.examName,
+              value: exam.id,
+            }))}
+            className={SELECT_TRIGGER}
+          />
         </div>
       </div>
 
@@ -211,20 +208,18 @@ function GenerateAdmitCardStep({ generator }: GenerateAdmitCardStepProps) {
           >
             Class
           </label>
-          <select
+          <SelectDropdown
             id="modalCardClass"
             value={selectedClass}
-            onChange={(event) => handleClassChange(event.target.value)}
+            onValueChange={handleClassChange}
             disabled={!selectedExam || scheduledClasses.length === 0}
-            className={inputClass}
-          >
-            <option value="">Select Class</option>
-            {scheduledClasses.map((className) => (
-              <option key={className} value={className}>
-                {toOrdinalLabel(className)}
-              </option>
-            ))}
-          </select>
+            placeholder="Select Class"
+            options={scheduledClasses.map((className) => ({
+              label: toOrdinalLabel(className),
+              value: className,
+            }))}
+            className={SELECT_TRIGGER}
+          />
           {selectedExam && scheduledClasses.length === 0 && (
             <p className="mt-1 text-xs font-semibold text-amber-700">
               No class has a scheduled paper yet.
@@ -239,20 +234,17 @@ function GenerateAdmitCardStep({ generator }: GenerateAdmitCardStepProps) {
           >
             Section
           </label>
-          <select
+          <SelectDropdown
             id="modalCardSection"
             value={selectedSection}
-            onChange={(event) => handleSectionChange(event.target.value)}
+            onValueChange={handleSectionChange}
             disabled={!selectedClass}
-            className={inputClass}
-          >
-            <option value="">All Sections</option>
-            {SECTIONS.map((section) => (
-              <option key={section} value={section}>
-                {section}
-              </option>
-            ))}
-          </select>
+            options={[
+              { label: "All Sections", value: "" },
+              ...SECTIONS.map((section) => ({ label: section, value: section })),
+            ]}
+            className={SELECT_TRIGGER}
+          />
         </div>
 
         <div className="lg:col-span-6">
