@@ -9,8 +9,10 @@ import type { ExamRules } from "./examRules";
 import { calculateMarksSummary, formatMarks } from "./marks";
 import {
   CELL_KEY,
-  GRADE_OPTIONS,
+  GRADE_CELL_OPTIONS,
   buildStudentDraft,
+  gradeCellText,
+  isValidGrade,
   resolveCell,
   type MarksSubjectColumn,
 } from "./marksEntry";
@@ -360,9 +362,9 @@ export function buildUploadPlan(params: UploadPlanParams): UploadPlan {
 
           if (column.isGrade) {
             const text = row.values[TEMPLATE_KEY.grade(column.id)] ?? "";
-            if (text && !GRADE_OPTIONS.includes(text.toUpperCase())) {
+            if (text && !isValidGrade(text)) {
               errors.push(
-                `${subjectLabel(column)}: "${text}" is not a valid grade (${GRADE_OPTIONS.join(", ")}).`,
+                `${subjectLabel(column)}: "${text}" is not a valid grade (${GRADE_CELL_OPTIONS.join(", ")}).`,
               );
             }
             continue;
@@ -561,7 +563,7 @@ export function evaluateStudentWrite(
       const text = (planned.values[key] ?? "").trim();
       if (!text) continue;
       const incoming = text.toUpperCase();
-      const existing = savedRecord?.grade?.trim() ?? "";
+      const existing = gradeCellText(savedRecord);
       const state = settle(existing !== "", existing === incoming);
       outcomes[key] = { key, incoming, existing, state };
       if (state === "new" || state === "overwrite") {

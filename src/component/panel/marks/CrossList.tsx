@@ -29,6 +29,7 @@ import {
   type LiveSubject,
 } from "../../../utils/marksService";
 import { loadRollNumbers } from "../../../utils/rollNumbers";
+import { dropUnitTestPracticalSiblings } from "../../../utils/marksEntry";
 import { useExamRules } from "../../../hooks/useExamRules";
 import type {
   ExamDoc,
@@ -101,52 +102,71 @@ interface LoadedEnrollment {
   section: string;
 }
 
+/** What one register cell of a subject shows. */
+type CellPart = "total" | "grade" | SubjectComponentName;
+
+interface CrossListColumnPart {
+  part: CellPart;
+  /** Sub-header under the subject name; empty for single-column subjects. */
+  label: string;
+}
+
 /**
  * The layout rule of the cross list subject columns - the ONE place to change
  * how columns are presented:
- *  - Unit Test / PG-UKG            : one "total" column per subject,
- *  - Main Exam without practical   : one "total" column per subject,
- *  - Main Exam practical paper     : one "practical" column (the theory part
- *                                    lives on the parent subject's column),
- *  - Scholastic (grade) subjects   : one grade column, after the numeric ones.
+ *  - Unit Test with Test + Notebook : two columns, "T" and "N",
+ *  - Unit Test / PG-UKG otherwise   : one "total" column per subject,
+ *  - Main Exam without practical    : one "total" column per subject,
+ *  - Main Exam practical paper      : one "practical" column (the theory part
+ *                                     lives on the parent subject's column),
+ *  - Scholastic (grade) subjects    : one grade column, after the numeric ones.
  */
 interface CrossListColumnGroup {
   subjectId: string;
   name: string;
   /** Subject type (e.g. "Theory", "Written", "Practical") shown under the name. */
   type: string;
-  isGrade: boolean;
-  split: boolean;
+  parts: CrossListColumnPart[];
+}
+
+function subjectParts(
+  examCategory: ExamCategory | null,
+  subject: ExamSheetSubjectColumn
+): CrossListColumnPart[] {
+  if (subject.isGrade) return [{ part: "grade", label: "" }];
+  const componentMax = subject.componentMax;
+  if (
+    typeof componentMax?.test === "number" &&
+    typeof componentMax?.notebook === "number"
+  ) {
+    return [
+      { part: "test", label: "T" },
+      { part: "notebook", label: "N" },
+    ];
+  }
+  if (
+    examCategory === "MAIN_EXAM" &&
+    typeof componentMax?.practical === "number"
+  ) {
+    return [{ part: "practical", label: "" }];
+  }
+  return [{ part: "total", label: "" }];
 }
 
 function buildCrossListGroups(
   examCategory: ExamCategory | null,
   sheetSubjects: readonly ExamSheetSubjectColumn[]
 ): CrossListColumnGroup[] {
-  const numeric: CrossListColumnGroup[] = [];
-  const grades: CrossListColumnGroup[] = [];
-  sheetSubjects.forEach((subject) => {
-    if (subject.isGrade) {
-      grades.push({
-        subjectId: subject.id,
-        name: subject.name,
-        type: subject.type,
-        isGrade: true,
-        split: false,
-      });
-      return;
-    }
-    numeric.push({
-      subjectId: subject.id,
-      name: subject.name,
-      type: subject.type,
-      isGrade: false,
-      split:
-        examCategory === "MAIN_EXAM" &&
-        typeof subject.componentMax?.practical === "number",
-    });
+  const toGroup = (subject: ExamSheetSubjectColumn): CrossListColumnGroup => ({
+    subjectId: subject.id,
+    name: subject.name,
+    type: subject.type,
+    parts: subjectParts(examCategory, subject),
   });
-  return [...numeric, ...grades];
+  return [
+    ...sheetSubjects.filter((subject) => !subject.isGrade).map(toGroup),
+    ...sheetSubjects.filter((subject) => subject.isGrade).map(toGroup),
+  ];
 }
 
 /** Completeness column definitions, derived from the snapshot's componentMax. */
@@ -278,7 +298,7 @@ function componentFlags(record: SubjectMarksRecord): string {
 /** Text of one register cell of a subject (or "-" when no marks). */
 function subjectCellText(
   record: SubjectMarksRecord | undefined,
-  part: "total" | "theory" | "practical" | "grade"
+  part: CellPart
 ): string {
   if (!record) return "-";
   const grade = typeof record.grade === "string" ? record.grade.trim() : "";
@@ -286,7 +306,7 @@ function subjectCellText(
   if (record.status === "absent") return "AB";
   if (record.status === "exempt") return "EX";
   if (part === "grade") return "-";
-  if (part === "theory" || part === "practical") {
+  if (part !== "total") {
     const state = record.componentStatus?.[part];
     if (state === "absent") return "AB";
     if (state === "exempt") return "EX";
@@ -551,13 +571,39 @@ function CrossList() {
     });
   }, [readyToLoad, blockClasses, liveByClass]);
 
+  const examCategory = selectedExam?.examCategory ?? null;
+
+  // Same subject rule as marks entry: a Unit Test (classes 1-8) has no
+  // practical paper, so a "Practical" sibling row never becomes a column -
+  // nor counts for completeness / ranks - even if an older sheet froze it.
+  const visibleSheetsByClass = useMemo(() => {
+    const result: Record<string, ExamSheetDoc | null> = {};
+    Object.entries(sheetsByClass).forEach(([className, sheet]) => {
+      result[className] = sheet
+        ? {
+            ...sheet,
+            subjects: dropUnitTestPracticalSiblings(
+              sheet.subjects,
+              examCategory,
+              className
+            ),
+          }
+        : null;
+    });
+    return result;
+  }, [sheetsByClass, examCategory]);
+
   const fallbackByClass = useMemo(() => {
     const result: Record<string, ExamSheetSubjectColumn[]> = {};
     Object.entries(liveByClass).forEach(([className, subjects]) => {
-      result[className] = toFallbackColumns(subjects);
+      result[className] = dropUnitTestPracticalSiblings(
+        toFallbackColumns(subjects),
+        examCategory,
+        className
+      );
     });
     return result;
-  }, [liveByClass]);
+  }, [liveByClass, examCategory]);
 
   // Subjects shown in marks entry but missing from the frozen sheet (e.g. a
   // Scholastic subject created later). They only add display columns; ranks
@@ -567,7 +613,8 @@ function CrossList() {
     if (!selectedExam) return result;
     Object.entries(sheetsByClass).forEach(([className, sheet]) => {
       const liveSubjects = liveByClass[className];
-      if (!sheet || !liveSubjects) return;
+      const visibleSheet = visibleSheetsByClass[className];
+      if (!sheet || !visibleSheet || !liveSubjects) return;
       const subjectIdsWithMarks = new Set<string>();
       currentMarks.forEach((marks) => {
         if (marks.className !== className) return;
@@ -576,7 +623,7 @@ function CrossList() {
         );
       });
       const inSheet = new Set(sheet.subjects.map((column) => column.id));
-      result[className] = syncSheetWithLiveSubjects({
+      const added = syncSheetWithLiveSubjects({
         sheet,
         exam: selectedExam,
         className,
@@ -587,9 +634,21 @@ function CrossList() {
         })),
         subjectIdsWithMarks,
       }).subjects.filter((column) => !inSheet.has(column.id));
+      result[className] = dropUnitTestPracticalSiblings(
+        [...visibleSheet.subjects, ...added],
+        examCategory,
+        className
+      ).filter((column) => !inSheet.has(column.id));
     });
     return result;
-  }, [selectedExam, sheetsByClass, liveByClass, currentMarks]);
+  }, [
+    selectedExam,
+    examCategory,
+    sheetsByClass,
+    visibleSheetsByClass,
+    liveByClass,
+    currentMarks,
+  ]);
 
   // Enrollments of the selected session load ONCE (equality filter on
   // academicYear only) and are cached per session together with the exam data.
@@ -759,7 +818,7 @@ function CrossList() {
         className: entry.className,
         section: entry.section,
         rows: sortDocumentRows(entry.rows),
-        sheet: sheetsByClass[entry.className] ?? null,
+        sheet: visibleSheetsByClass[entry.className] ?? null,
         sheetLoading: !(entry.className in sheetsByClass),
         fallbackSubjects: fallbackByClass[entry.className] ?? [],
         extraSubjects: extraByClass[entry.className] ?? [],
@@ -772,6 +831,7 @@ function CrossList() {
     selectedClass,
     selectedSection,
     sheetsByClass,
+    visibleSheetsByClass,
     fallbackByClass,
     extraByClass,
   ]);
@@ -789,7 +849,9 @@ function CrossList() {
     });
     byClass.forEach((docs, className) => {
       const sheetSubjects =
-        sheetsByClass[className]?.subjects ?? fallbackByClass[className] ?? [];
+        visibleSheetsByClass[className]?.subjects ??
+        fallbackByClass[className] ??
+        [];
       const columnDefs = buildColumnDefs(sheetSubjects);
       const completeRows = docs.filter((doc) =>
         isMarksDocComplete(doc, columnDefs)
@@ -805,7 +867,7 @@ function CrossList() {
       );
     });
     return ranks;
-  }, [currentMarks, sheetsByClass, fallbackByClass]);
+  }, [currentMarks, visibleSheetsByClass, fallbackByClass]);
 
   // Per-student ranks shared across every block of this view. Only COMPLETE
   // rows take part: incomplete rows (isMarksDocComplete false or a missing
@@ -1065,6 +1127,7 @@ function CrossListBlock({
     (a, b) => a.order - b.order || a.name.localeCompare(b.name)
   );
   const groups = buildCrossListGroups(examCategory, displaySubjects);
+  const headerRows = groups.some((group) => group.parts.length > 1) ? 2 : 1;
   const columnDefs = buildColumnDefs(sheetSubjects);
 
   const incompleteCount = block.rows.filter(
@@ -1114,23 +1177,41 @@ function CrossListBlock({
         </div>
       )}
 
-      <div className="overflow-x-auto print:overflow-visible">
+      {/* A real scroll box (height capped) so the sticky header has something to
+          stick to - an overflow-x-only wrapper would swallow position: sticky. */}
+      <div className="max-h-[75vh] overflow-auto print:max-h-none print:overflow-visible">
         <table className="w-full text-sm min-w-[900px] cross-list-register print:min-w-0">
-          <thead>
+          <thead className="sticky top-0 z-30 print:static">
             <tr className="bg-gray-800 text-white">
-              <th className="sticky left-0 z-20 w-16 px-2 py-2 text-center print:static print:left-auto print:z-auto">
+              <th
+                rowSpan={headerRows}
+                className="sticky left-0 z-20 w-16 px-2 py-2 text-center print:static print:left-auto print:z-auto"
+              >
                 Roll No
               </th>
-              <th className="w-24 px-2 py-2 text-center whitespace-nowrap">
+              <th
+                rowSpan={headerRows}
+                className="w-24 px-2 py-2 text-center whitespace-nowrap"
+              >
                 Adm. No
               </th>
-              <th className="sticky left-16 z-20 w-44 px-2 py-2 text-left print:static print:left-auto print:z-auto">
+              <th
+                rowSpan={headerRows}
+                className="sticky left-16 z-20 w-44 px-2 py-2 text-left print:static print:left-auto print:z-auto"
+              >
                 Student Name
               </th>
-              <th className="min-w-[9rem] px-2 py-2 text-left">Father Name</th>
+              <th
+                rowSpan={headerRows}
+                className="min-w-[9rem] px-2 py-2 text-left"
+              >
+                Father Name
+              </th>
               {groups.map((group) => (
                 <th
                   key={group.subjectId}
+                  colSpan={group.parts.length}
+                  rowSpan={group.parts.length > 1 ? 1 : headerRows}
                   className="px-2 py-2 text-center whitespace-nowrap"
                 >
                   {group.name}
@@ -1141,12 +1222,34 @@ function CrossListBlock({
                   )}
                 </th>
               ))}
-              <th className="px-2 py-2 text-center">Total</th>
-              <th className="px-2 py-2 text-center">Max</th>
-              <th className="px-2 py-2 text-center">Percentage</th>
-              <th className="px-2 py-2 text-center">Result</th>
-              <th className="px-2 py-2 text-center">{rankLabel}</th>
+              {["Total", "Max", "Percentage", "Result", rankLabel].map(
+                (label) => (
+                  <th
+                    key={label}
+                    rowSpan={headerRows}
+                    className="px-2 py-2 text-center"
+                  >
+                    {label}
+                  </th>
+                )
+              )}
             </tr>
+            {headerRows > 1 && (
+              <tr className="bg-gray-700 text-white">
+                {groups
+                  .filter((group) => group.parts.length > 1)
+                  .flatMap((group) =>
+                    group.parts.map(({ part, label }) => (
+                      <th
+                        key={`${group.subjectId}-${part}`}
+                        className="px-2 py-1 text-center text-xs"
+                      >
+                        {label}
+                      </th>
+                    ))
+                  )}
+              </tr>
+            )}
           </thead>
           <tbody>
             {block.rows.map((row, index) => {
@@ -1182,25 +1285,16 @@ function CrossListBlock({
                   <td className="px-2 py-1.5 whitespace-nowrap">
                     {row.fatherName}
                   </td>
-                  {groups.map((group) => {
+                  {groups.flatMap((group) => {
                     const record = row.doc?.subjectMarks[group.subjectId];
-                    // Practical-type subjects (classes 1-8 Main Exams) keep ONE
-                    // column showing only the practical marks; the theory part
-                    // lives on the parent subject's own column.
-                    const part: "total" | "practical" | "grade" =
-                      group.isGrade
-                        ? "grade"
-                        : group.split
-                          ? "practical"
-                          : "total";
-                    return (
+                    return group.parts.map(({ part }) => (
                       <td
-                        key={group.subjectId}
-                        className="px-2 py-1.5 text-center"
+                        key={`${group.subjectId}-${part}`}
+                        className="px-2 py-1.5 text-center whitespace-nowrap"
                       >
                         {subjectCellText(record, part)}
                       </td>
-                    );
+                    ));
                   })}
                   <td className="px-2 py-1.5 text-center">
                     {row.doc ? formatMarks(row.doc.totalMarks) : "-"}

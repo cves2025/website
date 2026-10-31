@@ -235,6 +235,33 @@ const nameKey = (value: unknown): string =>
     .toLowerCase();
 
 /**
+ * Unit Tests of classes 1-8 never have a practical paper, so a "Practical"-type
+ * subject is dropped when a same-named non-practical subject exists (that one
+ * already shows Notebook + Test). A "Practical" subject that is the ONLY one
+ * of its name is kept. Main Exams and other classes keep every subject.
+ */
+export function dropUnitTestPracticalSiblings<
+  T extends { name: string; type: string },
+>(
+  subjects: readonly T[],
+  examCategory: ExamDoc["examCategory"] | null | undefined,
+  className: string,
+): T[] {
+  if (examCategory !== "UNIT_TEST" || !isSchemeClass(className)) {
+    return [...subjects];
+  }
+  const nonPracticalNames = new Set(
+    subjects
+      .filter((subject) => subject.type !== "Practical")
+      .map((subject) => nameKey(subject.name)),
+  );
+  return subjects.filter(
+    (subject) =>
+      !(subject.type === "Practical" && nonPracticalNames.has(nameKey(subject.name))),
+  );
+}
+
+/**
  * The marks entry columns of one class: the subjects shown in marks entry,
  * sorted, with the Unit Test "Practical" sibling rows dropped (classes 1-8)
  * and every subject laid out by `enrichSubjectColumn`.
@@ -254,41 +281,18 @@ export function buildSubjectColumns(
       .map((subject) => nameKey(subject.data.name)),
   );
 
-  // Same-named subjects that DO have a non-practical row. A subject of type
-  // "Practical" is only the Main-Exam practical paper of its same-named
-  // written subject; such sibling rows have no paper in unit tests.
-  const nonPracticalNames = new Set(
-    shown
-      .filter((subject) => subject.data.type !== "Practical")
-      .map((subject) => nameKey(subject.data.name)),
-  );
-
   const oralNames = new Set(
     shown
       .filter((subject) => subject.data.type === "Oral")
       .map((subject) => nameKey(subject.data.name)),
   );
 
-  // Unit Tests of classes 1-8 never have a practical paper, so the
-  // "Practical"-type sibling row is dropped from the marks entry (the
-  // parent subject already shows Notebook + Test). Subjects where the
-  // "Practical" row is the ONLY row of that name are kept and also get
-  // Notebook + Test.
-  const isUnitTestScheme =
-    exam?.examCategory === "UNIT_TEST" && isSchemeClass(className);
-
-  return subjects
+  const columns = subjects
     .map(toSubjectColumnBase)
     .filter((c): c is SubjectColumnBase => c !== null && Boolean(c.name))
-    .sort(sortSubjectColumns)
-    .filter(
-      (c) =>
-        !(
-          isUnitTestScheme &&
-          c.type === "Practical" &&
-          nonPracticalNames.has(nameKey(c.name))
-        ),
-    )
+    .sort(sortSubjectColumns);
+
+  return dropUnitTestPracticalSiblings(columns, exam?.examCategory, className)
     .map((c) =>
       enrichSubjectColumn(
         c,
@@ -300,11 +304,53 @@ export function buildSubjectColumns(
     );
 }
 
+/** Status tokens a grade cell accepts besides the grades: absent / exempt. */
+const GRADE_STATUS_TOKENS: Record<string, "absent" | "exempt"> = {
+  AB: "absent",
+  EX: "exempt",
+};
+
+/** Everything a grade cell accepts: the grades plus AB / EX. */
+export const GRADE_CELL_OPTIONS = [
+  ...GRADE_OPTIONS,
+  ...Object.keys(GRADE_STATUS_TOKENS),
+];
+
+const GRADE_CHARS = new Set(GRADE_CELL_OPTIONS.join(""));
+export const GRADE_MAX_LENGTH = Math.max(
+  ...GRADE_CELL_OPTIONS.map((option) => option.length),
+);
+
+/** Upper-cases a typed grade and drops every character no option uses (digits included). */
 export function normalizeGrade(value: string): string {
-  return value
-    .toUpperCase()
-    .replace(/[^A-F0-9+-]/g, "")
-    .slice(0, 3);
+  return Array.from(value.toUpperCase())
+    .filter((char) => GRADE_CHARS.has(char))
+    .join("")
+    .slice(0, GRADE_MAX_LENGTH);
+}
+
+/** True for a grade (A+ ... F) or AB / EX, in any case. */
+export function isValidGrade(value: string): boolean {
+  return GRADE_CELL_OPTIONS.includes(value.trim().toUpperCase());
+}
+
+/** Saved record of a grade subject for a valid grade-cell value. */
+export function gradeCellRecord(value: string): SubjectMarksRecord {
+  const token = value.trim().toUpperCase();
+  const status = GRADE_STATUS_TOKENS[token];
+  return status
+    ? { status, obtained: null, maxMarks: 0 }
+    : { status: "present", obtained: null, maxMarks: 0, grade: token };
+}
+
+/** Text of a saved grade-subject record as typed in a grade cell. */
+export function gradeCellText(record: SubjectMarksRecord | undefined): string {
+  if (!record) return "";
+  const grade = record.grade?.trim() ?? "";
+  if (grade) return grade;
+  if (record.status === "absent") return "AB";
+  if (record.status === "exempt") return "EX";
+  return "";
 }
 
 /** "AB"/"EX" (any case) are shown back in the cell as uppercase tokens. */
@@ -495,13 +541,13 @@ export function buildStudentDraft(
 
       if (grade === "") {
         if (savedBySubject?.[column.id]) clearedSubjectKeys.push(column.id);
+      } else if (!isValidGrade(grade)) {
+        // Invalid grade: keep the last saved record untouched.
+        if (savedBySubject?.[column.id]) {
+          subjectMarks[column.id] = savedBySubject[column.id];
+        }
       } else {
-        subjectMarks[column.id] = {
-          status: "present",
-          obtained: null,
-          maxMarks: 0,
-          grade,
-        };
+        subjectMarks[column.id] = gradeCellRecord(grade);
       }
       return;
     }

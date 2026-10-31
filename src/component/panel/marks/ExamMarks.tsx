@@ -60,9 +60,12 @@ import {
 import { ExamDoc, MarksData, MarksDoc } from "../../../utils/type";
 import {
   CELL_KEY,
-  GRADE_OPTIONS,
+  GRADE_CELL_OPTIONS,
+  GRADE_MAX_LENGTH,
   buildStudentDraft,
   buildSubjectColumns,
+  gradeCellText,
+  isValidGrade,
   normalizeGrade,
   resolveCell,
   toMarkTokenOrRaw,
@@ -1458,10 +1461,18 @@ function ExamMarks() {
                             column.id,
                           );
 
-                          const savedGrade =
+                          const savedGrade = gradeCellText(
                             marksMap[student.studentUid]?.subjectMarks[
                               column.id
-                            ]?.grade ?? "";
+                            ],
+                          );
+
+                          const gradeDraft = drafts[cellKey];
+
+                          const invalid =
+                            gradeDraft !== undefined &&
+                            gradeDraft !== "" &&
+                            !isValidGrade(gradeDraft);
 
                           return (
                             <td
@@ -1471,8 +1482,9 @@ function ExamMarks() {
                               <input
                                 type="text"
                                 list="marksSubjectGrades"
-                                maxLength={3}
-                                value={drafts[cellKey] ?? savedGrade}
+                                maxLength={GRADE_MAX_LENGTH}
+                                title={`Grade: ${GRADE_CELL_OPTIONS.join(", ")}`}
+                                value={gradeDraft ?? savedGrade}
                                 readOnly={readOnly}
                                 onChange={(
                                   event: ChangeEvent<HTMLInputElement>,
@@ -1490,7 +1502,7 @@ function ExamMarks() {
                                 }
                                 className={`${marksInputClass}${
                                   readOnly ? ` ${readOnlyInputClass}` : ""
-                                }`}
+                                }${invalid ? ` ${invalidInputClass}` : ""}`}
                               />
                             </td>
                           );
@@ -1619,7 +1631,8 @@ function ExamMarks() {
 
             <p className="mt-2 text-xs text-gray-500">
               Marks are saved automatically as you type. You can type AB
-              (absent) or EX (exempt) in any subject cell.
+              (absent) or EX (exempt) in any subject cell. Grade subjects accept
+              only {GRADE_CELL_OPTIONS.join(", ")}.
             </p>
 
             {visibleColumns.some((column) => accessOf(column) === "view") && (
@@ -1629,7 +1642,7 @@ function ExamMarks() {
             )}
 
             <datalist id="marksSubjectGrades">
-              {GRADE_OPTIONS.map((grade) => (
+              {GRADE_CELL_OPTIONS.map((grade) => (
                 <option key={grade} value={grade}>
                   {grade}
                 </option>
