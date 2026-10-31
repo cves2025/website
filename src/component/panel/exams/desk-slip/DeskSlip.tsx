@@ -1,8 +1,9 @@
-import React, { ChangeEvent, useContext, useMemo, useState } from "react";
+import React, { useContext, useMemo, useState } from "react";
 import { CLASSES, SECTIONS } from "../../../../constants";
 import { toOrdinalLabel } from "../../../../utils/toOrdinalLabel";
 import { academicYears } from "../examScheduleShared";
 import PageHeader from "../../../../custom-components/PageHeader";
+import SelectDropdown from "../../../../custom-components/SelectDropdown";
 import useExamList from "../../../../hooks/useExamList";
 import useDeskSlipStudents from "../../../../hooks/useDeskSlipStudents";
 import useClassRollNumbers from "../../../../hooks/useClassRollNumbers";
@@ -10,8 +11,9 @@ import DeskSlipCard from "./DeskSlipCard";
 import { myContext } from "../../../context/MyContextProvider";
 import { NO_SCOPE, scopedClasses } from "../../../../permissions";
 
-const inputClass =
-  "w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500";
+// SelectDropdown trigger with the same look and height as the old selects.
+const selectTriggerClass =
+  "h-auto border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 disabled:bg-gray-100";
 
 const DeskSlip: React.FC = () => {
   // A teacher only sees students of the classes they are assigned to.
@@ -79,22 +81,17 @@ const DeskSlip: React.FC = () => {
           >
             Session
           </label>
-          <select
+          <SelectDropdown
             id="deskSlipSession"
             value={session}
-            onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-              setSession(event.target.value);
+            onValueChange={(value) => {
+              setSession(value);
               setExamId("");
             }}
-            className={inputClass}
-          >
-            <option value="">Select Session</option>
-            {academicYears.map((year) => (
-              <option key={year.value} value={year.value}>
-                {year.label}
-              </option>
-            ))}
-          </select>
+            placeholder="Select Session"
+            options={academicYears}
+            className={selectTriggerClass}
+          />
         </div>
 
         <div>
@@ -104,22 +101,18 @@ const DeskSlip: React.FC = () => {
           >
             Exam
           </label>
-          <select
+          <SelectDropdown
             id="deskSlipExam"
             value={examId}
-            onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-              setExamId(event.target.value)
-            }
+            onValueChange={setExamId}
             disabled={!session || loadingExam}
-            className={inputClass}
-          >
-            <option value="">Select Exam</option>
-            {sessionExams.map((exam) => (
-              <option key={exam.id} value={exam.id}>
-                {exam.examName}
-              </option>
-            ))}
-          </select>
+            placeholder="Select Exam"
+            options={sessionExams.map((exam) => ({
+              label: exam.examName,
+              value: exam.id,
+            }))}
+            className={selectTriggerClass}
+          />
         </div>
 
         <div>
@@ -129,21 +122,19 @@ const DeskSlip: React.FC = () => {
           >
             Class
           </label>
-          <select
+          <SelectDropdown
             id="deskSlipClass"
             value={selectedClass}
-            onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-              setSelectedClass(event.target.value)
-            }
-            className={inputClass}
-          >
-            {isAdmin && <option value="all">All Classes</option>}
-            {allowedClasses.map((className) => (
-              <option key={className} value={className}>
-                {toOrdinalLabel(className)}
-              </option>
-            ))}
-          </select>
+            onValueChange={setSelectedClass}
+            options={[
+              ...(isAdmin ? [{ label: "All Classes", value: "all" }] : []),
+              ...allowedClasses.map((className) => ({
+                label: toOrdinalLabel(className),
+                value: className,
+              })),
+            ]}
+            className={selectTriggerClass}
+          />
         </div>
 
         <div>
@@ -153,21 +144,19 @@ const DeskSlip: React.FC = () => {
           >
             Section
           </label>
-          <select
+          <SelectDropdown
             id="deskSlipSection"
             value={selectedSection}
-            onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-              setSelectedSection(event.target.value)
-            }
-            className={inputClass}
-          >
-            <option value="all">All Sections</option>
-            {SECTIONS.map((section) => (
-              <option key={section} value={section}>
-                Section {section}
-              </option>
-            ))}
-          </select>
+            onValueChange={setSelectedSection}
+            options={[
+              { label: "All Sections", value: "all" },
+              ...SECTIONS.map((section) => ({
+                label: `Section ${section}`,
+                value: section,
+              })),
+            ]}
+            className={selectTriggerClass}
+          />
         </div>
       </div>
       {/* Toolbar */}
