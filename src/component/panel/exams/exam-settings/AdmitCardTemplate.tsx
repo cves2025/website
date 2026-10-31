@@ -6,6 +6,7 @@ import { saveAdmitCardTemplate } from "./admit-card-template/admitCardSettings";
 
 import schoolLogo from "../../../../assets/image/schoolLogo1.png";
 import Button from "../../../../custom-components/Button";
+import RadioOptions from "../../../../custom-components/RadioOptions";
 import type { AdmitCardTemplateId } from "./admit-card-template/admitCardTemplates";
 
 // type AdmitCardTemplateId = "template1";
@@ -564,41 +565,18 @@ function AdmitCardTemplate() {
           Select Template
         </h2>
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {TEMPLATES.map((template) => {
-            const isSelected = selectedTemplate === template.id;
-
-            return (
-              <label
-                key={template.id}
-                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition ${
-                  isSelected
-                    ? "border-primaryBlue bg-blue-50"
-                    : "border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                {/* Radio */}
-                <input
-                  type="radio"
-                  name="admitCardTemplate"
-                  value={template.id}
-                  checked={isSelected}
-                  onChange={() => setSelectedTemplate(template.id)}
-                  className="mt-1 h-4 w-4 accent-primaryBlue"
-                />
-
-                {/* Template Information */}
-                <div className="min-w-0">
-                  <p className="font-medium text-gray-800">{template.name}</p>
-
-                  <p className="mt-1 text-sm text-gray-500">
-                    {template.description}
-                  </p>
-                </div>
-              </label>
-            );
-          })}
-        </div>
+        <RadioOptions
+          name="admitCardTemplate"
+          variant="card"
+          value={selectedTemplate}
+          onValueChange={setSelectedTemplate}
+          options={TEMPLATES.map((template) => ({
+            value: template.id,
+            label: template.name,
+            hint: template.description,
+          }))}
+          className="grid-cols-1 md:grid-cols-2"
+        />
         <div className="mt-4 flex items-center gap-3">
           <Button
             type="button"

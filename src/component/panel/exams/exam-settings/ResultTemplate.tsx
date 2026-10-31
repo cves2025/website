@@ -1,4 +1,5 @@
 import { useState } from "react";
+import RadioOptions from "../../../../custom-components/RadioOptions";
 
 type ResultTemplateId = "template1";
 
@@ -39,39 +40,17 @@ function ResultTemplate() {
           Select Template
         </h2>
 
-        <div className="space-y-3">
-          {TEMPLATES.map((template) => (
-            <label
-              key={template.id}
-              className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition ${
-                selectedTemplate === template.id
-                  ? "border-primaryBlue bg-blue-50"
-                  : "border-gray-200 hover:bg-gray-50"
-              }`}
-            >
-              {/* Radio */}
-              <input
-                type="radio"
-                name="resultTemplate"
-                value={template.id}
-                checked={selectedTemplate === template.id}
-                onChange={() => setSelectedTemplate(template.id)}
-                className="mt-1 h-4 w-4 accent-primaryBlue"
-              />
-
-              {/* Template Information */}
-              <div>
-                <p className="font-medium text-gray-800">
-                  {template.name}
-                </p>
-
-                <p className="mt-1 text-sm text-gray-500">
-                  {template.description}
-                </p>
-              </div>
-            </label>
-          ))}
-        </div>
+        <RadioOptions
+          name="resultTemplate"
+          variant="card"
+          value={selectedTemplate}
+          onValueChange={setSelectedTemplate}
+          options={TEMPLATES.map((template) => ({
+            value: template.id,
+            label: template.name,
+            hint: template.description,
+          }))}
+        />
       </section>
 
       {/* Preview */}
