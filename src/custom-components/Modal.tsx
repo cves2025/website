@@ -1,8 +1,10 @@
 import React from "react";
 import Button from "./Button";
 import { Button as UIButton } from "@/components/ui/button";
+import { X } from "lucide-react";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -91,22 +93,37 @@ const Modal: React.FC<ModalProps> = ({
         onInteractOutside={(event) => event.preventDefault()}
         onEscapeKeyDown={(event) => event.preventDefault()}
         {...(description ? {} : { "aria-describedby": undefined })}
+        showCloseButton={false}
         className={cn(
-          "flex max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] flex-col gap-0 rounded-lg border-0 bg-white p-0 shadow-xl sm:rounded-lg [&>button:last-child]:right-3 [&>button:last-child]:top-3 [&>button:last-child]:z-10 [&>button:last-child>svg]:h-5 [&>button:last-child>svg]:w-5",
+          "flex max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] flex-col gap-0 rounded-lg border-0 bg-white p-0 shadow-xl sm:rounded-lg",
           modalClassName
         )}
       >
-        <div className="overflow-y-auto p-6">
-          {/* Title */}
-          <div className={titleStyle}>
-            <DialogTitle className="pr-8 text-lg font-semibold text-gray-900">
+        {/* Header — title + cross stay fixed at the top while the body scrolls */}
+        <div className="flex shrink-0 items-start gap-3 border-b border-gray-200 px-6 py-4">
+          {/* Same width as the cross, so a centred title is truly centred. */}
+          <span className="h-8 w-8 shrink-0" aria-hidden="true" />
+          <div className={cn("min-w-0 flex-1 self-center text-center", titleStyle)}>
+            <DialogTitle className="text-lg font-semibold text-gray-900">
               {title}
             </DialogTitle>
           </div>
+          <DialogClose asChild>
+            <button
+              type="button"
+              disabled={loading}
+              aria-label="Close"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primaryGreen text-white shadow-sm transition-colors hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primaryGreen focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </DialogClose>
+        </div>
 
+        <div className="overflow-y-auto px-6 pb-6 pt-4">
           {/* Description */}
           {description && (
-            <DialogDescription className="mt-2 text-sm text-gray-600">
+            <DialogDescription className="text-sm text-gray-600">
               {description}
             </DialogDescription>
           )}
