@@ -36,6 +36,9 @@ function buildVersionPlugin(): Plugin {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), buildVersionPlugin()],
+  resolve: {
+    alias: { "@": resolve(projectRoot, "src") },
+  },
   define: {
     __APP_VERSION__: JSON.stringify(BUILD_ID),
     __APP_VERSION_LABEL__: JSON.stringify(APP_VERSION),
