@@ -5,6 +5,13 @@ import { db } from "../../../../../firebase/config";
 // TODO: set the correct import path for these constants
 import { COLLECTION, PRE_DEFINED_DOC_ID } from "../../../../../constants";
 import Button from "../../../../../custom-components/Button";
+import DatePicker from "../../../../../custom-components/DatePicker";
+import Modal from "../../../../../custom-components/Modal";
+import { ChevronDown, Plus, Trash2 } from "lucide-react";
+import { Button as UIButton } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import SearchableMultiSelect, {
   SearchableOption,
 } from "../../../../../custom-components/SearchableMultiSelect";
@@ -48,6 +55,9 @@ function ResultCardSettings() {
   const [errorIds, setErrorIds] = useState<string[]>([]);
   const [dateInvalid, setDateInvalid] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  // Remark row waiting for the "remove this range?" confirmation.
+  const [rowToRemove, setRowToRemove] = useState<RemarkRow | null>(null);
 
   // Makes sure the auto-select on first load runs only once
   const hasAutoSelected = useRef(false);
@@ -151,10 +161,47 @@ function ResultCardSettings() {
       prev.length === 1 ? [newRow()] : prev.filter((r) => r.id !== id),
     );
 
+  // True once the valid From-To ranges cover every percentage from 0 to 100,
+  // so no further range can be added ("Add Range" is hidden).
+  const coversFullScale = (() => {
+    const covered = new Array<boolean>(101).fill(false);
+    for (const r of rows) {
+      if (r.from.trim() === "" || r.to.trim() === "") continue;
+      const from = Number(r.from);
+      const to = Number(r.to);
+      if (!Number.isInteger(from) || !Number.isInteger(to)) continue;
+      if (from < 0 || to > 100 || from > to) continue;
+      for (let p = from; p <= to; p++) covered[p] = true;
+    }
+    return covered.every(Boolean);
+  })();
+
   const filledRows = () =>
     rows.filter(
       (r) => r.from.trim() !== "" || r.to.trim() !== "" || r.remark.trim() !== "",
     );
+
+  // Remarks as (from, to, remark) sorted by From, so the form and the saved
+  // value compare equal regardless of row order or whitespace.
+  const formRangesSignature = JSON.stringify(
+    filledRows()
+      .map((r) => [Number(r.from), Number(r.to), r.remark.trim()] as const)
+      .sort((a, b) => a[0] - b[0]),
+  );
+  const savedRangesSignature = (id: string) =>
+    JSON.stringify(
+      (savedRemarks[id]?.ranges ?? [])
+        .map((r) => [r.from, r.to, r.remark] as const)
+        .sort((a, b) => a[0] - b[0]),
+    );
+
+  // "Update" stays disabled until the form differs from what is saved. With
+  // several exams whose saved data differ, saving always changes something.
+  const isDirty =
+    !hasSavedForSelection ||
+    mismatch ||
+    formRangesSignature !== savedRangesSignature(validExamIds[0]) ||
+    date !== (savedDates[validExamIds[0]]?.date ?? "");
 
   const validate = (): { message: string; ids: string[]; badDate: boolean } => {
     if (!validExamIds.length) {
@@ -301,13 +348,6 @@ function ResultCardSettings() {
 
   const handleClearSaved = async () => {
     if (!hasSavedForSelection) return;
-    if (
-      !window.confirm(
-        "Delete the saved remarks and distribution date of the selected exams?",
-      )
-    ) {
-      return;
-    }
     setSaving(true);
     try {
       const remarksByExam: Record<string, FieldValue> = {};
@@ -319,6 +359,7 @@ function ResultCardSettings() {
       await setDoc(settingsRef, { remarksByExam, dateByExam }, { merge: true });
       setRows([newRow()]);
       setDate("");
+      setConfirmDeleteOpen(false);
       toast.success("Saved settings deleted successfully.");
     } catch {
       toast.error("Failed to delete. Please try again.");
@@ -327,10 +368,12 @@ function ResultCardSettings() {
     }
   };
 
+  // Overrides for the shadcn Input of a remark row (red when the row is invalid).
   const inputClass = (id: string) =>
-    `rounded-md border px-3 py-2 text-sm outline-none focus:border-blue-500 ${
-      errorIds.includes(id) ? "border-red-500 bg-red-50" : "border-gray-300"
-    }`;
+    cn(
+      "h-auto bg-white py-2 text-sm focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/50 md:text-sm",
+      errorIds.includes(id) ? "border-red-500 bg-red-50" : "border-gray-300",
+    );
 
   return (
     <div className="mx-auto flex w-full flex-col gap-4 rounded-md border border-gray-200 bg-white p-4">
@@ -355,20 +398,12 @@ function ResultCardSettings() {
           className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100"
           title={isOpen ? "Collapse" : "Expand"}
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            className={`h-5 w-5 transition-transform duration-200 ${
-              isOpen ? "rotate-180" : "rotate-0"
-            }`}
-          >
-            <path
-              fillRule="evenodd"
-              d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
-              clipRule="evenodd"
-            />
-          </svg>
+          <ChevronDown
+            className={cn(
+              "h-5 w-5 transition-transform duration-200",
+              isOpen ? "rotate-180" : "rotate-0",
+            )}
+          />
         </span>
       </div>
 
@@ -421,7 +456,7 @@ function ResultCardSettings() {
                     key={r.id}
                     className="grid grid-cols-2 items-center gap-3 md:grid-cols-[110px_110px_1fr_40px]"
                   >
-                    <input
+                    <Input
                       type="number"
                       min={0}
                       max={100}
@@ -431,7 +466,7 @@ function ResultCardSettings() {
                       onChange={(e) => updateRow(r.id, "from", e.target.value)}
                       className={inputClass(r.id)}
                     />
-                    <input
+                    <Input
                       type="number"
                       min={0}
                       max={100}
@@ -441,7 +476,7 @@ function ResultCardSettings() {
                       onChange={(e) => updateRow(r.id, "to", e.target.value)}
                       className={inputClass(r.id)}
                     />
-                    <input
+                    <Input
                       type="text"
                       maxLength={200}
                       placeholder="e.g. Excellent performance. Keep it up!"
@@ -449,46 +484,57 @@ function ResultCardSettings() {
                       onChange={(e) => updateRow(r.id, "remark", e.target.value)}
                       className={`col-span-2 md:col-span-1 ${inputClass(r.id)}`}
                     />
-                    <button
+                    <UIButton
                       type="button"
-                      onClick={() => removeRow(r.id)}
-                      className="col-span-2 rounded-md px-2 py-2 text-sm text-red-500 hover:bg-red-50 md:col-span-1"
+                      size="icon"
+                      variant="destructive"
+                      onClick={() => setRowToRemove(r)}
                       title="Remove"
+                      aria-label="Remove this range"
+                      className="col-span-2 h-8 w-8 justify-self-end bg-red-600 text-white hover:bg-red-700 md:col-span-1 md:justify-self-center"
                     >
-                      ✕
-                    </button>
+                      <Trash2 className="h-4 w-4" />
+                    </UIButton>
                   </div>
                 ))}
 
-                <button
-                  type="button"
-                  onClick={addRow}
-                  className="w-fit rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
-                >
-                  + Add Range
-                </button>
+                {coversFullScale ? (
+                  <p className="text-xs font-medium text-green-700">
+                    All percentages from 0 to 100 are covered.
+                  </p>
+                ) : (
+                  <UIButton
+                    type="button"
+                    variant="outline"
+                    onClick={addRow}
+                    className="w-fit border-dashed border-primaryPink text-primaryPink hover:bg-pink-50 hover:text-primaryPink"
+                  >
+                    <Plus className="h-4 w-4" /> Add Range
+                  </UIButton>
+                )}
               </div>
 
               {/* Distribution date */}
               <div className="flex flex-col gap-1 border-t border-gray-200 pt-4">
-                <label
+                <Label
                   htmlFor="distribution-date"
-                  className="text-sm font-semibold text-gray-800"
+                  className="font-semibold text-gray-800"
                 >
                   Report Card Distribution Date{" "}
                   <span className="font-normal text-gray-500">(optional)</span>
-                </label>
-                <input
+                </Label>
+                <DatePicker
                   id="distribution-date"
-                  type="date"
                   value={date}
-                  onChange={(e) => {
-                    setDate(e.target.value);
+                  onChange={(value) => {
+                    setDate(value);
                     setDateInvalid(false);
                   }}
-                  className={`w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-blue-500 md:w-60 ${
-                    dateInvalid ? "border-red-500 bg-red-50" : "border-gray-300"
-                  }`}
+                  aria-invalid={dateInvalid}
+                  className={cn(
+                    "md:w-60",
+                    dateInvalid && "border-red-500 bg-red-50 hover:bg-red-50",
+                  )}
                 />
                 <p className="text-xs text-gray-500">
                   Shown as the date on the result card. If it is empty, today's date is shown.
@@ -497,14 +543,15 @@ function ResultCardSettings() {
 
               <div className="flex flex-wrap justify-end gap-2">
                 {hasSavedForSelection && (
-                  <button
+                  <UIButton
                     type="button"
-                    onClick={handleClearSaved}
+                    variant="outline"
+                    onClick={() => setConfirmDeleteOpen(true)}
                     disabled={saving}
-                    className="rounded-md border border-red-300 px-4 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+                    className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
                   >
-                    Delete Saved
-                  </button>
+                    <Trash2 className="h-4 w-4" /> Delete Saved
+                  </UIButton>
                 )}
                 <Button
                   buttonName={saving ? "Saving..." : hasSavedForSelection ? "Update" : "Save"}
@@ -512,12 +559,55 @@ function ResultCardSettings() {
                   size="md"
                   buttonStyle="rounded-md"
                   onClick={handleSave}
+                  disabled={saving || !isDirty}
+                  title={
+                    isDirty ? undefined : "Change the remarks or date to update"
+                  }
                 />
               </div>
             </div>
           )}
         </>
       )}
+
+      <Modal
+        isOpen={confirmDeleteOpen}
+        onClose={() => setConfirmDeleteOpen(false)}
+        title="Delete Saved Settings"
+        description={`Delete the saved remarks and distribution date of the ${
+          validExamIds.length > 1
+            ? `${validExamIds.length} selected exams`
+            : "selected exam"
+        }? This cannot be undone.`}
+        submitText="Delete"
+        submitClassName="bg-red-600 hover:bg-red-700"
+        loading={saving}
+        onSubmit={() => void handleClearSaved()}
+      />
+
+      <Modal
+        isOpen={rowToRemove !== null}
+        onClose={() => setRowToRemove(null)}
+        title="Remove Remark Range"
+        description={
+          rowToRemove &&
+          (rowToRemove.from.trim() || rowToRemove.to.trim())
+            ? `Remove the range ${rowToRemove.from.trim() || "?"}% - ${
+                rowToRemove.to.trim() || "?"
+              }%${
+                rowToRemove.remark.trim()
+                  ? ` ("${rowToRemove.remark.trim()}")`
+                  : ""
+              }? It is removed from the form; click Save / Update to apply it.`
+            : "Remove this empty range from the form?"
+        }
+        submitText="Remove"
+        submitClassName="bg-red-600 hover:bg-red-700"
+        onSubmit={() => {
+          if (rowToRemove) removeRow(rowToRemove.id);
+          setRowToRemove(null);
+        }}
+      />
     </div>
   );
 }
