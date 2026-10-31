@@ -160,3 +160,37 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Scrollbar — brand gradient (green → blue → pink → red).
+   Gradients only work with the ::-webkit-scrollbar pseudo-elements
+   (Chrome / Edge / Safari). Chrome ignores those once the standard
+   scrollbar-color is set, so that solid fallback is limited to Firefox. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  border: 2px solid #f1f5f9;
+}
+::-webkit-scrollbar-thumb:vertical {
+  background: linear-gradient(to bottom, #009746, #393186, #e7087e, #e31e25);
+}
+::-webkit-scrollbar-thumb:horizontal {
+  background: linear-gradient(to right, #009746, #393186, #e7087e, #e31e25);
+}
+::-webkit-scrollbar-thumb:hover {
+  border-width: 1px;
+}
+::-webkit-scrollbar-corner {
+  background: #f1f5f9;
+}
+@supports (-moz-appearance: none) {
+  * {
+    scrollbar-color: #393186 #f1f5f9;
+    scrollbar-width: thin;
+  }
+}
