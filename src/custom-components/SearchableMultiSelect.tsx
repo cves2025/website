@@ -445,7 +445,7 @@ function SearchableMultiSelect({
                     onClick={toggleAllFiltered}
                     className="rounded border border-gray-300 bg-white px-2 py-1 font-bold text-gray-700 hover:bg-gray-100"
                   >
-                    {allFilteredSelected ? "Unselect shown" : "Select shown"}
+                    {allFilteredSelected ? "Unselect all" : "Select all"}
                   </button>
                   <button
                     type="button"
