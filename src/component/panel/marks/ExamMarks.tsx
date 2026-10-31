@@ -73,8 +73,6 @@ import {
 
 import PageHeader from "../../../custom-components/PageHeader";
 
-import Modal from "../../../custom-components/Modal";
-
 import Button from "../../../custom-components/Button";
 
 import { myContext } from "../../context/MyContextProvider";
@@ -271,7 +269,6 @@ function ExamMarks() {
 
   const [exams, setExams] = useState<ExamDoc[]>([]);
 
-  const [modalOpen, setModalOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [marksYear, setMarksYear] = useState(academicYears[0]?.value ?? "");
 
@@ -396,7 +393,6 @@ function ExamMarks() {
   const showTotals = visibleColumns.length === subjectColumns.length;
 
   const tableReady = Boolean(
-    modalOpen &&
     marksYear &&
     marksExamId &&
     marksClass &&
@@ -663,6 +659,13 @@ function ExamMarks() {
 
     setDrafts({});
   }, [marksYear, marksExamId, marksClass, section]);
+
+  useEffect(() => {
+    return () => {
+      flushPendingWrites();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!tableReady) {
@@ -1095,24 +1098,6 @@ function ExamMarks() {
     scheduleStudentWrite(student);
   };
 
-  const openModal = () => {
-    setMarksYear(academicYears[0]?.value ?? "");
-
-    setMarksExamId("");
-
-    setMarksClass("");
-
-    setSection("");
-
-    setModalOpen(true);
-  };
-
-  const closeModal = () => {
-    flushPendingWrites();
-
-    setModalOpen(false);
-  };
-
   return (
     <div className="flex flex-col gap-2">
       <PageHeader
@@ -1121,24 +1106,15 @@ function ExamMarks() {
         description="Enter student marks for every exam. Marks are saved automatically as you type."
         descriptionStyle="text-gray-500"
         button={
-          <div className="flex gap-3">
-            {can(PERMISSIONS.MARKS_ENTER) && (
-              <Button
-                buttonName="Upload Excel"
-                variant="success"
-                size="md"
-                buttonStyle="rounded-full"
-                onClick={() => setUploadOpen(true)}
-              />
-            )}
+          can(PERMISSIONS.MARKS_ENTER) && (
             <Button
-              buttonName="Add Marks"
-              variant="primary"
+              buttonName="Upload Excel"
+              variant="success"
               size="md"
-              buttonStyle="rounded-full bg-blue-600 hover:bg-blue-700"
-              onClick={openModal}
+              buttonStyle="rounded-full"
+              onClick={() => setUploadOpen(true)}
             />
-          </div>
+          )
         }
       />
 
@@ -1158,16 +1134,12 @@ function ExamMarks() {
         </div>
       )}
 
-      <Modal
-        isOpen={modalOpen}
-        onClose={closeModal}
-        title="Add Exam Marks"
-        description="Select the academic year, exam and class name to open the marks entry sheet."
-        cancelText="Cancel"
-        hideSubmit
-        onSubmit={() => undefined}
-        modalClassName="max-w-6xl"
-      >
+      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <p className="text-sm text-gray-600">
+          Select the academic year, exam and class name to open the marks
+          entry sheet.
+        </p>
+
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-4 gap-4">
           <div>
             <label
@@ -1308,9 +1280,9 @@ function ExamMarks() {
             No subject is assigned to you for this class and section.
           </div>
         ) : (
-          <div className="mt-4 overflow-x-auto">
+          <div className="mt-4 max-h-[65vh] overflow-auto">
             <table className="w-full text-sm min-w-[980px]">
-              <thead>
+              <thead className="sticky top-0 z-40">
                 <tr className="bg-gray-800 text-white text-left">
                   <th className="sticky left-0 z-30 px-3 py-2.5" rowSpan={2}>
                     #
@@ -1656,7 +1628,7 @@ function ExamMarks() {
             </datalist>
           </div>
         )}
-      </Modal>
+      </div>
       <MarksUploadModal
         isOpen={uploadOpen}
         onClose={() => setUploadOpen(false)}
