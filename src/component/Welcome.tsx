@@ -32,7 +32,9 @@ function Welcome() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-100 print:block print:h-auto print:overflow-visible print:bg-white">
+    // -m-0.5 cancels the m-0.5 wrapper in App.tsx; without it the panel is
+    // 100vh + 4px tall and the whole page scrolls by a few pixels.
+    <div className="-m-0.5 flex h-screen overflow-hidden bg-gray-100 print:m-0 print:block print:h-auto print:overflow-visible print:bg-white">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Backdrop for mobile */}
