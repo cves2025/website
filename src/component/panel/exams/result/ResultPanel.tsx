@@ -5,7 +5,7 @@ import Button from "../../../../custom-components/Button";
 import SearchableMultiSelect, {
   type SearchableOption,
 } from "../../../../custom-components/SearchableMultiSelect";
-import { CLASSES, SECTIONS } from "../../../../constants";
+import { SECTIONS } from "../../../../constants";
 import { toOrdinalLabel } from "../../../../utils/toOrdinalLabel";
 import {
   GENERATED_RESULT_CARDS_PATH,
@@ -95,7 +95,7 @@ function ResultPanel() {
             onChange={(event) => gen.handleClassChange(event.target.value)}
           >
             <option value="">Select class</option>
-            {CLASSES.map((className) => (
+            {gen.allowedClasses.map((className) => (
               <option key={className} value={className}>
                 {toOrdinalLabel(className)}
               </option>

@@ -6,11 +6,9 @@ import {
 import PageHeader from "../../../custom-components/PageHeader";
 import Button from "../../../custom-components/Button";
 import AdmitCardGenerateModal from "./AdmitCardGenerateModal";
-import ResultCardGenerateModal from "./ResultCardGenerateModal";
 
 function AdmitCard() {
   const [modalOpen, setModalOpen] = useState(false);
-  const [resultModalOpen, setResultModalOpen] = useState(false);
   const navigate = useNavigate();
 
   return (
@@ -30,13 +28,6 @@ function AdmitCard() {
             onClick={() => setModalOpen(true)}
           />
           <Button
-            buttonName="+ Result Card"
-            variant="success"
-            size="md"
-            buttonStyle="rounded-full bg-amber-600 hover:bg-amber-700"
-            onClick={() => setResultModalOpen(true)}
-          />
-          <Button
             buttonName="+ Exam Schedule"
             variant="success"
             size="md"
@@ -49,10 +40,6 @@ function AdmitCard() {
 
       {modalOpen && (
         <AdmitCardGenerateModal onClose={() => setModalOpen(false)} />
-      )}
-
-      {resultModalOpen && (
-        <ResultCardGenerateModal onClose={() => setResultModalOpen(false)} />
       )}
     </div>
   );

@@ -1,4 +1,4 @@
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useContext, useEffect, useMemo, useState } from "react";
 import {
   collection,
   getDocs,
@@ -34,6 +34,8 @@ import type {
 } from "../../../utils/type";
 import PageHeader from "../../../custom-components/PageHeader";
 import Button from "../../../custom-components/Button";
+import { myContext } from "../../context/MyContextProvider";
+import { NO_SCOPE, scopedClasses, scopedSections } from "../../../permissions";
 
 const academicYears = generateAcademicYears();
 
@@ -302,12 +304,33 @@ function CrossList() {
   /** Rules change (from the Settings page) -> marks are re-fetched under them. */
   const rulesKey = `${rules.rankScope}|${rules.passMode}|${rules.totalPassPercentage}|${rules.subjectPassPercentage}`;
 
+  // A teacher only sees the register of the classes/sections they are
+  // assigned to; "All Classes" / "All Sections" stays admin-only.
+  const { user } = useContext(myContext);
+  const scope = user?.scope ?? NO_SCOPE;
+  const isAdmin = scope.kind === "all";
+  const allowedClasses = scopedClasses(scope, CLASSES);
+
   // Newest academic year first (e.g. 2026-27), so the current session is
   // pre-selected by default.
   const [session, setSession] = useState(academicYears[0]?.value ?? "");
   const [examId, setExamId] = useState("");
-  const [selectedClass, setSelectedClass] = useState("all");
+  const [selectedClass, setSelectedClass] = useState(
+    () => (isAdmin ? "all" : allowedClasses[0] ?? ""),
+  );
   const [selectedSection, setSelectedSection] = useState("all");
+
+  const allowedSections = useMemo(() => {
+    if (isAdmin) return [...SECTIONS];
+    if (selectedClass === "all") return [];
+    return scopedSections(scope, selectedClass, SECTIONS);
+  }, [isAdmin, scope, selectedClass]);
+
+  /** Whether a class/section the data was loaded for is in the teacher's scope. */
+  const canAccess = (className: string, section: string) =>
+    isAdmin ||
+    (allowedClasses.includes(className) &&
+      scopedSections(scope, className, SECTIONS).includes(section));
 
   const [allExams, setAllExams] = useState<ExamDoc[]>([]);
   const [loadingExams, setLoadingExams] = useState(true);
@@ -388,7 +411,20 @@ function CrossList() {
     setCurrentMarks([]);
     setLoadingMarks(true);
     setLoadError("");
-    loadMarksForExam(session, examId, undefined, undefined, rules)
+
+    // A teacher only ever loads marks of their own classes - never the whole
+    // exam - so nothing outside their scope reaches the browser.
+    const marksPromise = isAdmin
+      ? loadMarksForExam(session, examId, undefined, undefined, rules)
+      : allowedClasses.length === 0
+        ? Promise.resolve<MarksDoc[]>([])
+        : Promise.all(
+            allowedClasses.map((className) =>
+              loadMarksForExam(session, examId, className, undefined, rules),
+            ),
+          ).then((perClass) => perClass.flat());
+
+    marksPromise
       .then((docs) => {
         if (cancelled) return;
         setMarksByExam((prev) => ({ ...prev, [key]: docs }));
@@ -404,7 +440,17 @@ function CrossList() {
     return () => {
       cancelled = true;
     };
-  }, [readyToLoad, session, examId, rulesKey, rules, marksByExam, refreshNonce]);
+  }, [
+    readyToLoad,
+    session,
+    examId,
+    rulesKey,
+    rules,
+    marksByExam,
+    refreshNonce,
+    isAdmin,
+    allowedClasses.join(","),
+  ]);
 
   const handleRefresh = () => {
     if (!readyToLoad) return;
@@ -424,14 +470,18 @@ function CrossList() {
   };
 
   // Client-side class / section filtering - never triggers a refetch.
+  // canAccess is the last line of defense: even if currentMarks ever held a
+  // row outside scope, it would never render.
   const filteredMarks = useMemo(
     () =>
       currentMarks.filter(
         (marks) =>
           (selectedClass === "all" || marks.className === selectedClass) &&
-          (selectedSection === "all" || marks.section === selectedSection)
+          (selectedSection === "all" || marks.section === selectedSection) &&
+          canAccess(marks.className, marks.section)
       ),
-    [currentMarks, selectedClass, selectedSection]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [currentMarks, selectedClass, selectedSection, isAdmin, allowedClasses.join(",")]
   );
 
   const blockClasses = useMemo(() => {
@@ -505,13 +555,23 @@ function CrossList() {
       setCurrentEnrollments(enrollmentsBySession[session]);
       return;
     }
+    // A teacher never loads the roster of classes outside their scope.
+    if (!isAdmin && allowedClasses.length === 0) {
+      setCurrentEnrollments([]);
+      return;
+    }
     let cancelled = false;
-    getDocs(
-      query(
-        collection(db, COLLECTION.ENROLLMENTS),
-        where("academicYear", "==", session)
-      )
-    )
+    const enrollmentsQuery = isAdmin
+      ? query(
+          collection(db, COLLECTION.ENROLLMENTS),
+          where("academicYear", "==", session)
+        )
+      : query(
+          collection(db, COLLECTION.ENROLLMENTS),
+          where("academicYear", "==", session),
+          where("className", "in", allowedClasses)
+        );
+    getDocs(enrollmentsQuery)
       .then((snapshot) => {
         if (cancelled) return;
         const rows = snapshot.docs
@@ -544,7 +604,14 @@ function CrossList() {
     return () => {
       cancelled = true;
     };
-  }, [readyToLoad, session, enrollmentsBySession, refreshNonce]);
+  }, [
+    readyToLoad,
+    session,
+    enrollmentsBySession,
+    refreshNonce,
+    isAdmin,
+    allowedClasses.join(","),
+  ]);
 
   // Live roll numbers derived from the session roster exactly like the marks
   // entry screen (per class: section, then admission number).
@@ -587,7 +654,8 @@ function CrossList() {
         .filter(
           (student) =>
             student.className === selectedClass &&
-            (selectedSection === "all" || student.section === selectedSection)
+            (selectedSection === "all" || student.section === selectedSection) &&
+            canAccess(student.className, student.section)
         )
         .forEach((student) => {
           const key = `${selectedClass}::${student.section}`;
@@ -806,8 +874,8 @@ function CrossList() {
             }
             className={inputClass}
           >
-            <option value="all">All Classes</option>
-            {CLASSES.map((className) => (
+            {isAdmin && <option value="all">All Classes</option>}
+            {allowedClasses.map((className) => (
               <option key={className} value={className}>
                 {toOrdinalLabel(className)}
               </option>
@@ -830,7 +898,7 @@ function CrossList() {
             className={inputClass}
           >
             <option value="all">All Sections</option>
-            {SECTIONS.map((section) => (
+            {(isAdmin ? SECTIONS : allowedSections).map((section) => (
               <option key={section} value={section}>
                 Section {section}
               </option>

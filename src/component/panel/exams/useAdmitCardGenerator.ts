@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   collection,
   doc,
@@ -12,6 +19,8 @@ import { db } from "../../../firebase/config";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import { CardStudent, ScheduleRow } from "../../../utils/type";
 import type { SearchableOption } from "../../../custom-components/SearchableMultiSelect";
+import { myContext } from "../../context/MyContextProvider";
+import { NO_SCOPE, scopedClasses } from "../../../permissions";
 import {
   academicYears,
   loadStudentsWithClassNameVariants,
@@ -64,6 +73,11 @@ export function useAdmitCardGenerator(
   const { exams, loadingExams } = useExamTemplates();
   const { classesOfSubject, classesOfSubjectType, typeOfSubjectInClass } =
     useSubjectOptions();
+
+  // A teacher only sees classes they are assigned to; admins see every class.
+  const { user } = useContext(myContext);
+  const scope = user?.scope ?? NO_SCOPE;
+  const allowedClasses = scopedClasses(scope, CLASSES);
 
   const [selectedYear, setSelectedYear] = useState(
     options.initialYear || academicYears[0]?.value || "",
@@ -130,6 +144,15 @@ export function useAdmitCardGenerator(
       return;
     }
 
+    // A teacher never loads students of a class outside their own scope,
+    // even when that class comes from the URL (the generated-cards page).
+    if (scope.kind !== "all" && !allowedClasses.includes(selectedClass)) {
+      setClassStudents([]);
+      setLoadingStudents(false);
+      setStudentsResolved(true);
+      return;
+    }
+
     let cancelled = false;
     setLoadingStudents(true);
 
@@ -190,7 +213,11 @@ export function useAdmitCardGenerator(
       cancelled = true;
       unsubscribe();
     };
-  }, [selectedClass]);
+    // allowedClasses.join(",") is the stable part of the scope that actually
+    // matters here — it only changes when the resolved scope really changes,
+    // so this never restarts the listener on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedClass, scope.kind, allowedClasses.join(",")]);
 
   /* ------------------------------------------------------------ derived -- */
   const yearExams = useMemo(
@@ -216,7 +243,7 @@ export function useAdmitCardGenerator(
       : classesOfSubject(row.subject);
 
   /* Classes that have at least one applicable paper in the schedule. */
-  const scheduledClasses = CLASSES.filter((className) =>
+  const scheduledClasses = allowedClasses.filter((className) =>
     rows.some(
       (row) =>
         row.subject &&
@@ -493,6 +520,7 @@ export function useAdmitCardGenerator(
   ]);
 
   return {
+    allowedClasses,
     exams,
     loadingExams,
     selectedYear,

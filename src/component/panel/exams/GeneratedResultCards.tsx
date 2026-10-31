@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { NavLink, useSearchParams } from "react-router-dom";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { FaPrint } from "react-icons/fa";
@@ -12,9 +12,11 @@ import { buildResultTable } from "../../../utils/resultCardModel";
 import { ADMIT_CARD_PATH, useExamTemplates } from "./examScheduleShared";
 import { useResultCardStudents } from "./useResultCardStudents";
 import ResultCard from "./result/ResultCard";
-import { COLLECTION } from "../../../constants";
+import { CLASSES, COLLECTION } from "../../../constants";
 import { db } from "../../../firebase/config";
 import { useSuggestedRemarks } from "../../../hooks/useSuggestedRemarks";
+import { myContext } from "../../context/MyContextProvider";
+import { NO_SCOPE, scopedClasses } from "../../../permissions";
 
 interface AttendanceSummary {
   attendancePresent: number;
@@ -49,6 +51,15 @@ function GeneratedResultCards() {
         .map((value) => value.trim())
         .filter(Boolean);
 
+  // A teacher can only ever generate result cards of their own classes, even
+  // if this URL (built from the Result page's selection) is edited by hand.
+  const { user } = useContext(myContext);
+  const scope = user?.scope ?? NO_SCOPE;
+  const isAdmin = scope.kind === "all";
+  const allowedClasses = scopedClasses(scope, CLASSES);
+  const classAllowed = isAdmin || allowedClasses.includes(className);
+  const effectiveClassName = classAllowed ? className : "";
+
   const { exams: allExams, loadingExams } = useExamTemplates();
   const selectedExams = useMemo(() => {
     const ids = examsRaw
@@ -77,13 +88,13 @@ function GeneratedResultCards() {
 
   const data = useResultCardData({
     session: year,
-    className,
+    className: effectiveClassName,
     section,
     exams: selectedExams,
   });
   const students = useResultCardStudents({
     year,
-    className,
+    className: effectiveClassName,
     section,
     enrollments: [],
     allStudents: true,
@@ -95,7 +106,7 @@ function GeneratedResultCards() {
     error: rollNumbersError,
   } = useClassRollNumbers({
     academicYear: year,
-    classNames: className ? [className] : [],
+    classNames: effectiveClassName ? [effectiveClassName] : [],
   });
 
   const [attendanceByStudent, setAttendanceByStudent] = useState<
@@ -117,7 +128,7 @@ function GeneratedResultCards() {
   }, [attendanceExam, selectedExams, getDistributionDate]);
 
   useEffect(() => {
-    if (!year || !className || !attendanceExam) {
+    if (!year || !effectiveClassName || !attendanceExam) {
       setAttendanceByStudent({});
       setAttendanceLoading(false);
       setAttendanceError("");
@@ -129,7 +140,7 @@ function GeneratedResultCards() {
     const filters = [
       where("session", "==", year),
       where("examId", "==", attendanceExam.id),
-      where("className", "==", className),
+      where("className", "==", effectiveClassName),
     ];
     if (section && section !== "all")
       filters.push(where("section", "==", section));
@@ -163,7 +174,7 @@ function GeneratedResultCards() {
     return () => {
       active = false;
     };
-  }, [year, className, section, attendanceExam]);
+  }, [year, effectiveClassName, section, attendanceExam]);
 
   /* Cards follow the roll number order; students without a generated roll
      number fall back to alphabetical order. */
@@ -231,6 +242,19 @@ function GeneratedResultCards() {
       ),
     [allResults, allStudents, enrollments],
   );
+
+  if (className && !classAllowed) {
+    return (
+      <div className="mx-auto max-w-3xl rounded-lg border border-red-300 bg-red-50 p-6 text-center">
+        <p className="font-bold text-red-900">
+          You don&apos;t have access to this class.
+        </p>
+        <p className="mt-1 text-sm text-red-800">
+          Result cards can only be generated for the classes assigned to you.
+        </p>
+      </div>
+    );
+  }
 
   const missingSelection =
     !examsRaw ||

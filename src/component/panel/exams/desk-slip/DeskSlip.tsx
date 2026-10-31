@@ -1,4 +1,4 @@
-import React, { ChangeEvent, useMemo, useState } from "react";
+import React, { ChangeEvent, useContext, useMemo, useState } from "react";
 import { CLASSES, SECTIONS } from "../../../../constants";
 import { toOrdinalLabel } from "../../../../utils/toOrdinalLabel";
 import { academicYears } from "../examScheduleShared";
@@ -7,14 +7,24 @@ import useExamList from "../../../../hooks/useExamList";
 import useDeskSlipStudents from "../../../../hooks/useDeskSlipStudents";
 import useClassRollNumbers from "../../../../hooks/useClassRollNumbers";
 import DeskSlipCard from "./DeskSlipCard";
+import { myContext } from "../../../context/MyContextProvider";
+import { NO_SCOPE, scopedClasses } from "../../../../permissions";
 
 const inputClass =
   "w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500";
 
 const DeskSlip: React.FC = () => {
+  // A teacher only sees students of the classes they are assigned to.
+  const { user } = useContext(myContext);
+  const scope = user?.scope ?? NO_SCOPE;
+  const isAdmin = scope.kind === "all";
+  const allowedClasses = scopedClasses(scope, CLASSES);
+
   const [session, setSession] = useState(academicYears[0]?.value ?? "");
   const [examId, setExamId] = useState("");
-  const [selectedClass, setSelectedClass] = useState("PG");
+  const [selectedClass, setSelectedClass] = useState(
+    () => allowedClasses[0] ?? "",
+  );
   const [selectedSection, setSelectedSection] = useState("all");
 
   const { exams, loadingExam } = useExamList();
@@ -36,7 +46,7 @@ const DeskSlip: React.FC = () => {
 
   const { getRollNumber, loading: loadingRollNumbers } = useClassRollNumbers({
     academicYear: session,
-    classNames: selectedClass === "all" ? CLASSES : [selectedClass],
+    classNames: selectedClass === "all" ? allowedClasses : [selectedClass],
     enabled: readyToLoad,
   });
 
@@ -127,8 +137,8 @@ const DeskSlip: React.FC = () => {
             }
             className={inputClass}
           >
-            <option value="all">All Classes</option>
-            {CLASSES.map((className) => (
+            {isAdmin && <option value="all">All Classes</option>}
+            {allowedClasses.map((className) => (
               <option key={className} value={className}>
                 {toOrdinalLabel(className)}
               </option>
