@@ -1,13 +1,26 @@
 import { useContext, useState } from "react";
 import {
-  FaChevronDown,
-  FaChevronUp,
-  FaSortNumericDown,
-  FaTrash,
-} from "react-icons/fa";
+  ChevronDown,
+  ChevronUp,
+  ListOrdered,
+  Loader2,
+  Trash2,
+} from "lucide-react";
 import toast from "react-hot-toast";
 
 import Modal from "../../../custom-components/Modal";
+import SelectDropdown from "../../../custom-components/SelectDropdown";
+import { Button as UIButton } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { myContext } from "../../context/MyContextProvider";
 import { useAllClassesLengthOfStudents } from "../../../hooks/useAllClassesLengthOfStudents";
 import { deleteClassStudents } from "../../../utils/classStudents";
@@ -25,9 +38,6 @@ import type {
 } from "../../../utils/type";
 
 const academicYears = generateAcademicYears();
-
-const selectClass =
-  "w-full sm:w-64 border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 function AllClassLists() {
   const { user } = useContext(myContext);
@@ -202,49 +212,52 @@ function AllClassLists() {
             aria-expanded={isExpanded}
             className="flex items-center gap-2 self-start text-left font-semibold text-gray-800"
           >
-            {isExpanded ? <FaChevronUp /> : <FaChevronDown />}
+            {isExpanded ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
             <span>All Class Lists</span>
             <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
               {classes.length}
             </span>
           </button>
 
-          <button
+          <UIButton
             type="button"
             onClick={() => void handleGenerateAll()}
             disabled={generationInProgress || !selectedYear}
-            className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="bg-blue-600 font-semibold text-white hover:bg-blue-700"
           >
-            <FaSortNumericDown />
+            {generatingAll ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ListOrdered className="h-4 w-4" />
+            )}
             {generatingAll
               ? "Generating All..."
               : "Generate All Class Roll Numbers"}
-          </button>
+          </UIButton>
         </div>
 
         {isExpanded && (
           <div className="p-4">
             <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <label
+                <Label
                   htmlFor="classListYear"
-                  className="mb-1 block text-sm font-semibold text-gray-700"
+                  className="mb-1 block font-bold text-gray-700"
                 >
                   Academic Year
-                </label>
-                <select
+                </Label>
+                <SelectDropdown
                   id="classListYear"
                   value={selectedYear}
                   disabled={generationInProgress}
-                  onChange={(event) => setSelectedYear(event.target.value)}
-                  className={selectClass}
-                >
-                  {academicYears.map((year) => (
-                    <option key={year.value} value={year.value}>
-                      {year.label}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={setSelectedYear}
+                  options={academicYears}
+                  className="sm:w-64"
+                />
               </div>
 
               <p className="text-sm text-gray-500">
@@ -256,79 +269,90 @@ function AllClassLists() {
               </p>
             </div>
 
-            <div className="overflow-x-auto rounded-lg border border-gray-200">
-              <table className="w-full min-w-[720px] text-sm">
-                <thead>
-                  <tr className="bg-gray-100 text-left text-gray-700">
-                    <th className="px-4 py-3">Sr. No.</th>
-                    <th className="px-4 py-3">Class Name</th>
-                    <th className="px-4 py-3">Total Students</th>
-                    <th className="px-4 py-3">Actions</th>
-                  </tr>
-                </thead>
+            <div className="overflow-hidden rounded-lg border border-gray-200">
+              <Table className="min-w-[720px]">
+                <TableHeader>
+                  <TableRow className="bg-gray-50 hover:bg-gray-50">
+                    <TableHead className="font-bold text-gray-700">Sr. No.</TableHead>
+                    <TableHead className="font-bold text-gray-700">
+                      Class Name
+                    </TableHead>
+                    <TableHead className="font-bold text-gray-700">
+                      Total Students
+                    </TableHead>
+                    <TableHead className="text-center font-bold text-gray-700">
+                      Actions
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
 
-                <tbody>
+                <TableBody>
                   {loading ? (
-                    <tr>
-                      <td
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell
                         colSpan={4}
-                        className="px-4 py-10 text-center text-gray-500"
+                        className="py-10 text-center text-gray-500"
                       >
                         Counting students of every class...
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ) : error ? (
-                    <tr>
-                      <td
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell
                         colSpan={4}
-                        className="px-4 py-10 text-center text-red-600"
+                        className="py-10 text-center text-red-600"
                       >
                         {error}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ) : classes.length === 0 ? (
-                    <tr>
-                      <td
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell
                         colSpan={4}
-                        className="px-4 py-10 text-center text-gray-500"
+                        className="py-10 text-center text-gray-500"
                       >
                         No classes found.
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ) : (
                     classes.map((item, index) => (
-                      <tr
-                        key={item.className}
-                        className="border-t border-gray-100"
-                      >
-                        <td className="px-4 py-3">{index + 1}</td>
+                      <TableRow key={item.className}>
+                        <TableCell className="text-gray-500">{index + 1}</TableCell>
 
-                        <td className="px-4 py-3 font-semibold text-gray-800">
+                        <TableCell className="font-semibold text-gray-800">
                           {toOrdinalLabel(item.className)}
-                        </td>
+                        </TableCell>
 
-                        <td className="px-4 py-3">{item.totalStudents}</td>
+                        <TableCell>
+                          <span className="inline-block min-w-[40px] rounded-full bg-indigo-50 px-2.5 py-0.5 text-center text-xs font-bold text-primaryBlue">
+                            {item.totalStudents}
+                          </span>
+                        </TableCell>
 
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <button
+                        <TableCell>
+                          <div className="flex items-center justify-center gap-2">
+                            <UIButton
                               type="button"
+                              size="icon"
                               title={`Generate roll numbers for Class ${toOrdinalLabel(item.className)}`}
                               aria-label={`Generate roll numbers for Class ${toOrdinalLabel(item.className)}`}
                               disabled={generationInProgress || !selectedYear}
                               onClick={() =>
                                 void handleGenerateClass(item.className)
                               }
-                              className="inline-flex items-center gap-2 rounded-md border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="h-8 w-8 bg-blue-600 text-white hover:bg-blue-700"
                             >
-                              <FaSortNumericDown />
-                              {generatingClass === item.className
-                                ? "Generating..."
-                                : "Generate Roll Numbers"}
-                            </button>
+                              {generatingClass === item.className ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <ListOrdered className="h-4 w-4" />
+                              )}
+                            </UIButton>
 
-                            <button
+                            <UIButton
                               type="button"
+                              size="icon"
+                              variant="destructive"
                               title={
                                 item.totalStudents === 0
                                   ? `No students in ${selectedYear}`
@@ -337,17 +361,17 @@ function AllClassLists() {
                               aria-label={`Delete the students of Class ${toOrdinalLabel(item.className)}`}
                               disabled={item.totalStudents === 0}
                               onClick={() => openDeleteModal(item)}
-                              className="rounded border p-2 text-sm text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                              className="h-8 w-8 bg-red-600 text-white hover:bg-red-700"
                             >
-                              <FaTrash />
-                            </button>
+                              <Trash2 className="h-4 w-4" />
+                            </UIButton>
                           </div>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))
                   )}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           </div>
         )}
@@ -410,13 +434,13 @@ function AllClassLists() {
           </div>
         ) : (
           <div className="mt-4">
-            <label
+            <Label
               htmlFor="deleteConfirmPassword"
-              className="mb-1 block text-sm font-semibold text-gray-700"
+              className="mb-1 block font-semibold text-gray-700"
             >
               Enter your account password
-            </label>
-            <input
+            </Label>
+            <Input
               id="deleteConfirmPassword"
               type="password"
               autoFocus
@@ -435,7 +459,7 @@ function AllClassLists() {
                 }
               }}
               placeholder="Your account password"
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="h-auto border-gray-300 bg-white py-2 text-sm focus-visible:ring-2 focus-visible:ring-blue-500 md:text-sm"
             />
             {passwordError && (
               <p className="mt-2 text-sm text-red-600">{passwordError}</p>
