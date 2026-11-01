@@ -16,6 +16,8 @@ export const COLLECTION = {
   NEWS: "news",
   /** Photos of the Gallery page, managed from Settings > Gallery. */
   GALLERY: "gallery",
+  /** Syllabus / time table PDFs of the Downloads page (Settings > Downloads). */
+  DOWNLOADS: "downloads",
 };
 
 export const PRE_DEFINED_DOC_ID = {

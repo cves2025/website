@@ -22,6 +22,7 @@ import {
   FaIdBadge,
   FaNewspaper,
   FaImages,
+  FaFilePdf,
 } from "react-icons/fa";
 import schoolLogo from "../../assets/image/schoolLogo.jpg";
 import { BRAND, MENU, filterMenu, groupOfPath, type MenuItem } from "../../config/navigation";
@@ -45,6 +46,9 @@ const NEWS_PATH = "/welcome/settings/news";
 /** Page opened by the "Gallery" item of the account menu. */
 const GALLERY_PATH = "/welcome/settings/gallery";
 
+/** Page opened by the "Downloads" item of the account menu. */
+const DOWNLOADS_PATH = "/welcome/settings/downloads";
+
 interface SidebarProps {
   open: boolean;
   onClose: () => void;
@@ -61,12 +65,14 @@ function Sidebar({ open, onClose }: SidebarProps) {
   const canOpenProfile = can(PERMISSIONS.PROFILE_VIEW);
   const canManageNews = can(PERMISSIONS.NEWS_MANAGE);
   const canManageGallery = can(PERMISSIONS.GALLERY_MANAGE);
+  const canManageDownloads = can(PERMISSIONS.DOWNLOADS_MANAGE);
   const canOpenAccountMenu =
     canOpenProfile ||
     canOpenSettings ||
     canManagePermissions ||
     canManageNews ||
-    canManageGallery;
+    canManageGallery ||
+    canManageDownloads;
 
   const menu = useMemo(
   () => filterMenu(MENU, user?.permissions ?? []),
@@ -104,7 +110,7 @@ const hoverTimer = useRef<number | null>(null);
   useEffect(() => clearHoverTimer, []);
 
   // Mini sidebar ("account menu") shown when the user name at the bottom is
-  // clicked. It hosts the My Profile, Settings, Permissions, News and Gallery entries.
+  // clicked. It hosts the My Profile, Settings, Permissions, News, Gallery and Downloads entries.
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -404,6 +410,13 @@ const hoverTimer = useRef<number | null>(null);
                   label: "Gallery",
                   icon: <FaImages />,
                   color: BRAND.blue,
+                },
+                {
+                  show: canManageDownloads,
+                  path: DOWNLOADS_PATH,
+                  label: "Downloads",
+                  icon: <FaFilePdf />,
+                  color: BRAND.pink,
                 },
               ]
                 .filter((item) => item.show)

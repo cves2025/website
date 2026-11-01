@@ -41,6 +41,11 @@ export const TEACHER_PERMISSION_GROUPS: PermissionCatalogGroup[] = [
         label: "Gallery",
         description: "Upload, hide and delete the photos of the Gallery page.",
       },
+      {
+        permission: P.DOWNLOADS_MANAGE,
+        label: "Downloads",
+        description: "Upload, hide and delete the syllabus and time table PDFs.",
+      },
     ],
   },
   {
