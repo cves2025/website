@@ -24,3 +24,14 @@ export function generateAcademicYears(
   // Newest session first so the current academic year is the first option.
   return years.reverse();
 }
+
+/**
+ * The session that follows `academicYear`, e.g. "2026-27" -> "2027-28".
+ * Used by the promotion page, which must offer the next session before it has
+ * started (promotions are usually done in March). Returns "" for bad input.
+ */
+export function nextAcademicYear(academicYear: string): string {
+  const start = Number.parseInt(academicYear.slice(0, 4), 10);
+  if (!Number.isFinite(start)) return "";
+  return `${start + 1}-${String(start + 2).slice(-2)}`;
+}

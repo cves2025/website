@@ -16,6 +16,7 @@ import Welcome from './Welcome'
 import PanelHome from './panel/PanelHome'
 import AddStudent from './panel/students/AddStudent'
 import StudentList from './panel/students/StudentList'
+import StudentPromote from './panel/students/StudentPromote'
 import Subject from './panel/students/Subject'
 import ExamList from './panel/exams/ExamList'
 import AddTeacher from './panel/teacher/AddTeacher'
@@ -63,6 +64,7 @@ function Router() {
           <Route index element={<PanelHome />} />
           <Route path="student/add" element={<AddStudent />} />
           <Route path="student/list" element={<StudentList />} />
+          <Route path="student/promote" element={<StudentPromote />} />
           <Route path="student/subject" element={<Subject />} />
           <Route path="settings" element={<Settings />} />
           <Route path="exam/list" element={<ExamList />} />

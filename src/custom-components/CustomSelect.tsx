@@ -29,6 +29,9 @@ interface CustomSelectProps<T extends FieldValues = FieldValues> {
   className?: string;
   optionValue?: string;
   optionLabel?: string;
+  /** Show a search box on top of the list (filters as you type). */
+  searchable?: boolean;
+  searchPlaceholder?: string;
   /**
    * Extra change handler invoked AFTER the react-hook-form controller handler,
    * so the form value is already updated when this runs.
@@ -55,6 +58,8 @@ function CustomSelect<T extends FieldValues = FieldValues>({
   className = "",
   optionValue = "value",
   optionLabel = "label",
+  searchable = false,
+  searchPlaceholder,
   onValueChange,
 }: CustomSelectProps<T>) {
   const isRequired = required || Boolean(rules.required);
@@ -100,6 +105,8 @@ function CustomSelect<T extends FieldValues = FieldValues>({
               options={normalizedOptions}
               placeholder={placeholder ?? ""}
               disabled={disabled}
+              searchable={searchable}
+              searchPlaceholder={searchPlaceholder}
               aria-invalid={invalid}
               className={cn(fieldBorder(invalid), className)}
             />
