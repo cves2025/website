@@ -5,6 +5,7 @@ import {
   useRef,
   useMemo,
 } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { myContext } from "../context/MyContextProvider";
 import {
@@ -58,7 +59,35 @@ function Sidebar({ open, onClose }: SidebarProps) {
   [user?.permissions]
 );
 const [expanded, setExpanded] = useState(groupOfPath(menu, location.pathname));
-const [collapsed, setCollapsed] = useState(false);
+// Desktop sidebar starts collapsed; `collapsed` is what the chevron pins.
+const [collapsed, setCollapsed] = useState(true);
+// While collapsed, hovering opens it (the page shrinks like a normal open);
+// leaving closes it again.
+const [hovering, setHovering] = useState(false);
+const isCollapsed = collapsed && !hovering;
+const hoverTimer = useRef<number | null>(null);
+
+  const clearHoverTimer = () => {
+    if (hoverTimer.current !== null) {
+      window.clearTimeout(hoverTimer.current);
+      hoverTimer.current = null;
+    }
+  };
+
+  // A short delay so a cursor just passing over the bar does not open it.
+  const handlePointerEnter = (event: ReactPointerEvent) => {
+    if (event.pointerType !== "mouse" || !collapsed) return;
+    clearHoverTimer();
+    hoverTimer.current = window.setTimeout(() => setHovering(true), 120);
+  };
+
+  const handlePointerLeave = () => {
+    clearHoverTimer();
+    setHovering(false);
+    setAccountMenuOpen(false);
+  };
+
+  useEffect(() => clearHoverTimer, []);
 
   // Mini sidebar ("account menu") shown when the user name at the bottom is
   // clicked. It hosts the My Profile, Settings and Permissions entries.
@@ -95,10 +124,10 @@ const [collapsed, setCollapsed] = useState(false);
 
   const onSettingsPage = location.pathname.startsWith(SETTINGS_PATH);
 
-  // When collapsed, clicking a group icon navigates straight to its first sub-link
-  // instead of expanding (since there's no room to show sub-links while collapsed).
+  // When isCollapsed, clicking a group icon navigates straight to its first sub-link
+  // instead of expanding (since there's no room to show sub-links while isCollapsed).
   const handleGroupClick = (item: Extract<MenuItem, { subLinks: unknown[] }>) => {
-    if (collapsed) {
+    if (isCollapsed) {
       navigate(item.subLinks[0].path);
       onClose();
       return;
@@ -108,6 +137,8 @@ const [collapsed, setCollapsed] = useState(false);
 
   const toggleCollapse = () => {
     setCollapsed((prev) => !prev);
+    clearHoverTimer();
+    setHovering(false);
     setExpanded("");
   };
 
@@ -131,12 +162,14 @@ const [collapsed, setCollapsed] = useState(false);
       )}
 
       <aside
+        onPointerEnter={handlePointerEnter}
+        onPointerLeave={handlePointerLeave}
         className={`fixed inset-y-0 left-0 z-40 w-72 flex flex-col shadow-2xl transform transition-all duration-300 ease-in-out border-r border-white/5
           bg-gradient-to-b from-[#12141C] to-[#181B26] text-white
           ${open ? "translate-x-0" : "-translate-x-full"}
           md:translate-x-0 md:static md:z-30 md:h-screen md:shrink-0
           print:hidden
-          ${collapsed ? "md:w-20" : "md:w-72"}`}
+          ${isCollapsed ? "md:w-20" : "md:w-72"}`}
       >
         {/* Collapse toggle (desktop only) */}
         <button
@@ -149,10 +182,10 @@ const [collapsed, setCollapsed] = useState(false);
         </button>
 
         {/* Brand */}
-        <div className={collapsed ? "md:px-0" : ""}>
+        <div className={isCollapsed ? "md:px-0" : ""}>
           <div
             className={`flex items-center border-b border-white/5 px-5 py-5 ${
-              collapsed ? "md:justify-center md:px-0" : "justify-between"
+              isCollapsed ? "md:justify-center md:px-0" : "justify-between"
             }`}
           >
             <NavLink
@@ -167,7 +200,7 @@ const [collapsed, setCollapsed] = useState(false);
                 alt="Children's Valley English School logo"
                 className="h-10 w-10 shrink-0 rounded-xl bg-white object-contain p-0.5 shadow-sm transition-transform group-hover:scale-105"
               />
-              <div className={`min-w-0 ${collapsed ? "md:hidden" : ""}`}>
+              <div className={`min-w-0 ${isCollapsed ? "md:hidden" : ""}`}>
                 <h2 className="font-bold text-base text-white truncate leading-tight tracking-tight">
                   CVES Panel
                 </h2>
@@ -201,14 +234,14 @@ const [collapsed, setCollapsed] = useState(false);
               <div key={item.label}>
                 <button
                   onClick={() => handleGroupClick(item)}
-                  title={collapsed ? item.label : undefined}
+                  title={isCollapsed ? item.label : undefined}
                   style={
                     expanded === item.label
                       ? { borderLeft: `3px solid ${item.accent}` }
                       : { borderLeft: "3px solid transparent" }
                   }
                   className={`w-full flex items-center rounded-r-lg text-sm font-semibold transition-colors
-                    ${collapsed ? "md:justify-center md:rounded-lg px-0 py-2.5" : "justify-between pl-3 pr-3 py-2.5"}
+                    ${isCollapsed ? "md:justify-center md:rounded-lg px-0 py-2.5" : "justify-between pl-3 pr-3 py-2.5"}
                     ${
                       expanded === item.label
                         ? "bg-white/[0.06] text-white"
@@ -225,18 +258,18 @@ const [collapsed, setCollapsed] = useState(false);
                     >
                       {item.icon}
                     </span>
-                    <span className={collapsed ? "md:hidden" : ""}>{item.label}</span>
+                    <span className={isCollapsed ? "md:hidden" : ""}>{item.label}</span>
                   </span>
-                  <span className={`text-xs ${collapsed ? "md:hidden" : ""}`}>
+                  <span className={`text-xs ${isCollapsed ? "md:hidden" : ""}`}>
                     {expanded === item.label ? <BsChevronUp /> : <BsChevronDown />}
                   </span>
                 </button>
 
                 <div
                   className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                    collapsed ? "md:hidden" : ""
+                    isCollapsed ? "md:hidden" : ""
                   } ${
-                    expanded === item.label && !collapsed
+                    expanded === item.label && !isCollapsed
                       ? "max-h-96 opacity-100 mt-1"
                       : "max-h-0 opacity-0"
                   }`}
@@ -271,10 +304,10 @@ const [collapsed, setCollapsed] = useState(false);
                 to={item.path}
                 end={item.end}
                 onClick={onClose}
-                title={collapsed ? item.label : undefined}
+                title={isCollapsed ? item.label : undefined}
                 className={({ isActive }) =>
                   `flex items-center gap-3 rounded-lg text-sm font-semibold transition-colors ${
-                    collapsed ? "md:justify-center px-0 py-2.5" : "px-3 py-2.5"
+                    isCollapsed ? "md:justify-center px-0 py-2.5" : "px-3 py-2.5"
                   } ${
                     isActive
                       ? "text-white shadow-sm"
@@ -297,7 +330,7 @@ const [collapsed, setCollapsed] = useState(false);
                     >
                       {item.icon}
                     </span>
-                    <span className={collapsed ? "md:hidden" : ""}>{item.label}</span>
+                    <span className={isCollapsed ? "md:hidden" : ""}>{item.label}</span>
                   </>
                 )}
               </NavLink>
@@ -368,16 +401,16 @@ const [collapsed, setCollapsed] = useState(false);
                 ))}
             </div>}
 
-            {/* Clicking the name (or the avatar while collapsed) opens the menu */}
+            {/* Clicking the name (or the avatar while isCollapsed) opens the menu */}
             <button
               type="button"
               onClick={() => canOpenAccountMenu && setAccountMenuOpen((prev) => !prev)}
               aria-haspopup="menu"
               aria-expanded={accountMenuOpen}
               aria-controls="sidebar-account-menu"
-              title={collapsed ? "Account menu" : undefined}
+              title={isCollapsed ? "Account menu" : undefined}
               className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg transition-colors ${
-                collapsed ? "md:justify-center" : ""
+                isCollapsed ? "md:justify-center" : ""
               } ${
                 accountMenuOpen || onSettingsPage
                   ? "bg-white/[0.06]"
@@ -394,7 +427,7 @@ const [collapsed, setCollapsed] = useState(false);
               </span>
               <span
                 className={`min-w-0 flex-1 text-left ${
-                  collapsed ? "md:hidden" : ""
+                  isCollapsed ? "md:hidden" : ""
                 }`}
               >
                 <span className="block truncate text-sm font-semibold text-white">
@@ -404,7 +437,7 @@ const [collapsed, setCollapsed] = useState(false);
                   {user?.email}
                 </span>
               </span>
-              {!collapsed && canOpenAccountMenu && (
+              {!isCollapsed && canOpenAccountMenu && (
                 <span className="text-xs text-gray-400" aria-hidden="true">
                   {accountMenuOpen ? <BsChevronDown /> : <BsChevronUp />}
                 </span>
@@ -413,7 +446,7 @@ const [collapsed, setCollapsed] = useState(false);
           </div>
           <button
             onClick={handleLogout}
-            title={collapsed ? "Logout" : undefined}
+            title={isCollapsed ? "Logout" : undefined}
             className="mt-3 w-full flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold transition-colors border"
             style={{
               borderColor: `${BRAND.red}4D`,
@@ -427,7 +460,7 @@ const [collapsed, setCollapsed] = useState(false);
               e.currentTarget.style.backgroundColor = "transparent";
             }}
           >
-            <FaSignOutAlt /> <span className={collapsed ? "md:hidden" : ""}>Logout</span>
+            <FaSignOutAlt /> <span className={isCollapsed ? "md:hidden" : ""}>Logout</span>
           </button>
 
           {/* App version — bumped automatically on every deploy */}
