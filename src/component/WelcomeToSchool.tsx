@@ -1,7 +1,22 @@
+import { useEffect, useState } from "react";
 import schoolBuilding from "../assets/image/schoolImage.jpg";
 import Underline from "../design/Underline";
+import { subscribeSchoolPhoto } from "../utils/siteImagesService";
 
+/** Welcome block of the Home and About pages. */
 function WelcomeToSchool() {
+  // null = still loading; "" = no uploaded photo, use the bundled one.
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+
+  useEffect(
+    () =>
+      subscribeSchoolPhoto(setPhotoUrl, (error) => {
+        console.error("Failed to load the school photo:", error);
+        setPhotoUrl("");
+      }),
+    []
+  );
+
   return (
     <div className="flex flex-col items-center justify-center gap-y-8 mt-8 pb-8 bg-gradient-to-b from-blue-200 to-white overflow-hidden">
       {/* Title Section */}
@@ -17,11 +32,16 @@ function WelcomeToSchool() {
       <div className="flex flex-col items-center justify-center gap-y-8 lg:flex-row lg:gap-x-16 px-4 mx-auto">
         {/* Image Container */}
         <div className="flex items-center justify-center w-full max-w-md lg:max-w-xl md:max-w-2xl">
-          <img
-            src={schoolBuilding}
-            alt="School Building"
-            className="rounded-xl shadow-2xl border-4 border-white transform hover:scale-105 transition-transform duration-300 ease-in-out"
-          />
+          {photoUrl === null ? (
+            // Placeholder while loading, so the old photo never flashes first.
+            <div className="aspect-[4/3] w-full animate-pulse rounded-xl border-4 border-white bg-blue-100 shadow-2xl" />
+          ) : (
+            <img
+              src={photoUrl || schoolBuilding}
+              alt="School Building"
+              className="rounded-xl shadow-2xl border-4 border-white transform hover:scale-105 transition-transform duration-300 ease-in-out"
+            />
+          )}
         </div>
 
         {/* Text Content */}

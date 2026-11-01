@@ -24,6 +24,8 @@ export const PRE_DEFINED_DOC_ID = {
   ROLE_PERMISSIONS: "rolePermissions",
   /** Marks that the bundled gallery photos were imported into Firestore. */
   GALLERY_IMPORT: "galleryImport",
+  /** Website photos (the school photo of Home / About), Settings > Gallery. */
+  SITE_IMAGES: "siteImages",
 }
 
 /** Document id inside COLLECTION.STAMP_SIGN that stores the Principal's

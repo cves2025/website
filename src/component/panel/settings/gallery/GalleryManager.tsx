@@ -21,6 +21,7 @@ import {
 } from "../../../../utils/galleryService";
 import { LEGACY_GALLERY_PHOTOS } from "../../../../utils/legacyGallery";
 import { myContext } from "../../../context/MyContextProvider";
+import SchoolPhotoCard from "./SchoolPhotoCard";
 
 interface Progress {
   label: string;
@@ -172,7 +173,7 @@ function GalleryManager() {
       <PageHeader
         title="Gallery"
         titleStyle="text-primaryBlue"
-        description="Photos of the Gallery page. You can pick many photos at once; switch a photo OFF to hide it without deleting it."
+        description="The school photo of the Home and About pages, and the photos of the Gallery page. You can pick many gallery photos at once; switch a photo OFF to hide it without deleting it."
         descriptionStyle="text-gray-500"
         button={
           <Button
@@ -185,6 +186,8 @@ function GalleryManager() {
           />
         }
       />
+      <SchoolPhotoCard />
+
       <input
         ref={fileInputRef}
         type="file"
