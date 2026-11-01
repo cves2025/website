@@ -14,12 +14,16 @@ export const COLLECTION = {
   ROLL_NUMBER: "rollNumber",
   /** School news shown on the Home page, managed from Settings > News. */
   NEWS: "news",
+  /** Photos of the Gallery page, managed from Settings > Gallery. */
+  GALLERY: "gallery",
 };
 
 export const PRE_DEFINED_DOC_ID = {
   SUGGESTED_REMARKS: "suggestedRemarks",
   /** School-wide teacher permission defaults (Permissions page). */
   ROLE_PERMISSIONS: "rolePermissions",
+  /** Marks that the bundled gallery photos were imported into Firestore. */
+  GALLERY_IMPORT: "galleryImport",
 }
 
 /** Document id inside COLLECTION.STAMP_SIGN that stores the Principal's

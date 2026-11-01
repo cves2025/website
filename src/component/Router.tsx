@@ -39,6 +39,7 @@ import Settings from './panel/settings/Settings'
 import Permissions from './panel/settings/permissions/Permissions'
 import Profile from './panel/settings/profile/Profile'
 import News from './panel/settings/news/News'
+import GalleryManager from './panel/settings/gallery/GalleryManager'
 import DeskSlip from './panel/exams/desk-slip/DeskSlip'
 import RequireAccess from '../routes/RequireAccess'
 import RequireRoutePermission from '../routes/RequireRoutePermission'
@@ -73,6 +74,7 @@ function Router() {
           <Route path="settings/permissions" element={<Permissions />} />
           <Route path="settings/profile" element={<Profile />} />
           <Route path="settings/news" element={<News />} />
+          <Route path="settings/gallery" element={<GalleryManager />} />
           <Route path="exam/list" element={<ExamList />} />
           <Route path="teacher/add" element={<AddTeacher />} />
           <Route path="teacher/list" element={<TeachersList />} />

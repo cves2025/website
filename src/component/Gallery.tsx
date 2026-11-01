@@ -1,35 +1,65 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Underline from "../design/Underline";
 import SEO from "./SEO";
+import {
+  subscribeGallery,
+  subscribeGalleryImported,
+  type GalleryPhoto,
+} from "../utils/galleryService";
+import { LEGACY_GALLERY_PHOTOS } from "../utils/legacyGallery";
 
+interface GalleryImage {
+  key: string;
+  src: string;
+  caption: string;
+}
+
+/**
+ * The photos published on Settings > Gallery, newest first. Until the
+ * photos bundled with the code have been imported there, they are shown
+ * after the uploaded ones.
+ */
 function Gallery() {
-  // const [allImages, setAllImages] = useState(firebaseStorageImageData);
-  // const [filteredImages, setFilteredImages] = useState([]);
-  // const [activeButton, setActiveButton] = useState("All");
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
   const [isClosing, setIsClosing] = useState(false);
-  // const [loading, setLoading] = useState(true); // Loading state
-  const [images, setImages] = useState<{ src: string; alt: string }[]>([]);
+  const [photos, setPhotos] = useState<GalleryPhoto[] | null>(null);
+  // null = not known yet; a failed read counts as "not imported".
+  const [imported, setImported] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const imageModules = import.meta.glob<string>(
-      "../assets/image/gallery/*.{png,jpg,jpeg,svg,gif}",
-      {
-        eager: true,
-        query: "?url",
-        import: "default",
-      }
-    );
-
-    const loadedImages = Object.keys(imageModules).map((path) => {
-      return {
-        src: imageModules[path],
-        alt: `Image from gallery ${path.split("/").pop()}`,
-      };
+    const stopPhotos = subscribeGallery({ publishedOnly: true }, setPhotos, (error) => {
+      console.error("Failed to load the gallery:", error);
+      setPhotos([]);
     });
-
-    setImages(loadedImages);
+    const stopImported = subscribeGalleryImported(setImported, (error) => {
+      console.error("Failed to read the gallery import status:", error);
+      setImported(false);
+    });
+    return () => {
+      stopPhotos();
+      stopImported();
+    };
   }, []);
+
+  const images = useMemo<GalleryImage[]>(() => {
+    if (photos === null || imported === null) return [];
+    return [
+      ...photos.map((photo) => ({
+        key: photo.id,
+        src: photo.imageUrl,
+        caption: photo.caption,
+      })),
+      ...(imported
+        ? []
+        : LEGACY_GALLERY_PHOTOS.map((photo) => ({
+            key: `bundled-${photo.name}`,
+            src: photo.url,
+            caption: "",
+          }))),
+    ];
+  }, [photos, imported]);
+
+  const loading = photos === null || imported === null;
 
   const handleCloseModal = () => {
     setIsClosing(true);
@@ -56,16 +86,24 @@ function Gallery() {
 
         {/* Gallery Grid */}
         <div className="mt-4 m-auto">
+          {loading && (
+            <p className="py-10 text-center text-gray-500">Loading photos...</p>
+          )}
+          {!loading && images.length === 0 && (
+            <p className="py-10 text-center text-gray-500">
+              Photos will be added soon.
+            </p>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4 place-items-center">
             {images.map((img, i) => (
               <div
-                key={i}
+                key={img.key}
                 className="cursor-pointer"
-                onClick={() => setSelectedImage(img.src)}
+                onClick={() => setSelectedImage(img)}
               >
                 <img
                   src={img.src}
-                  alt={`Gallery ${i}`}
+                  alt={img.caption || `Gallery ${i + 1}`}
                   className="w-full h-auto rounded-lg shadow-lg hover:scale-105 transition-transform duration-300 ease-in-out"
                   loading="lazy"
                 />
@@ -84,10 +122,15 @@ function Gallery() {
           >
             <div className="relative p-4 transform scale-90 transition-transform duration-300 ease-out animate-zoomIn">
               <img
-                src={selectedImage}
-                alt="Zoomed"
+                src={selectedImage.src}
+                alt={selectedImage.caption || "Zoomed"}
                 className="w-auto max-w-full h-auto max-h-[80vh] rounded-lg shadow-2xl"
               />
+              {selectedImage.caption && (
+                <p className="mt-3 text-center text-base font-semibold text-white">
+                  {selectedImage.caption}
+                </p>
+              )}
               <button
                 className="absolute top-4 right-4 bg-red-600 text-white rounded-full px-3 py-1 text-lg"
                 onClick={() => setSelectedImage(null)}

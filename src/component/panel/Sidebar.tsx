@@ -21,6 +21,7 @@ import {
   FaUserShield,
   FaIdBadge,
   FaNewspaper,
+  FaImages,
 } from "react-icons/fa";
 import schoolLogo from "../../assets/image/schoolLogo.jpg";
 import { BRAND, MENU, filterMenu, groupOfPath, type MenuItem } from "../../config/navigation";
@@ -41,6 +42,9 @@ const PROFILE_PATH = "/welcome/settings/profile";
 /** Page opened by the "News" item of the account menu. */
 const NEWS_PATH = "/welcome/settings/news";
 
+/** Page opened by the "Gallery" item of the account menu. */
+const GALLERY_PATH = "/welcome/settings/gallery";
+
 interface SidebarProps {
   open: boolean;
   onClose: () => void;
@@ -56,8 +60,13 @@ function Sidebar({ open, onClose }: SidebarProps) {
   // ON for teachers by default; the admin can switch it off per teacher.
   const canOpenProfile = can(PERMISSIONS.PROFILE_VIEW);
   const canManageNews = can(PERMISSIONS.NEWS_MANAGE);
+  const canManageGallery = can(PERMISSIONS.GALLERY_MANAGE);
   const canOpenAccountMenu =
-    canOpenProfile || canOpenSettings || canManagePermissions || canManageNews;
+    canOpenProfile ||
+    canOpenSettings ||
+    canManagePermissions ||
+    canManageNews ||
+    canManageGallery;
 
   const menu = useMemo(
   () => filterMenu(MENU, user?.permissions ?? []),
@@ -95,7 +104,7 @@ const hoverTimer = useRef<number | null>(null);
   useEffect(() => clearHoverTimer, []);
 
   // Mini sidebar ("account menu") shown when the user name at the bottom is
-  // clicked. It hosts the My Profile, Settings, Permissions and News entries.
+  // clicked. It hosts the My Profile, Settings, Permissions, News and Gallery entries.
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -388,6 +397,13 @@ const hoverTimer = useRef<number | null>(null);
                   label: "News",
                   icon: <FaNewspaper />,
                   color: BRAND.red,
+                },
+                {
+                  show: canManageGallery,
+                  path: GALLERY_PATH,
+                  label: "Gallery",
+                  icon: <FaImages />,
+                  color: BRAND.blue,
                 },
               ]
                 .filter((item) => item.show)

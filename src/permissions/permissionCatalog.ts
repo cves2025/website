@@ -36,6 +36,11 @@ export const TEACHER_PERMISSION_GROUPS: PermissionCatalogGroup[] = [
         label: "News",
         description: "Add, edit, publish and delete the news on the Home page.",
       },
+      {
+        permission: P.GALLERY_MANAGE,
+        label: "Gallery",
+        description: "Upload, hide and delete the photos of the Gallery page.",
+      },
     ],
   },
   {
