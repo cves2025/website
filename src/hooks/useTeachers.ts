@@ -26,7 +26,14 @@ export interface UseTeachersResult {
 function toTeacherRecord(
   snapshot: QueryDocumentSnapshot<DocumentData>
 ): TeacherRecord {
-  const data = snapshot.data();
+  return teacherRecordFromData(snapshot.id, snapshot.data());
+}
+
+/** A users/{uid} document as a TeacherRecord (also used by the Profile page). */
+export function teacherRecordFromData(
+  id: string,
+  data: DocumentData
+): TeacherRecord {
   const stringField = (key: string) =>
     typeof data[key] === "string" ? data[key] : "";
 
@@ -34,8 +41,8 @@ function toTeacherRecord(
   const legacyFields = toLegacyTeacherFields(sectionAssignments);
 
   return {
-    id: snapshot.id,
-    uid: snapshot.id,
+    id,
+    uid: id,
     role: stringField("role") || "teacher",
     firstName: stringField("firstName"),
     lastName: stringField("lastName"),

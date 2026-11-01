@@ -6,6 +6,7 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   "/welcome": "any",
   "/welcome/settings": P.SETTINGS_ACCESS,
   "/welcome/settings/permissions": P.PERMISSIONS_MANAGE,
+  "/welcome/settings/profile": P.PROFILE_VIEW,
 
   "/welcome/student/add": P.STUDENT_CREATE,
   "/welcome/student/list": P.STUDENT_READ,

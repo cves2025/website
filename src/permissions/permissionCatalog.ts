@@ -19,6 +19,16 @@ export interface PermissionCatalogGroup {
  */
 export const TEACHER_PERMISSION_GROUPS: PermissionCatalogGroup[] = [
   {
+    label: "Account",
+    items: [
+      {
+        permission: P.PROFILE_VIEW,
+        label: "My Profile",
+        description: "See their own profile (the details saved on Add Teacher).",
+      },
+    ],
+  },
+  {
     label: "Student",
     items: [
       {
@@ -117,3 +127,15 @@ export const TEACHER_PERMISSION_GROUPS: PermissionCatalogGroup[] = [
 
 export const TEACHER_PERMISSION_ITEMS: PermissionCatalogItem[] =
   TEACHER_PERMISSION_GROUPS.flatMap((group) => group.items);
+
+/** Every permission the page offers - saved as `known` with the defaults. */
+export const TEACHER_CATALOG_PERMISSIONS: Permission[] =
+  TEACHER_PERMISSION_ITEMS.map((item) => item.permission);
+
+/**
+ * The page's permissions before `known` was saved with the defaults. A
+ * permission added to the catalog later is missing here, so a document saved
+ * earlier falls back to that permission's built-in default.
+ */
+export const LEGACY_CATALOG_PERMISSIONS: Permission[] =
+  TEACHER_CATALOG_PERMISSIONS.filter((p) => p !== P.PROFILE_VIEW);

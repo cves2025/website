@@ -2,7 +2,8 @@
  * Firestore access for the Permissions page.
  *
  * - School-wide teacher defaults: ONE document,
- *   `panelSettings/rolePermissions` -> { teacher: [...], classTeacher: [...] }.
+ *   `panelSettings/rolePermissions`
+ *   -> { teacher: [...], classTeacher: [...], known: [...] }.
  *   Missing document = the defaults of rolePermissions.ts.
  * - Per-teacher changes: `users/{uid}.permissionOverrides`
  *   -> { grant: [...], revoke: [...] }, read by resolvePermissions().
@@ -23,6 +24,10 @@ import type { DocumentSnapshot } from "firebase/firestore";
 import { COLLECTION, PRE_DEFINED_DOC_ID } from "../constants";
 import { db } from "../firebase/config";
 import {
+  CLASS_TEACHER_BONUS,
+  LEGACY_CATALOG_PERMISSIONS,
+  ROLE_PERMISSIONS,
+  TEACHER_CATALOG_PERMISSIONS,
   cleanPermissionList,
   isTeacherBlocked,
   type Permission,
@@ -35,14 +40,30 @@ const rolePermissionsRef = () =>
 const allowedOnly = (list: readonly Permission[]) =>
   [...new Set(list)].filter((permission) => !isTeacherBlocked(permission));
 
+/**
+ * The saved defaults. `known` lists the permissions the page offered when the
+ * document was saved; a permission that did not exist yet (e.g. My Profile)
+ * takes its built-in default instead of reading as OFF.
+ */
 export function parseTeacherRoleDefaults(
   snapshot: DocumentSnapshot
 ): TeacherRoleDefaults | null {
   if (!snapshot.exists()) return null;
   const data = snapshot.data();
+  const known = new Set(
+    Array.isArray(data.known)
+      ? cleanPermissionList(data.known)
+      : LEGACY_CATALOG_PERMISSIONS
+  );
+  const withNewDefaults = (saved: unknown, builtIn: readonly Permission[]) => [
+    ...new Set([
+      ...cleanPermissionList(saved),
+      ...builtIn.filter((p) => !known.has(p)),
+    ]),
+  ];
   return {
-    teacher: cleanPermissionList(data.teacher),
-    classTeacher: cleanPermissionList(data.classTeacher),
+    teacher: withNewDefaults(data.teacher, ROLE_PERMISSIONS.teacher),
+    classTeacher: withNewDefaults(data.classTeacher, CLASS_TEACHER_BONUS),
   };
 }
 
@@ -74,6 +95,7 @@ export async function saveTeacherRoleDefaults(
   await setDoc(rolePermissionsRef(), {
     teacher: allowedOnly(defaults.teacher),
     classTeacher: allowedOnly(defaults.classTeacher),
+    known: TEACHER_CATALOG_PERMISSIONS,
     updatedAt: serverTimestamp(),
     updatedBy,
   });

@@ -18,6 +18,7 @@ import {
   FaSignOutAlt,
   FaCog,
   FaUserShield,
+  FaIdBadge,
 } from "react-icons/fa";
 import schoolLogo from "../../assets/image/schoolLogo.jpg";
 import { BRAND, MENU, filterMenu, groupOfPath, type MenuItem } from "../../config/navigation";
@@ -32,6 +33,9 @@ const SETTINGS_PATH = "/welcome/settings";
 /** Page opened by the "Permissions" item of the account menu. */
 const PERMISSIONS_PATH = "/welcome/settings/permissions";
 
+/** Page opened by the "My Profile" item of the account menu. */
+const PROFILE_PATH = "/welcome/settings/profile";
+
 interface SidebarProps {
   open: boolean;
   onClose: () => void;
@@ -44,7 +48,10 @@ function Sidebar({ open, onClose }: SidebarProps) {
 
   const canOpenSettings = can(PERMISSIONS.SETTINGS_ACCESS);
   const canManagePermissions = can(PERMISSIONS.PERMISSIONS_MANAGE);
-  const canOpenAccountMenu = canOpenSettings || canManagePermissions;
+  // ON for teachers by default; the admin can switch it off per teacher.
+  const canOpenProfile = can(PERMISSIONS.PROFILE_VIEW);
+  const canOpenAccountMenu =
+    canOpenProfile || canOpenSettings || canManagePermissions;
 
   const menu = useMemo(
   () => filterMenu(MENU, user?.permissions ?? []),
@@ -54,7 +61,7 @@ const [expanded, setExpanded] = useState(groupOfPath(menu, location.pathname));
 const [collapsed, setCollapsed] = useState(false);
 
   // Mini sidebar ("account menu") shown when the user name at the bottom is
-  // clicked. It hosts the Settings and Permissions entries.
+  // clicked. It hosts the My Profile, Settings and Permissions entries.
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -316,6 +323,13 @@ const [collapsed, setCollapsed] = useState(false);
                 Account
               </p>
               {[
+                {
+                  show: canOpenProfile,
+                  path: PROFILE_PATH,
+                  label: "My Profile",
+                  icon: <FaIdBadge />,
+                  color: BRAND.pink,
+                },
                 {
                   show: canOpenSettings,
                   path: SETTINGS_PATH,
