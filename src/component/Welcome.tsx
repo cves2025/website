@@ -55,9 +55,22 @@ function Welcome() {
           >
             <BsList className="w-7 h-7" />
           </button>
-          <h1 className="text-lg md:text-xl font-bold text-gray-800 truncate">
-            Welcome{user?.fullName ? `, ${user.fullName}` : ""}!
-          </h1>
+          {user.role === "admin" ? (
+            // Admins see the school name, styled like the AddStudent /
+            // result card letterhead.
+            <h1 className="min-w-0 truncate text-base font-bold text-gray-800 md:text-xl">
+              <span className="font-cancun font-extrabold tracking-tight">
+                <span className="text-green-700">CHILDREN&apos;S </span>
+                <span className="text-indigo-800">VALLEY </span>
+                <span className="text-red-600">ENGLISH </span>
+                <span className="text-pink-600">SCHOOL</span>
+              </span>
+            </h1>
+          ) : (
+            <h1 className="text-lg md:text-xl font-bold text-gray-800 truncate">
+              Welcome{user?.fullName ? `, ${user.fullName}` : ""}!
+            </h1>
+          )}
         </header>
 
         {/* Page content */}
