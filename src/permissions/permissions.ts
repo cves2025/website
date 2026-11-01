@@ -28,6 +28,7 @@ export const PERMISSIONS = {
   NEWS_MANAGE: "news.manage",
   GALLERY_MANAGE: "gallery.manage",
   DOWNLOADS_MANAGE: "downloads.manage",
+  BANNER_MANAGE: "banner.manage",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

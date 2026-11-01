@@ -23,6 +23,7 @@ import {
   FaNewspaper,
   FaImages,
   FaFilePdf,
+  FaPhotoVideo,
 } from "react-icons/fa";
 import schoolLogo from "../../assets/image/schoolLogo.jpg";
 import { BRAND, MENU, filterMenu, groupOfPath, type MenuItem } from "../../config/navigation";
@@ -49,6 +50,9 @@ const GALLERY_PATH = "/welcome/settings/gallery";
 /** Page opened by the "Downloads" item of the account menu. */
 const DOWNLOADS_PATH = "/welcome/settings/downloads";
 
+/** Page opened by the "Home Banner" item of the account menu. */
+const BANNER_PATH = "/welcome/settings/banner";
+
 interface SidebarProps {
   open: boolean;
   onClose: () => void;
@@ -66,13 +70,15 @@ function Sidebar({ open, onClose }: SidebarProps) {
   const canManageNews = can(PERMISSIONS.NEWS_MANAGE);
   const canManageGallery = can(PERMISSIONS.GALLERY_MANAGE);
   const canManageDownloads = can(PERMISSIONS.DOWNLOADS_MANAGE);
+  const canManageBanner = can(PERMISSIONS.BANNER_MANAGE);
   const canOpenAccountMenu =
     canOpenProfile ||
     canOpenSettings ||
     canManagePermissions ||
     canManageNews ||
     canManageGallery ||
-    canManageDownloads;
+    canManageDownloads ||
+    canManageBanner;
 
   const menu = useMemo(
   () => filterMenu(MENU, user?.permissions ?? []),
@@ -110,7 +116,8 @@ const hoverTimer = useRef<number | null>(null);
   useEffect(() => clearHoverTimer, []);
 
   // Mini sidebar ("account menu") shown when the user name at the bottom is
-  // clicked. It hosts the My Profile, Settings, Permissions, News, Gallery and Downloads entries.
+  // clicked. It hosts the My Profile, Settings, Permissions, Home Banner, News, Gallery and
+  // Downloads entries.
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -395,6 +402,13 @@ const hoverTimer = useRef<number | null>(null);
                   path: PERMISSIONS_PATH,
                   label: "Permissions",
                   icon: <FaUserShield />,
+                  color: BRAND.green,
+                },
+                {
+                  show: canManageBanner,
+                  path: BANNER_PATH,
+                  label: "Home Banner",
+                  icon: <FaPhotoVideo />,
                   color: BRAND.green,
                 },
                 {

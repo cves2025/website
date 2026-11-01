@@ -32,6 +32,11 @@ export const TEACHER_PERMISSION_GROUPS: PermissionCatalogGroup[] = [
     label: "School",
     items: [
       {
+        permission: P.BANNER_MANAGE,
+        label: "Home Banner",
+        description: "Change the slides (photo and text) at the top of the Home page.",
+      },
+      {
         permission: P.NEWS_MANAGE,
         label: "News",
         description: "Add, edit, publish and delete the news on the Home page.",

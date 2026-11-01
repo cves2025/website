@@ -34,6 +34,8 @@ export const PRE_DEFINED_DOC_ID = {
     signature and the school stamp image URLs. */
 export const STAMP_SIGN_PRINCIPLE_DOC = "principle";
 export const ADMIT_CARD_SETTINGS_DOC = "admitCard";
+/** Document id inside COLLECTION.SETTINGS with the Home page banner slides. */
+export const HOME_BANNER_SETTINGS_DOC = "homeBanner";
 
 /** Field names of the "stampSign"/"principle" document. */
 export const STAMP_SIGN_FIELDS = {

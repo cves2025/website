@@ -10,6 +10,7 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   "/welcome/settings/news": P.NEWS_MANAGE,
   "/welcome/settings/gallery": P.GALLERY_MANAGE,
   "/welcome/settings/downloads": P.DOWNLOADS_MANAGE,
+  "/welcome/settings/banner": P.BANNER_MANAGE,
 
   "/welcome/student/add": P.STUDENT_CREATE,
   "/welcome/student/list": P.STUDENT_READ,
