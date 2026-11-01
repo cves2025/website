@@ -14,17 +14,17 @@ export interface LatestRelease {
 }
 
 export const latestRelease: LatestRelease = {
-  id: "2026-11-new-look",
-  title: "A Fresh New Look",
+  id: "2026-11-promotion-permissions-news",
+  title: "Promotion, Permissions, Profile & News",
   description:
-    "The whole panel has a cleaner, consistent design - dropdowns, tables, buttons, toggles and forms now look and work the same on every page. Your data and the way you work stay the same.",
+    "New tools to move students into the next session, control what teachers can use, see your own profile and keep the school news up to date - plus a sidebar that stays out of your way.",
   highlights: [
-    "Easier dates & times - Exam Schedule and Result Card Settings now open a calendar to pick a date, and a simple Hour / Minute / AM-PM picker for paper timings.",
-    "Admission Form - pressing Next now scrolls straight to the first required field that is still empty, so nothing is missed.",
-    "Marks Entry & Cross List - a clearer table with the header and student name always visible while scrolling, plus Pass / Fail and percentage badges.",
-    "Student List, Subjects, Exams & Settings - edit and delete are now small icon buttons, and the student list header stays visible while you scroll.",
-    "Safer changes - removing a remark range or deleting saved settings now asks for confirmation, and Save / Update buttons turn on only after you change something.",
-    "Suggested Remarks - the Add Range button hides once your ranges cover 0% to 100%.",
-    "Academic Year lists now start from the current session, 2026-27.",
+    "Promote Students (Student > Promote Student) - move one student or a whole class into the next session. Pass / Fail from all exams suggests the new class; class and section can be changed for every student, Class 8 can be marked Passed Out / TC, and any promotion can be undone.",
+    "Permissions (click your name in the sidebar) - switch features ON or OFF for all teachers, for class teachers, or for one teacher. Changes apply at once, without logging out.",
+    "My Profile (click your name in the sidebar) - teachers can now see their own details: personal, job and contact details and their classes & subjects.",
+    "News (click your name in the sidebar) - add, edit, hide or delete the Latest News on the Home page, with an optional picture. News without a picture shows the school logo.",
+    "Sidebar - it now stays collapsed and opens when you move the mouse over it, then closes again when you move away. Use the arrow button to keep it open.",
+    "Searchable dropdowns - choosing a student or a teacher now has a search box, so you can find them by name, enrollment number or email.",
+    "The admin header now shows the school name.",
   ],
 };
