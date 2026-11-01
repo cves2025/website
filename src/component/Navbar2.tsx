@@ -4,17 +4,9 @@ import { NavLink } from "react-router-dom";
 
 function Navbar2({ dynemicClass }: { dynemicClass?: string }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [downloadIsOpen, setDownloadIsOpen] = useState(false);
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
-  };
-
-  const toggleDownloadMenu = () => {
-    setDownloadIsOpen(() => !downloadIsOpen);
-    setTimeout(() => {
-      setDownloadIsOpen(false);
-    }, 5000);
   };
 
   const linkClasses = ({ isActive }: { isActive: boolean }) =>
@@ -44,58 +36,14 @@ function Navbar2({ dynemicClass }: { dynemicClass?: string }) {
           >
             Gallery
           </NavLink>
-          <h1
-            className={`relative flex flex-row justify-center items-center hover:text-amber-600 hover:cursor-pointer`}
-            onClick={toggleDownloadMenu}
+          <NavLink
+            className={({ isActive }) =>
+              isActive ? "text-blue-600" : "hover:text-amber-600"
+            }
+            to="/downloads"
           >
             Downloads
-            <svg
-              className={`w-5 h-5 transform transition-transform duration-200 ${downloadIsOpen ? "rotate-180" : ""
-                }`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
-            <div
-              className={`${downloadIsOpen
-                ? "absolute flex flex-col top-10 left-10 bg-gray-100"
-                : "hidden"
-                }`}
-            >
-              <ul className="">
-                <li>
-                  <NavLink
-                    className={({ isActive }) =>
-                      isActive
-                        ? "text-blue-600 flex flex-row justify-center items-center"
-                        : "hover:text-amber-600 flex justify-row justify-center items-center"
-                    }
-                    to="/downloads"
-                  >
-                    Downloads
-                  </NavLink>
-                </li>
-                <li><NavLink
-                  className={({ isActive }) =>
-                    isActive
-                      ? "text-blue-600 flex flex-row justify-center items-center"
-                      : "hover:text-amber-600 flex justify-row justify-center items-center"
-                  }
-                  to="/download/result"
-                >
-                  Result
-                </NavLink></li>
-              </ul>
-            </div>
-          </h1>
+          </NavLink>
           <NavLink
             className={({ isActive }) =>
               isActive ? "text-blue-600" : "hover:text-amber-600"
