@@ -3,9 +3,17 @@ interface NewsCardProps {
   newHeading: string;
   newText: string;
   newsDate: string;
+  /** The school logo stands in for a missing image: shown whole, on white. */
+  isLogo?: boolean;
 }
 
-function NewsCard({ newsImage, newHeading, newText, newsDate }: NewsCardProps) {
+function NewsCard({
+  newsImage,
+  newHeading,
+  newText,
+  newsDate,
+  isLogo = false,
+}: NewsCardProps) {
   const date = new Date(newsDate);
   const options: Intl.DateTimeFormatOptions = {
     year: "numeric",
@@ -20,13 +28,15 @@ function NewsCard({ newsImage, newHeading, newText, newsDate }: NewsCardProps) {
         <div className="w-full flex items-center justify-center aspect-w-16 aspect-h-9">
           <img
             src={newsImage}
-            alt="summer vacation"
-            className="rounded-lg shadow-lg border h-36 w-32 object-cover md:h-48 md:w-48"
+            alt={isLogo ? "School logo" : newHeading}
+            className={`rounded-lg shadow-lg border h-36 w-32 md:h-48 md:w-48 ${
+              isLogo ? "object-contain bg-white p-2" : "object-cover"
+            }`}
           />
         </div>
         <div className="flex flex-col items-start justify-center gap-y-1 w-full">
           <p className="font-bold text-sm lg:text-2xl">{newHeading}</p>
-          <p className="text-sm lg:text-xl">{newText}</p>
+          <p className="text-sm lg:text-xl whitespace-pre-line">{newText}</p>
           <p className="font-bold text-sm lg:text-xl">{formattedDate}</p>
         </div>
       </div>

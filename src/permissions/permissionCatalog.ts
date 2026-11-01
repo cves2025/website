@@ -29,6 +29,16 @@ export const TEACHER_PERMISSION_GROUPS: PermissionCatalogGroup[] = [
     ],
   },
   {
+    label: "School",
+    items: [
+      {
+        permission: P.NEWS_MANAGE,
+        label: "News",
+        description: "Add, edit, publish and delete the news on the Home page.",
+      },
+    ],
+  },
+  {
     label: "Student",
     items: [
       {

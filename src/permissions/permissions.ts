@@ -25,6 +25,7 @@ export const PERMISSIONS = {
   DESK_SLIP: "deskslip.access",
   PERMISSIONS_MANAGE: "permissions.manage",
   PROFILE_VIEW: "profile.view",
+  NEWS_MANAGE: "news.manage",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

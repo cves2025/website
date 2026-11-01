@@ -38,6 +38,7 @@ import IdCardAdmin from './panel/IdCardAdmin'
 import Settings from './panel/settings/Settings'
 import Permissions from './panel/settings/permissions/Permissions'
 import Profile from './panel/settings/profile/Profile'
+import News from './panel/settings/news/News'
 import DeskSlip from './panel/exams/desk-slip/DeskSlip'
 import RequireAccess from '../routes/RequireAccess'
 import RequireRoutePermission from '../routes/RequireRoutePermission'
@@ -71,6 +72,7 @@ function Router() {
           <Route path="settings" element={<Settings />} />
           <Route path="settings/permissions" element={<Permissions />} />
           <Route path="settings/profile" element={<Profile />} />
+          <Route path="settings/news" element={<News />} />
           <Route path="exam/list" element={<ExamList />} />
           <Route path="teacher/add" element={<AddTeacher />} />
           <Route path="teacher/list" element={<TeachersList />} />

@@ -12,6 +12,8 @@ export const COLLECTION = {
   PANEL_SETTINGS: "panelSettings",
   ATTENDANCE: "attendance",
   ROLL_NUMBER: "rollNumber",
+  /** School news shown on the Home page, managed from Settings > News. */
+  NEWS: "news",
 };
 
 export const PRE_DEFINED_DOC_ID = {

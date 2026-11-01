@@ -20,6 +20,7 @@ import {
   FaCog,
   FaUserShield,
   FaIdBadge,
+  FaNewspaper,
 } from "react-icons/fa";
 import schoolLogo from "../../assets/image/schoolLogo.jpg";
 import { BRAND, MENU, filterMenu, groupOfPath, type MenuItem } from "../../config/navigation";
@@ -37,6 +38,9 @@ const PERMISSIONS_PATH = "/welcome/settings/permissions";
 /** Page opened by the "My Profile" item of the account menu. */
 const PROFILE_PATH = "/welcome/settings/profile";
 
+/** Page opened by the "News" item of the account menu. */
+const NEWS_PATH = "/welcome/settings/news";
+
 interface SidebarProps {
   open: boolean;
   onClose: () => void;
@@ -51,8 +55,9 @@ function Sidebar({ open, onClose }: SidebarProps) {
   const canManagePermissions = can(PERMISSIONS.PERMISSIONS_MANAGE);
   // ON for teachers by default; the admin can switch it off per teacher.
   const canOpenProfile = can(PERMISSIONS.PROFILE_VIEW);
+  const canManageNews = can(PERMISSIONS.NEWS_MANAGE);
   const canOpenAccountMenu =
-    canOpenProfile || canOpenSettings || canManagePermissions;
+    canOpenProfile || canOpenSettings || canManagePermissions || canManageNews;
 
   const menu = useMemo(
   () => filterMenu(MENU, user?.permissions ?? []),
@@ -90,7 +95,7 @@ const hoverTimer = useRef<number | null>(null);
   useEffect(() => clearHoverTimer, []);
 
   // Mini sidebar ("account menu") shown when the user name at the bottom is
-  // clicked. It hosts the My Profile, Settings and Permissions entries.
+  // clicked. It hosts the My Profile, Settings, Permissions and News entries.
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -376,6 +381,13 @@ const hoverTimer = useRef<number | null>(null);
                   label: "Permissions",
                   icon: <FaUserShield />,
                   color: BRAND.green,
+                },
+                {
+                  show: canManageNews,
+                  path: NEWS_PATH,
+                  label: "News",
+                  icon: <FaNewspaper />,
+                  color: BRAND.red,
                 },
               ]
                 .filter((item) => item.show)
