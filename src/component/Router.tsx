@@ -36,6 +36,7 @@ import IdCardTeachers from './panel/IdCardTeachers'
 import IdCardStaff from './panel/IdCardStaff'
 import IdCardAdmin from './panel/IdCardAdmin'
 import Settings from './panel/settings/Settings'
+import Permissions from './panel/settings/permissions/Permissions'
 import DeskSlip from './panel/exams/desk-slip/DeskSlip'
 import RequireAccess from '../routes/RequireAccess'
 import RequireRoutePermission from '../routes/RequireRoutePermission'
@@ -67,6 +68,7 @@ function Router() {
           <Route path="student/promote" element={<StudentPromote />} />
           <Route path="student/subject" element={<Subject />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="settings/permissions" element={<Permissions />} />
           <Route path="exam/list" element={<ExamList />} />
           <Route path="teacher/add" element={<AddTeacher />} />
           <Route path="teacher/list" element={<TeachersList />} />

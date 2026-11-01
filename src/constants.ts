@@ -16,6 +16,8 @@ export const COLLECTION = {
 
 export const PRE_DEFINED_DOC_ID = {
   SUGGESTED_REMARKS: "suggestedRemarks",
+  /** School-wide teacher permission defaults (Permissions page). */
+  ROLE_PERMISSIONS: "rolePermissions",
 }
 
 /** Document id inside COLLECTION.STAMP_SIGN that stores the Principal's

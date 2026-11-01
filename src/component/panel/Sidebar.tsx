@@ -17,6 +17,7 @@ import {
 import {
   FaSignOutAlt,
   FaCog,
+  FaUserShield,
 } from "react-icons/fa";
 import schoolLogo from "../../assets/image/schoolLogo.jpg";
 import { BRAND, MENU, filterMenu, groupOfPath, type MenuItem } from "../../config/navigation";
@@ -27,6 +28,9 @@ const DASHBOARD_PATH = "/welcome";
 
 /** Page opened by the "Settings" item of the account menu (mini sidebar). */
 const SETTINGS_PATH = "/welcome/settings";
+
+/** Page opened by the "Permissions" item of the account menu. */
+const PERMISSIONS_PATH = "/welcome/settings/permissions";
 
 interface SidebarProps {
   open: boolean;
@@ -39,6 +43,8 @@ function Sidebar({ open, onClose }: SidebarProps) {
   const location = useLocation();
 
   const canOpenSettings = can(PERMISSIONS.SETTINGS_ACCESS);
+  const canManagePermissions = can(PERMISSIONS.PERMISSIONS_MANAGE);
+  const canOpenAccountMenu = canOpenSettings || canManagePermissions;
 
   const menu = useMemo(
   () => filterMenu(MENU, user?.permissions ?? []),
@@ -48,7 +54,7 @@ const [expanded, setExpanded] = useState(groupOfPath(menu, location.pathname));
 const [collapsed, setCollapsed] = useState(false);
 
   // Mini sidebar ("account menu") shown when the user name at the bottom is
-  // clicked. It currently hosts the Settings entry.
+  // clicked. It hosts the Settings and Permissions entries.
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -73,11 +79,11 @@ const [collapsed, setCollapsed] = useState(false);
     };
   }, [accountMenuOpen]);
 
-  /** Opens the Settings page from the account menu and closes the drawer. */
-  const handleOpenSettings = () => {
+  /** Opens a page from the account menu and closes the drawer. */
+  const openFromAccountMenu = (path: string) => {
     setAccountMenuOpen(false);
     onClose();
-    navigate(SETTINGS_PATH);
+    navigate(path);
   };
 
   const onSettingsPage = location.pathname.startsWith(SETTINGS_PATH);
@@ -296,7 +302,7 @@ const [collapsed, setCollapsed] = useState(false);
         <div className="px-3 py-4 border-t border-white/5">
           <div ref={accountMenuRef} className="relative">
             {/* Account menu (mini sidebar) — opens upwards from the user block */}
-            {canOpenSettings && <div
+            {canOpenAccountMenu && <div
               id="sidebar-account-menu"
               role="menu"
               aria-label="Account menu"
@@ -309,29 +315,49 @@ const [collapsed, setCollapsed] = useState(false);
               <p className="px-4 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-widest text-white/35">
                 Account
               </p>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={handleOpenSettings}
-                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-gray-300 transition-colors hover:bg-white/[0.06] hover:text-white"
-              >
-                <span
-                  className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-base"
-                  style={{
-                    backgroundColor: `${BRAND.blue}1A`,
-                    color: BRAND.blue,
-                  }}
-                >
-                  <FaCog />
-                </span>
-                Settings
-              </button>
+              {[
+                {
+                  show: canOpenSettings,
+                  path: SETTINGS_PATH,
+                  label: "Settings",
+                  icon: <FaCog />,
+                  color: BRAND.blue,
+                },
+                {
+                  show: canManagePermissions,
+                  path: PERMISSIONS_PATH,
+                  label: "Permissions",
+                  icon: <FaUserShield />,
+                  color: BRAND.green,
+                },
+              ]
+                .filter((item) => item.show)
+                .map((item) => (
+                  <button
+                    key={item.path}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => openFromAccountMenu(item.path)}
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-gray-300 transition-colors hover:bg-white/[0.06] hover:text-white"
+                  >
+                    <span
+                      className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-base"
+                      style={{
+                        backgroundColor: `${item.color}1A`,
+                        color: item.color,
+                      }}
+                    >
+                      {item.icon}
+                    </span>
+                    {item.label}
+                  </button>
+                ))}
             </div>}
 
             {/* Clicking the name (or the avatar while collapsed) opens the menu */}
             <button
               type="button"
-              onClick={() => canOpenSettings && setAccountMenuOpen((prev) => !prev)}
+              onClick={() => canOpenAccountMenu && setAccountMenuOpen((prev) => !prev)}
               aria-haspopup="menu"
               aria-expanded={accountMenuOpen}
               aria-controls="sidebar-account-menu"
@@ -364,7 +390,7 @@ const [collapsed, setCollapsed] = useState(false);
                   {user?.email}
                 </span>
               </span>
-              {!collapsed && canOpenSettings && (
+              {!collapsed && canOpenAccountMenu && (
                 <span className="text-xs text-gray-400" aria-hidden="true">
                   {accountMenuOpen ? <BsChevronDown /> : <BsChevronUp />}
                 </span>

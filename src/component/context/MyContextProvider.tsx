@@ -5,18 +5,21 @@ import {
   signOut,
   type User as FirebaseUser,
 } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "../../firebase/config";
 import Loader from "../../custom-components/Loader";
 import {
   Permission,
   PermissionOverrides,
   Role,
+  TeacherRoleDefaults,
+  isClassTeacherProfile,
   isRole,
   resolvePermissions,
   ALL_SCOPE, NO_SCOPE, type AccessScope
 } from "../../permissions";
 import { toEditableSectionAssignments } from "../../utils/teacherSections";
+import { subscribeTeacherRoleDefaults } from "../../utils/permissionSettingsService";
 
 export type AccessState =
   | "ok"
@@ -76,16 +79,6 @@ function friendlyAuthError(code: string): string {
   }
 }
 
-function readIsClassTeacher(data: Record<string, unknown>): boolean {
-  const sections = data.sectionAssignments;
-  if (Array.isArray(sections)) {
-    return sections.some(
-      (s) => (s as { isClassTeacher?: unknown } | null)?.isClassTeacher === true
-    );
-  }
-  return data.isClassTeacher === true;
-}
-
 function buildScope(role: Role, data: Record<string, unknown>): AccessScope {
   if (role === "admin") return ALL_SCOPE;
   if (role === "teacher") {
@@ -97,71 +90,75 @@ function buildScope(role: Role, data: Record<string, unknown>): AccessScope {
   return NO_SCOPE; // student / parent ka scope baad ke step mein
 }
 
+function baseUser(firebaseUser: FirebaseUser): AuthUser {
+  return {
+    uid: firebaseUser.uid,
+    email: firebaseUser.email,
+    permissions: [],
+    accessState: "no-profile",
+    scope: NO_SCOPE,
+  };
+}
+
+/** Builds the app user from the users/{uid} document (null = no profile). */
+function buildUser(
+  firebaseUser: FirebaseUser,
+  data: Record<string, unknown> | null,
+  teacherDefaults: TeacherRoleDefaults | null
+): AuthUser {
+  const base = baseUser(firebaseUser);
+  if (!data) return base;
+
+  const fullName = typeof data.fullName === "string" ? data.fullName : undefined;
+  const lastSeenReleaseId =
+    typeof data.lastSeenReleaseId === "string" &&
+    data.lastSeenReleaseId.trim() !== ""
+      ? data.lastSeenReleaseId
+      : undefined;
+
+  if (!isRole(data.role)) {
+    return { ...base, fullName: fullName, accessState: "invalid-role" };
+  }
+  const role = data.role;
+
+  const status = typeof data.status === "string" ? data.status : "";
+  const inactive =
+    data.isDeleted === true || (status !== "" && status !== "Active");
+  if (inactive) {
+    return { ...base, fullName: fullName, role, accessState: "inactive" };
+  }
+
+  return {
+    ...base,
+    fullName: fullName,
+    role,
+    lastSeenReleaseId,
+    accessState: "ok",
+    permissions: resolvePermissions(
+      role,
+      data.permissionOverrides as PermissionOverrides | undefined,
+      isClassTeacherProfile(data),
+      teacherDefaults
+    ),
+    scope: buildScope(role, data),
+  };
+}
+
 export function MyContextProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [profileReady, setProfileReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const buildUserFromFirebase = async (
-    firebaseUser: FirebaseUser
-  ): Promise<AuthUser> => {
-    const base: AuthUser = {
-      uid: firebaseUser.uid,
-      email: firebaseUser.email,
-      permissions: [],
-      accessState: "no-profile",
-      scope: NO_SCOPE,
-    };
-
-    try {
-      const snapshot = await getDoc(doc(db, "users", firebaseUser.uid));
-      if (!snapshot.exists()) return base;
-
-      const data = snapshot.data() as Record<string, unknown>;
-      const fullName = typeof data.fullName === "string" ? data.fullName : undefined;
-      const lastSeenReleaseId =
-        typeof data.lastSeenReleaseId === "string" &&
-        data.lastSeenReleaseId.trim() !== ""
-          ? data.lastSeenReleaseId
-          : undefined;
-
-      if (!isRole(data.role)) {
-        return { ...base, fullName: fullName, accessState: "invalid-role" };
-      }
-      const role = data.role;
-
-      const status = typeof data.status === "string" ? data.status : "";
-      const inactive =
-        data.isDeleted === true || (status !== "" && status !== "Active");
-      if (inactive) {
-        return { ...base, fullName: fullName, role, accessState: "inactive" };
-      }
-
-      return {
-        ...base,
-        fullName: fullName,
-        role,
-        lastSeenReleaseId,
-        accessState: "ok",
-        permissions: resolvePermissions(
-          role,
-          data.permissionOverrides as PermissionOverrides | undefined,
-          readIsClassTeacher(data)
-        ),
-        scope: buildScope(role, data),
-      };
-    } catch (err) {
-      console.error("Could not load Firestore user profile:", err);
-      return { ...base, accessState: "profile-error" };
-    }
-  };
-
   useEffect(() => {
-    let active = true;
+    // The profile and the school-wide teacher defaults are both listened to
+    // live, so permission changes made on the Permissions page (or a
+    // deactivated account) reach an open app without a reload.
+    let stopListening: (() => void) | null = null;
 
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (!active) return;
+      stopListening?.();
+      stopListening = null;
 
       if (!firebaseUser) {
         setUser(null);
@@ -170,37 +167,67 @@ export function MyContextProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      setUser({
-        uid: firebaseUser.uid,
-        email: firebaseUser.email,
-        permissions: [],
-        accessState: "no-profile",
-        scope: NO_SCOPE,
-      });
+      setUser(baseUser(firebaseUser));
       setAuthReady(true);
       setProfileReady(false);
 
-      void buildUserFromFirebase(firebaseUser).then((fullUser) => {
-        if (!active) return;
-        setUser((prev) =>
-          prev && prev.uid === firebaseUser.uid ? fullUser : prev
-        );
+      // undefined = not loaded yet; the user is built once both have arrived.
+      let profile: Record<string, unknown> | null | undefined;
+      let teacherDefaults: TeacherRoleDefaults | null | undefined;
+      let profileFailed = false;
+
+      const publish = () => {
+        if (profileFailed) {
+          setUser({ ...baseUser(firebaseUser), accessState: "profile-error" });
+        } else if (profile !== undefined && teacherDefaults !== undefined) {
+          setUser(buildUser(firebaseUser, profile, teacherDefaults));
+        } else {
+          return;
+        }
         setProfileReady(true);
+      };
+
+      const stopProfile = onSnapshot(
+        doc(db, "users", firebaseUser.uid),
+        (snapshot) => {
+          profileFailed = false;
+          profile = snapshot.exists()
+            ? (snapshot.data() as Record<string, unknown>)
+            : null;
+          publish();
+        },
+        (err) => {
+          console.error("Could not load Firestore user profile:", err);
+          profileFailed = true;
+          publish();
+        }
+      );
+      const stopDefaults = subscribeTeacherRoleDefaults((defaults) => {
+        teacherDefaults = defaults;
+        publish();
       });
+
+      stopListening = () => {
+        stopProfile();
+        stopDefaults();
+      };
     });
 
     return () => {
-      active = false;
+      stopListening?.();
       unsubscribe();
     };
   }, []);
 
+  // The profile itself is loaded by the onAuthStateChanged listener above;
+  // RequireAccess shows a loader until it is ready.
   const login = async (email: string, password: string) => {
     try {
       const credential = await signInWithEmailAndPassword(auth, email, password);
-      const fullUser = await buildUserFromFirebase(credential.user);
-      setUser(fullUser);
-      setProfileReady(true);
+      // Normally the listener has already set the user; never replace it.
+      setUser((prev) =>
+        prev?.uid === credential.user.uid ? prev : baseUser(credential.user)
+      );
       setError(null);
       return true;
     } catch (err) {

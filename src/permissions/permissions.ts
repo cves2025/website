@@ -23,6 +23,7 @@ export const PERMISSIONS = {
   SETTINGS_ACCESS: "settings.access",
   EXAM_SETTINGS: "examSettings.access",
   DESK_SLIP: "deskslip.access",
+  PERMISSIONS_MANAGE: "permissions.manage",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

@@ -3,3 +3,4 @@ export * from "./rolePermissions";
 export * from "./resolvePermissions";
 export * from "./routePermissions";
 export * from "./teacherScope";
+export * from "./permissionCatalog";
