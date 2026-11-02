@@ -211,8 +211,8 @@ const hoverTimer = useRef<number | null>(null);
       <aside
         onPointerEnter={handlePointerEnter}
         onPointerLeave={handlePointerLeave}
-        className={`fixed inset-y-0 left-0 z-40 w-72 flex flex-col shadow-2xl transform transition-all duration-300 ease-in-out border-r border-white/5
-          bg-gradient-to-b from-[#12141C] to-[#181B26] text-white
+        className={`fixed inset-y-0 left-0 z-40 w-72 flex flex-col shadow-2xl md:shadow-sm transform transition-all duration-300 ease-in-out border-r border-gray-200
+          bg-white text-gray-800
           ${open ? "translate-x-0" : "-translate-x-full"}
           md:translate-x-0 md:static md:z-30 md:h-screen md:shrink-0
           print:hidden
@@ -221,7 +221,7 @@ const hoverTimer = useRef<number | null>(null);
         {/* Collapse toggle (desktop only) */}
         <button
           onClick={toggleCollapse}
-          className="hidden md:flex absolute -right-3 top-8 z-50 w-6 h-6 items-center justify-center rounded-full bg-[#20222E] border border-white/10 text-gray-300 text-xs shadow-md hover:text-white hover:border-[#3763E0] transition-colors"
+          className="hidden md:flex absolute -right-3 top-8 z-50 w-6 h-6 items-center justify-center rounded-full bg-white border border-gray-200 text-gray-500 text-xs shadow-md hover:text-gray-900 hover:border-[#3763E0] transition-colors"
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
@@ -231,7 +231,7 @@ const hoverTimer = useRef<number | null>(null);
         {/* Brand */}
         <div className={isCollapsed ? "md:px-0" : ""}>
           <div
-            className={`flex items-center border-b border-white/5 px-5 py-5 ${
+            className={`flex items-center border-b border-gray-100 px-5 py-5 ${
               isCollapsed ? "md:justify-center md:px-0" : "justify-between"
             }`}
           >
@@ -240,25 +240,25 @@ const hoverTimer = useRef<number | null>(null);
               onClick={onClose}
               title="Go to dashboard"
               aria-label="Children's Valley English School logo - go to dashboard"
-              className="group -m-1 flex min-w-0 items-center gap-3 rounded-lg p-1 transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3763E0]"
+              className="group -m-1 flex min-w-0 items-center gap-3 rounded-lg p-1 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3763E0]"
             >
               <img
                 src={schoolLogo}
                 alt="Children's Valley English School logo"
-                className="h-10 w-10 shrink-0 rounded-xl bg-white object-contain p-0.5 shadow-sm transition-transform group-hover:scale-105"
+                className="h-10 w-10 shrink-0 rounded-xl bg-white object-contain p-0.5 shadow-sm ring-1 ring-gray-200 transition-transform group-hover:scale-105"
               />
               <div className={`min-w-0 ${isCollapsed ? "md:hidden" : ""}`}>
-                <h2 className="font-bold text-base text-white truncate leading-tight tracking-tight">
+                <h2 className="font-bold text-base text-gray-900 truncate leading-tight tracking-tight">
                   CVES Panel
                 </h2>
-                <p className="text-[11px] text-gray-400 truncate">
+                <p className="text-[11px] text-gray-500 truncate">
                   Children's Valley English School
                 </p>
               </div>
             </NavLink>
             <button
               onClick={onClose}
-              className="md:hidden text-gray-400 hover:text-white hover:bg-white/10 rounded-lg p-1.5 transition-colors text-xl"
+              className="md:hidden text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg p-1.5 transition-colors text-xl"
               aria-label="Close menu"
             >
               <BsX />
@@ -284,24 +284,28 @@ const hoverTimer = useRef<number | null>(null);
                   title={isCollapsed ? item.label : undefined}
                   style={
                     expanded === item.label
-                      ? { borderLeft: `3px solid ${item.accent}` }
+                      ? {
+                          borderLeft: `3px solid ${item.accent}`,
+                          backgroundColor: `${item.accent}0F`,
+                        }
                       : { borderLeft: "3px solid transparent" }
                   }
                   className={`w-full flex items-center rounded-r-lg text-sm font-semibold transition-colors
                     ${isCollapsed ? "md:justify-center md:rounded-lg px-0 py-2.5" : "justify-between pl-3 pr-3 py-2.5"}
                     ${
                       expanded === item.label
-                        ? "bg-white/[0.06] text-white"
-                        : "text-gray-300 hover:bg-white/[0.04] hover:text-white"
+                        ? "text-gray-900"
+                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                     }`}
                 >
                   <span className="flex items-center gap-3">
                     <span
                       className="w-8 h-8 flex items-center justify-center rounded-lg text-base shrink-0"
-                      style={{
-                        backgroundColor: `${item.accent}1A`,
-                        color: item.accent,
-                      }}
+                      style={
+                        expanded === item.label
+                          ? { backgroundColor: item.accent, color: "#fff" }
+                          : { backgroundColor: `${item.accent}1A`, color: item.accent }
+                      }
                     >
                       {item.icon}
                     </span>
@@ -321,7 +325,7 @@ const hoverTimer = useRef<number | null>(null);
                       : "max-h-0 opacity-0"
                   }`}
                 >
-                  <div className="ml-4 space-y-0.5 border-l-2 border-white/5 pl-4 py-0.5">
+                  <div className="ml-4 space-y-0.5 border-l-2 border-gray-100 pl-4 py-0.5">
                     {item.subLinks.map((link) => (
                       <NavLink
                         key={link.path}
@@ -329,17 +333,27 @@ const hoverTimer = useRef<number | null>(null);
                         end={link.end}
                         onClick={onClose}
                         className={({ isActive }) =>
-                          `block px-3 py-2 rounded-lg text-sm transition-colors ${
+                          `flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
                             isActive
-                              ? "font-bold text-white shadow-sm"
-                              : "text-gray-400 hover:text-white hover:bg-white/[0.05]"
+                              ? "font-bold text-gray-900"
+                              : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
                           }`
                         }
                         style={({ isActive }) =>
-                          isActive ? { backgroundColor: item.accent } : undefined
+                          isActive ? { backgroundColor: `${item.accent}1A` } : undefined
                         }
                       >
-                        {link.label}
+                        {({ isActive }) => (
+                          <>
+                            <span
+                              className="h-1.5 w-1.5 shrink-0 rounded-full"
+                              style={{
+                                backgroundColor: isActive ? item.accent : "#D1D5DB",
+                              }}
+                            />
+                            {link.label}
+                          </>
+                        )}
                       </NavLink>
                     ))}
                   </div>
@@ -357,12 +371,12 @@ const hoverTimer = useRef<number | null>(null);
                     isCollapsed ? "md:justify-center px-0 py-2.5" : "px-3 py-2.5"
                   } ${
                     isActive
-                      ? "text-white shadow-sm"
-                      : "text-gray-300 hover:bg-white/[0.04] hover:text-white"
+                      ? "text-gray-900"
+                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                   }`
                 }
                 style={({ isActive }) =>
-                  isActive ? { backgroundColor: item.accent } : undefined
+                  isActive ? { backgroundColor: `${item.accent}1A` } : undefined
                 }
               >
                 {({ isActive }) => (
@@ -371,7 +385,7 @@ const hoverTimer = useRef<number | null>(null);
                       className="w-8 h-8 flex items-center justify-center rounded-lg text-base shrink-0"
                       style={
                         isActive
-                          ? { backgroundColor: "rgba(255,255,255,0.15)", color: "#fff" }
+                          ? { backgroundColor: item.accent, color: "#fff" }
                           : { backgroundColor: `${item.accent}1A`, color: item.accent }
                       }
                     >
@@ -386,20 +400,20 @@ const hoverTimer = useRef<number | null>(null);
         </nav>
 
         {/* User + logout */}
-        <div className="px-3 py-4 border-t border-white/5">
+        <div className="px-3 py-4 border-t border-gray-100">
           <div ref={accountMenuRef} className="relative">
             {/* Account menu (mini sidebar) — opens upwards from the user block */}
             {canOpenAccountMenu && <div
               id="sidebar-account-menu"
               role="menu"
               aria-label="Account menu"
-              className={`absolute bottom-full left-0 right-0 z-10 mb-2 min-w-[12rem] origin-bottom overflow-hidden rounded-xl border border-white/10 bg-[#1D2029] shadow-2xl transition-all duration-200 ease-out ${
+              className={`absolute bottom-full left-0 right-0 z-10 mb-2 min-w-[12rem] origin-bottom overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl transition-all duration-200 ease-out ${
                 accountMenuOpen
                   ? "visible translate-y-0 opacity-100 pointer-events-auto"
                   : "invisible translate-y-1 opacity-0 pointer-events-none"
               }`}
             >
-              <p className="px-4 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-widest text-white/35">
+              <p className="px-4 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
                 Account
               </p>
               {[
@@ -460,7 +474,7 @@ const hoverTimer = useRef<number | null>(null);
                     type="button"
                     role="menuitem"
                     onClick={() => openFromAccountMenu(item.path)}
-                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-gray-300 transition-colors hover:bg-white/[0.06] hover:text-white"
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900"
                   >
                     <span
                       className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-base"
@@ -488,8 +502,8 @@ const hoverTimer = useRef<number | null>(null);
                 isCollapsed ? "md:justify-center" : ""
               } ${
                 accountMenuOpen || onSettingsPage
-                  ? "bg-white/[0.06]"
-                  : "hover:bg-white/[0.04]"
+                  ? "bg-gray-100"
+                  : "hover:bg-gray-50"
               }`}
             >
               <span
@@ -505,10 +519,10 @@ const hoverTimer = useRef<number | null>(null);
                   isCollapsed ? "md:hidden" : ""
                 }`}
               >
-                <span className="block truncate text-sm font-semibold text-white">
+                <span className="block truncate text-sm font-semibold text-gray-900">
                   {user?.fullName || user?.email || "User"}
                 </span>
-                <span className="block truncate text-xs text-gray-400">
+                <span className="block truncate text-xs text-gray-500">
                   {user?.email}
                 </span>
               </span>
@@ -539,7 +553,7 @@ const hoverTimer = useRef<number | null>(null);
           </button>
 
           {/* App version — bumped automatically on every deploy */}
-          <p className="mt-3 text-center text-[10px] tracking-wide text-white/25 select-none">
+          <p className="mt-3 text-center text-[10px] tracking-wide text-gray-400 select-none">
             v{__APP_VERSION_LABEL__}
           </p>
         </div>
