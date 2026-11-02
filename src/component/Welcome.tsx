@@ -1,9 +1,10 @@
 import { useEffect, useState, useContext } from "react";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "./panel/Sidebar";
 import { myContext } from "./context/MyContextProvider";
 import Loader from "../custom-components/Loader";
 import { BsList } from "react-icons/bs";
+import { FaGlobe } from "react-icons/fa";
 import WhatsNewModal from "../features/whats-new/WhatsNewModal";
 import { useWhatsNew } from "../features/whats-new/useWhatsNew";
 
@@ -70,6 +71,17 @@ function Welcome() {
             <h1 className="text-lg md:text-xl font-bold text-gray-800 truncate">
               Welcome{user?.fullName ? `, ${user.fullName}` : ""}!
             </h1>
+          )}
+          {user.role === "admin" && (
+            <Link
+              to="/"
+              title="Go to Website"
+              className="ml-auto flex shrink-0 items-center gap-2 rounded-full bg-blue-600 px-3 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700 sm:px-4"
+            >
+              <FaGlobe className="h-4 w-4" />
+              {/* Icon only on small phones, so the school name keeps its room. */}
+              <span className="hidden sm:inline">Go to Website</span>
+            </Link>
           )}
         </header>
 
