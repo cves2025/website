@@ -22,6 +22,7 @@ import {
   enrollmentKey,
   findExistingEnrollmentKeys,
 } from "../../utils/duplicateEnrollments";
+import { recordEnrollments } from "../../utils/enrollmentCounter";
 
 const PREVIEW_ROWS = 5;
 
@@ -174,6 +175,13 @@ function BulkStudentImport({ onImported }: BulkStudentImportProps) {
       }
 
       const count = await importStudentsToFirestore(newStudents);
+
+      // Keep the Add Student page's next Enrollment No. ahead of the import.
+      try {
+        await recordEnrollments(newStudents.map((student) => student.enrollment));
+      } catch (counterError) {
+        console.error("Failed to update the enrollment counter:", counterError);
+      }
 
       // Generate roll numbers once per affected class, not once per student.
       let rollNumbersUpdated = true;

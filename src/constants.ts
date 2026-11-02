@@ -28,6 +28,8 @@ export const PRE_DEFINED_DOC_ID = {
   GALLERY_IMPORT: "galleryImport",
   /** Website photos (the school photo of Home / About), Settings > Gallery. */
   SITE_IMAGES: "siteImages",
+  /** Highest Enrollment No. in use; the Add Student page suggests the next. */
+  ENROLLMENT_COUNTER: "enrollmentCounter",
 }
 
 /** Document id inside COLLECTION.STAMP_SIGN that stores the Principal's

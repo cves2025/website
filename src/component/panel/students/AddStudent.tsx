@@ -44,6 +44,11 @@ import {
   PhotoKind,
 } from "../../../firebase/studentPhotos";
 import { generateClassRollNumbers } from "../../../utils/rollNumbers";
+import {
+  fetchNextEnrollment,
+  isEnrollmentTaken,
+  recordEnrollments,
+} from "../../../utils/enrollmentCounter";
 
 type StudentTab = "info" | "school" | "bulk";
 
@@ -436,6 +441,8 @@ function AddStudent() {
   );
   const [nextStudentConfirmOpen, setNextStudentConfirmOpen] = useState(false);
   const [loadingNextStudent, setLoadingNextStudent] = useState(false);
+  // Bumped after a new student is saved, so the next number is suggested.
+  const [enrollmentRefresh, setEnrollmentRefresh] = useState(0);
 
   /* Copy-paste photo routing: which photo box receives an image pasted from
      the clipboard. A focused photo box wins, otherwise the last-focused box is
@@ -604,6 +611,26 @@ function AddStudent() {
     };
   }, [editEnrollmentId, reset, setSearchParams]);
 
+  // Add mode: suggest the next Enrollment No. (still editable). Never
+  // overwrites a number the admin has already typed.
+  useEffect(() => {
+    if (editEnrollmentId) return;
+
+    let cancelled = false;
+    fetchNextEnrollment()
+      .then((next) => {
+        if (cancelled || getValues("enrollment").trim()) return;
+        setValue("enrollment", next);
+      })
+      .catch((error) => {
+        console.error("Failed to suggest the next enrollment number:", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [editEnrollmentId, enrollmentRefresh, getValues, setValue]);
+
   /**
    * Scrolls the Student Info page to a field (centred on screen) and focuses
    * it. Without a selector it targets the first field marked invalid, in the
@@ -716,6 +743,15 @@ function AddStudent() {
         return;
       }
 
+      if (await isEnrollmentTaken(data.enrollment, editingStudentId)) {
+        toast.error(
+          `Enrollment No. ${data.enrollment.trim()} already belongs to another student (recycle bin included). Please use another number.`,
+        );
+        setActiveTab("info");
+        scrollToInfoField("#enrollment");
+        return;
+      }
+
       // A new student's Firestore id is generated up-front (doc() assigns the
       // id locally without a write) so photos can be uploaded to their final
       // students/{studentId}/... path before the Firestore batch is committed.
@@ -775,6 +811,9 @@ function AddStudent() {
         });
 
         await batch.commit();
+        void recordEnrollments([data.enrollment]).catch((error) =>
+          console.error("Failed to update the enrollment counter:", error),
+        );
 
         const previousClassName = String(
           previousEnrollment.className ?? "",
@@ -894,6 +933,13 @@ function AddStudent() {
 
       await batch.commit();
 
+      try {
+        await recordEnrollments([data.enrollment]);
+      } catch (error) {
+        // The duplicate check on save still stops a repeated number.
+        console.error("Failed to update the enrollment counter:", error);
+      }
+
       let rollNumbersUpdated = true;
 
       try {
@@ -907,6 +953,7 @@ function AddStudent() {
       }
 
       reset(defaultValues);
+      setEnrollmentRefresh((value) => value + 1);
       setPendingStudentPhoto(null);
       setPendingFatherPhoto(null);
       setPendingMotherPhoto(null);
