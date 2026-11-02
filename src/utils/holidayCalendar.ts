@@ -105,3 +105,15 @@ export const isWorkingDay = (
 /** Holidays sorted by start date. */
 export const sortHolidays = (holidays: Holiday[]): Holiday[] =>
   [...holidays].sort((a, b) => a.from.localeCompare(b.from) || a.name.localeCompare(b.name));
+
+/** Every date from `from` to `to` (inclusive); empty when `to` < `from`. */
+export function datesBetween(from: string, to: string): string[] {
+  const dates: string[] = [];
+  const cursor = fromDateKey(from);
+  const end = fromDateKey(to);
+  while (cursor <= end) {
+    dates.push(toDateKey(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return dates;
+}

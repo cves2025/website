@@ -168,6 +168,11 @@ export interface UploadContext {
   /** Saved attendance by studentUid. */
   savedAttendance: Readonly<Record<string, SavedAttendance>>;
   includeAttendance: boolean;
+  /**
+   * Whether this user may write attendance for students of this section
+   * (admin / class teacher). Missing = every section.
+   */
+  canEditAttendance?: (section: string) => boolean;
   rules: ExamRules;
 }
 
@@ -223,6 +228,7 @@ export function buildUploadPlan(params: UploadPlanParams): UploadPlan {
     savedMarks: params.savedMarks,
     savedAttendance: params.savedAttendance,
     includeAttendance: params.includeAttendance,
+    canEditAttendance: params.canEditAttendance,
     rules: params.rules,
   };
   const { columns, canEditSubject, includeAttendance } = context;
@@ -275,7 +281,9 @@ export function buildUploadPlan(params: UploadPlanParams): UploadPlan {
   columns
     .filter((column) => editableAnywhere.has(column.id))
     .forEach((column) => keysOf(column).forEach((key) => validKeys.add(key)));
-  if (includeAttendance && editableAnywhere.size > 0) {
+  const attendanceAllowed = (section: string) =>
+    includeAttendance && (context.canEditAttendance?.(section) ?? true);
+  if (editableAnywhere.size > 0 && sections.some(attendanceAllowed)) {
     validKeys.add(TEMPLATE_KEY.attendancePresent);
     validKeys.add(TEMPLATE_KEY.attendanceTotal);
   }
@@ -395,7 +403,16 @@ export function buildUploadPlan(params: UploadPlanParams): UploadPlan {
             }
           });
 
-        if (includeAttendance) {
+        if (!attendanceAllowed(student.section)) {
+          if (
+            (row.values[TEMPLATE_KEY.attendancePresent] ?? "").trim() ||
+            (row.values[TEMPLATE_KEY.attendanceTotal] ?? "").trim()
+          ) {
+            warnings.push(
+              `Attendance: ignored, only the class teacher of Section ${student.section} can change it.`,
+            );
+          }
+        } else {
           rowKeys.add(TEMPLATE_KEY.attendancePresent);
           rowKeys.add(TEMPLATE_KEY.attendanceTotal);
           const present = row.values[TEMPLATE_KEY.attendancePresent] ?? "";
@@ -634,7 +651,10 @@ export function evaluateStudentWrite(
   let attendance: CellOutcome | null = null;
   let attendanceChange: { presentDays: number; totalDays: number } | null =
     null;
-  if (plan.context.includeAttendance) {
+  if (
+    plan.context.includeAttendance &&
+    (plan.context.canEditAttendance?.(student.section) ?? true)
+  ) {
     const present = (
       planned.values[TEMPLATE_KEY.attendancePresent] ?? ""
     ).trim();

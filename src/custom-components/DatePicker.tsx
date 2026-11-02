@@ -64,6 +64,16 @@ function DatePicker({
   const selected = parseDate(value);
   const minDate = min ? parseDate(min) : undefined;
   const maxDate = max ? parseDate(max) : undefined;
+  // With nothing selected the calendar opens on today's month, kept inside
+  // min / max.
+  const today = new Date();
+  const openMonth =
+    selected ??
+    (maxDate && today > maxDate
+      ? maxDate
+      : minDate && today < minDate
+        ? minDate
+        : today);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -94,7 +104,7 @@ function DatePicker({
           // stay put while moving between months.
           fixedWeeks
           selected={selected}
-          defaultMonth={selected ?? maxDate}
+          defaultMonth={openMonth}
           disabled={[
             ...(minDate ? [{ before: minDate }] : []),
             ...(maxDate ? [{ after: maxDate }] : []),

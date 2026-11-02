@@ -94,12 +94,14 @@ import { myContext } from "../../context/MyContextProvider";
 import {
   NO_SCOPE,
   PERMISSIONS,
+  isClassTeacherOf,
   scopedClasses,
   scopedSections,
   subjectAccess,
   type SubjectAccess,
 } from "../../../permissions";
 import MarksUploadModal from "./MarksUploadModal";
+import AttendanceFillModal from "./AttendanceFillModal";
 
 const academicYears = generateAcademicYears();
 
@@ -285,6 +287,7 @@ function ExamMarks() {
   const [exams, setExams] = useState<ExamDoc[]>([]);
 
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [attendanceFillOpen, setAttendanceFillOpen] = useState(false);
   const [marksYear, setMarksYear] = useState(academicYears[0]?.value ?? "");
 
   const [marksExamId, setMarksExamId] = useState("");
@@ -414,6 +417,15 @@ function ExamMarks() {
     selectedExam &&
     section &&
     selectionAllowed,
+  );
+
+  /** Attendance belongs to the admin and the section's class teacher. */
+  const canEditAttendance = (studentSection: string): boolean =>
+    can(PERMISSIONS.MARKS_ENTER) &&
+    (isAdmin || isClassTeacherOf(scope, marksClass, studentSection));
+
+  const attendanceFillStudents = rowStudents.filter((student) =>
+    canEditAttendance(student.section),
   );
 
   const buildStudentDraftFor = (studentUid: string): StudentDraftPlan =>
@@ -946,7 +958,8 @@ function ExamMarks() {
     field: keyof AttendanceDraft,
     value: string,
   ) => {
-    if (!can(PERMISSIONS.MARKS_ENTER)) return;
+    const student = rowStudents.find((item) => item.studentUid === studentUid);
+    if (!student || !canEditAttendance(student.section)) return;
     if (value !== "" && (!/^\d+$/.test(value) || Number(value) < 0)) return;
     const current = attendanceDraftsRef.current[studentUid] ?? {
       presentDays: "",
@@ -959,7 +972,7 @@ function ExamMarks() {
   };
 
   const saveAttendanceForStudent = async (student: MarksRowStudent) => {
-    if (!can(PERMISSIONS.MARKS_ENTER)) return;
+    if (!canEditAttendance(student.section)) return;
     const studentUid = student.studentUid;
     const attendance = attendanceDraftsRef.current[studentUid] ?? {
       presentDays: "",
@@ -1131,13 +1144,25 @@ function ExamMarks() {
         descriptionStyle="text-gray-500"
         button={
           can(PERMISSIONS.MARKS_ENTER) && (
-            <Button
-              buttonName="Upload Excel"
-              variant="success"
-              size="md"
-              buttonStyle="rounded-full"
-              onClick={() => setUploadOpen(true)}
-            />
+            <div className="flex flex-wrap gap-2">
+              {tableReady && attendanceFillStudents.length > 0 && (
+                <Button
+                  buttonName="Fill from Daily Attendance"
+                  variant="outline"
+                  size="md"
+                  buttonStyle="rounded-full"
+                  disabled={attendanceLoading}
+                  onClick={() => setAttendanceFillOpen(true)}
+                />
+              )}
+              <Button
+                buttonName="Upload Excel"
+                variant="success"
+                size="md"
+                buttonStyle="rounded-full"
+                onClick={() => setUploadOpen(true)}
+              />
+            </div>
           )
         }
       />
@@ -1423,7 +1448,7 @@ function ExamMarks() {
                                   ?.presentDays ?? ""
                               }
                               readOnly={
-                                !can(PERMISSIONS.MARKS_ENTER) || attendanceLoading
+                                !canEditAttendance(student.section) || attendanceLoading
                               }
                               onChange={(event: ChangeEvent<HTMLInputElement>) =>
                                 handleAttendanceChange(
@@ -1435,7 +1460,11 @@ function ExamMarks() {
                               onBlur={() =>
                                 void saveAttendanceForStudent(student)
                               }
-                              className={attendanceInputClass}
+                              className={cn(
+                                attendanceInputClass,
+                                !canEditAttendance(student.section) &&
+                                  readOnlyInputClass,
+                              )}
                             />
                             <span className="text-gray-300">/</span>
                             <Input
@@ -1450,7 +1479,7 @@ function ExamMarks() {
                                 ""
                               }
                               readOnly={
-                                !can(PERMISSIONS.MARKS_ENTER) || attendanceLoading
+                                !canEditAttendance(student.section) || attendanceLoading
                               }
                               onChange={(event: ChangeEvent<HTMLInputElement>) =>
                                 handleAttendanceChange(
@@ -1462,7 +1491,11 @@ function ExamMarks() {
                               onBlur={() =>
                                 void saveAttendanceForStudent(student)
                               }
-                              className={attendanceInputClass}
+                              className={cn(
+                                attendanceInputClass,
+                                !canEditAttendance(student.section) &&
+                                  readOnlyInputClass,
+                              )}
                             />
                           </div>
                         </TableCell>
@@ -1678,6 +1711,18 @@ function ExamMarks() {
         onClose={() => setUploadOpen(false)}
         exams={exams}
       />
+
+      {attendanceFillOpen && selectedExam && (
+        <AttendanceFillModal
+          isOpen
+          onClose={() => setAttendanceFillOpen(false)}
+          session={marksYear}
+          exam={selectedExam}
+          className={marksClass}
+          students={attendanceFillStudents}
+          saved={attendanceDrafts}
+        />
+      )}
     </div>
   );
 }

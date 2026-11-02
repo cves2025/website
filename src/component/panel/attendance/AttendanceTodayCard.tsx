@@ -7,6 +7,7 @@ import { NO_SCOPE, PERMISSIONS } from "../../../permissions";
 import useHolidayCalendar from "../../../hooks/useHolidayCalendar";
 import { useTeachers } from "../../../hooks/useTeachers";
 import { loadAttendanceOnDate } from "../../../utils/attendanceService";
+import { TEACHER_SECTIONS } from "../../../utils/teacherSections";
 import {
   dayOffReason,
   sessionOfDate,
@@ -120,7 +121,9 @@ function AdminRows() {
           .filter((a) => a.isClassTeacher && a.classTeacherOf.trim())
           .map((a) => ({
             className: a.classTeacherOf.trim(),
-            section: a.section,
+            // Records saved before sections existed have none; like the
+            // teacher's own scope, they count as the first section.
+            section: a.section || TEACHER_SECTIONS[0],
             teacherName: `${teacher.firstName} ${teacher.lastName}`.trim(),
           }))
       ),

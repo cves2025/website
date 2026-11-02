@@ -35,6 +35,8 @@ export interface MarksTemplateStudent {
   studentName: string;
   fatherName: string;
   section: string;
+  /** Pre-filled attendance (e.g. from the daily attendance). */
+  attendance?: { presentDays: number; totalDays: number } | null;
 }
 
 export interface MarksTemplateParams {
@@ -103,14 +105,20 @@ export function buildMarksTemplateWorkbook(
     headers.push("Attendance · Present days", "Attendance · Total days");
   }
 
-  const emptyCells = keys.length - FIXED_HEADERS.length;
+  const markCells = keys.length - FIXED_HEADERS.length - (includeAttendance ? 2 : 0);
   const studentRows = students.map((student) => [
     // Plain strings stay text cells, so enrollment numbers keep leading zeros.
     student.admissionNumber,
     student.studentName,
     student.fatherName,
     student.section,
-    ...Array<string | null>(emptyCells).fill(null),
+    ...Array<string | null>(markCells).fill(null),
+    ...(includeAttendance
+      ? [
+          student.attendance?.presentDays ?? null,
+          student.attendance?.totalDays ?? null,
+        ]
+      : []),
   ]);
 
   const marksSheet = XLSX.utils.aoa_to_sheet([keys, headers, ...studentRows]);
@@ -141,6 +149,9 @@ export function buildMarksTemplateWorkbook(
     ["6. Grades allowed: A+, A, B+, B, C+, C, D, E, F."],
     [
       "7. Attendance: whole days only, and present days cannot be more than total days.",
+    ],
+    [
+      "8. Attendance comes pre-filled from the daily attendance (session start to the exam's end date). Change it only if needed.",
     ],
   ]);
   instructionsSheet["!cols"] = [{ wch: 120 }];

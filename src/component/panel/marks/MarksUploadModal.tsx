@@ -13,6 +13,12 @@ import { generateAcademicYears } from "../../../utils/generateAcademicYears";
 import { formatMarks } from "../../../utils/marks";
 import type { MarksSubjectColumn } from "../../../utils/marksEntry";
 import { downloadMarksTemplate } from "../../../utils/marksTemplate";
+import { loadHolidayCalendar } from "../../../utils/attendanceService";
+import {
+  defaultExamAttendanceRange,
+  loadExamAttendance,
+} from "../../../utils/examAttendance";
+import { todayKey } from "../../../utils/holidayCalendar";
 import {
   buildUploadPlan,
   evaluateStudentWrite,
@@ -27,6 +33,7 @@ import type { ExamDoc } from "../../../utils/type";
 import {
   NO_SCOPE,
   PERMISSIONS,
+  isClassTeacherOf,
   scopedClasses,
   subjectAccess,
 } from "../../../permissions";
@@ -141,6 +148,14 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
     [canEnter, scope, className],
   );
 
+  /** Attendance belongs to the admin and the section's class teacher. */
+  const canEditAttendance = useCallback(
+    (section: string): boolean =>
+      canEnter &&
+      (scope.kind === "all" || isClassTeacherOf(scope, className, section)),
+    [canEnter, scope, className],
+  );
+
   const { writableSections, templateColumns } = useMemo(() => {
     const sections = Array.from(
       new Set(data.roster.map((student) => student.section)),
@@ -159,21 +174,59 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
   const canUseTemplate =
     dataReady && data.roster.length > 0 && templateColumns.length > 0;
 
-  const handleDownload = () => {
+  const [preparingTemplate, setPreparingTemplate] = useState(false);
+
+  const handleDownload = async () => {
     if (!exam || !canUseTemplate) return;
+    const students = data.roster.filter((student) =>
+      writableSections.has(student.section),
+    );
+    const attendanceSections = Array.from(writableSections).filter(
+      canEditAttendance,
+    );
+
+    // Present / Total come pre-filled from the daily attendance (session
+    // start to the exam's end date) for the sections the user may change.
+    setPreparingTemplate(true);
+    let attendance = new Map<string, { presentDays: number; totalDays: number }>();
+    try {
+      if (attendanceSections.length > 0) {
+        const today = todayKey();
+        const calendar = await loadHolidayCalendar(year);
+        const range = defaultExamAttendanceRange(year, exam, today);
+        attendance = (
+          await loadExamAttendance({
+            session: year,
+            className,
+            sections: attendanceSections,
+            calendar,
+            ...range,
+            today,
+          })
+        ).byStudent;
+      }
+    } catch (error) {
+      console.error("Failed to load daily attendance for the template:", error);
+      toast.error("Daily attendance could not be loaded; the attendance columns are left empty.");
+    } finally {
+      setPreparingTemplate(false);
+    }
+
     downloadMarksTemplate({
       session: year,
       exam,
       className,
       columns: templateColumns,
-      students: data.roster
-        .filter((student) => writableSections.has(student.section))
-        .map((student) => ({
-          admissionNumber: student.admissionNumber,
-          studentName: student.studentName,
-          fatherName: student.fatherName,
-          section: student.section,
-        })),
+      includeAttendance: attendanceSections.length > 0,
+      students: students.map((student) => ({
+        admissionNumber: student.admissionNumber,
+        studentName: student.studentName,
+        fatherName: student.fatherName,
+        section: student.section,
+        attendance: canEditAttendance(student.section)
+          ? attendance.get(student.studentUid) ?? null
+          : null,
+      })),
     });
   };
 
@@ -206,6 +259,7 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
       savedMarks: data.savedMarks,
       savedAttendance: data.savedAttendance,
       includeAttendance: true,
+      canEditAttendance,
       rules,
     });
   }, [
@@ -219,6 +273,7 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
     data.savedMarks,
     data.savedAttendance,
     canEditSubject,
+    canEditAttendance,
     rules,
   ]);
 
@@ -459,10 +514,13 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
           {/* ---- Step 2 and 3: template + file -------------------------- */}
           <div className="mt-4 flex flex-wrap items-center gap-3 rounded-md border border-gray-200 bg-gray-50 p-4">
             <Button
-              buttonName="1. Download Template"
+              buttonName={
+                preparingTemplate ? "Preparing..." : "1. Download Template"
+              }
               variant="outline"
               size="sm"
-              onClick={handleDownload}
+              disabled={preparingTemplate}
+              onClick={() => void handleDownload()}
             />
             <label className="cursor-pointer rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700">
               2. Choose Filled File
