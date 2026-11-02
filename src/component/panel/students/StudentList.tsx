@@ -22,10 +22,11 @@ import {
 } from "firebase/firestore";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
-import { Pencil, Trash2 } from "lucide-react";
+import { Eye, Pencil, Trash2 } from "lucide-react";
 
 import {
   ADD_STUDENT_PATH,
+  VIEW_STUDENT_PATH,
   CLASSES,
   COLLECTION,
   SECTIONS,
@@ -221,6 +222,9 @@ export default function StudentList() {
   const isAdmin = scope.kind === "all";
   // Add / edit / delete stay with the roles that may create students.
   const canManage = can(PERMISSIONS.STUDENT_CREATE);
+  // View / print the admission form; ON for teachers by default.
+  const canViewForm = can(PERMISSIONS.STUDENT_FORM_VIEW);
+  const showActions = canManage || canViewForm;
   const scopeReady = profileReady && user?.accessState === "ok";
 
   /** Class + section pairs the user may see; null = every class (admin). */
@@ -622,7 +626,7 @@ export default function StudentList() {
     </TableHead>
   );
 
-  const columnCount = canManage ? 9 : 8;
+  const columnCount = showActions ? 9 : 8;
   const noAccess = profileReady && user?.accessState !== "ok";
   const nothingAssigned = scopeReady && pairs !== null && pairs.length === 0;
 
@@ -781,7 +785,7 @@ export default function StudentList() {
 
               {sortableHeader("Phone", "phone")}
 
-              {canManage && (
+              {showActions && (
                 <TableHead className="text-center font-bold text-gray-700">
                   Actions
                 </TableHead>
@@ -837,37 +841,56 @@ export default function StudentList() {
 
                   <TableCell>{student.phone || "-"}</TableCell>
 
-                  {canManage && (
+                  {showActions && (
                     <TableCell>
                       <div className="flex justify-center gap-2">
-                        <UIButton
-                          type="button"
-                          size="icon"
-                          title="Edit"
-                          aria-label={`Edit ${student.studentName}`}
-                          onClick={() => {
-                            navigate(`${ADD_STUDENT_PATH}?edit=${student.id}`);
-                          }}
-                          className="h-8 w-8 bg-blue-600 text-white hover:bg-blue-700"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </UIButton>
+                        {canViewForm && (
+                          <UIButton
+                            type="button"
+                            size="icon"
+                            title="View"
+                            aria-label={`View ${student.studentName}`}
+                            onClick={() => {
+                              navigate(`${VIEW_STUDENT_PATH}?id=${student.id}`);
+                            }}
+                            className="h-8 w-8 bg-green-600 text-white hover:bg-green-700"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </UIButton>
+                        )}
 
-                        <UIButton
-                          type="button"
-                          size="icon"
-                          variant="destructive"
-                          title="Delete"
-                          aria-label={`Delete ${student.studentName}`}
-                          disabled={deletingId === student.id}
-                          onClick={() => {
-                            setStudentToDelete(student);
-                            setIsDeleteModalOpen(true);
-                          }}
-                          className="h-8 w-8 bg-red-600 text-white hover:bg-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </UIButton>
+                        {canManage && (
+                          <>
+                            <UIButton
+                              type="button"
+                              size="icon"
+                              title="Edit"
+                              aria-label={`Edit ${student.studentName}`}
+                              onClick={() => {
+                                navigate(`${ADD_STUDENT_PATH}?edit=${student.id}`);
+                              }}
+                              className="h-8 w-8 bg-blue-600 text-white hover:bg-blue-700"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </UIButton>
+
+                            <UIButton
+                              type="button"
+                              size="icon"
+                              variant="destructive"
+                              title="Delete"
+                              aria-label={`Delete ${student.studentName}`}
+                              disabled={deletingId === student.id}
+                              onClick={() => {
+                                setStudentToDelete(student);
+                                setIsDeleteModalOpen(true);
+                              }}
+                              className="h-8 w-8 bg-red-600 text-white hover:bg-red-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </UIButton>
+                          </>
+                        )}
                       </div>
                     </TableCell>
                   )}

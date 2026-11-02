@@ -62,6 +62,12 @@ export const TEACHER_PERMISSION_GROUPS: PermissionCatalogGroup[] = [
         description: "See the students of their own classes.",
       },
       {
+        permission: P.STUDENT_FORM_VIEW,
+        label: "View Admission Form",
+        description:
+          "Open and print the admission form of a student of their own classes.",
+      },
+      {
         permission: P.SUBJECT_MANAGE,
         label: "Subjects",
         description: "Add, edit and delete subjects of a class.",
@@ -163,4 +169,6 @@ export const TEACHER_CATALOG_PERMISSIONS: Permission[] =
  * earlier falls back to that permission's built-in default.
  */
 export const LEGACY_CATALOG_PERMISSIONS: Permission[] =
-  TEACHER_CATALOG_PERMISSIONS.filter((p) => p !== P.PROFILE_VIEW);
+  TEACHER_CATALOG_PERMISSIONS.filter(
+    (p) => p !== P.PROFILE_VIEW && p !== P.STUDENT_FORM_VIEW
+  );

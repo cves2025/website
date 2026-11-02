@@ -114,3 +114,5 @@ export const PHONE_PATTERN: RegExp = /^[0-9+\-\s()]*$/;
 
 // Routes
 export const ADD_STUDENT_PATH = "/welcome/student/add";
+/** View / print one student's admission form: `?id=<enrollmentId>`. */
+export const VIEW_STUDENT_PATH = "/welcome/student/view";

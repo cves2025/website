@@ -56,6 +56,11 @@ interface AdmissionBoxedInputProps<T extends FieldValues = FieldValues>
   align?: "left" | "center";
   /** When true, renders ONE single box/input instead of multiple per-character cells. */
   singleInputBox?: boolean;
+  /**
+   * From the `sm` width up, the cells share the full row width (like the
+   * printed form) instead of a fixed width each. Phones keep wrapping.
+   */
+  fillRow?: boolean;
 }
 
 /** Upper bound for the cell count when no maxLength is given. */
@@ -73,6 +78,7 @@ function AdmissionBoxedInput<T extends FieldValues = FieldValues>({
   inputClassName = "",
   align = "center",
   singleInputBox = false,
+  fillRow = false,
   maxLength,
   numeric = false,
   ...rest
@@ -146,17 +152,22 @@ function AdmissionBoxedInput<T extends FieldValues = FieldValues>({
               onBlur={field.onBlur}
               containerClassName={cn(
                 "flex-wrap gap-0 gap-y-2",
+                fillRow && "sm:flex-nowrap",
                 wrapperClassName || "w-full"
               )}
             >
               {/* Each cell is its own group so the strip can wrap onto a new row. */}
               {Array.from({ length: totalCells }, (_, i) => (
-                <InputOTPGroup key={i}>
+                <InputOTPGroup
+                  key={i}
+                  className={fillRow ? "sm:min-w-0 sm:flex-1" : undefined}
+                >
                   <InputOTPSlot
                     index={i}
                     className={cn(
                       cellHeightClassName,
                       "w-10 shrink-0 rounded-none border font-semibold text-slate-900 shadow-none ring-sky-500 first:rounded-none last:rounded-none",
+                      fillRow && "sm:w-full sm:shrink",
                       borderColor,
                       i !== 0 && "-ml-px",
                       align === "center" ? "justify-center" : "justify-start pl-2 pr-1",

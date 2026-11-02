@@ -4,6 +4,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   admin: Object.values(P),
   teacher: [
     P.STUDENT_READ,
+    P.STUDENT_FORM_VIEW,
     P.MARKS_ENTER,
     P.MARKS_VIEW,
     P.RESULT_VIEW,

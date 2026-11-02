@@ -4,6 +4,7 @@ export type Role = (typeof ROLES)[number];
 export const PERMISSIONS = {
   STUDENT_CREATE: "student.create",
   STUDENT_READ: "student.read",
+  STUDENT_FORM_VIEW: "student.formView",
   STUDENT_PROMOTE: "student.promote",
   SUBJECT_MANAGE: "subject.manage",
   TEACHER_CREATE: "teacher.create",

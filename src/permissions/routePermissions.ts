@@ -14,6 +14,7 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
 
   "/welcome/student/add": P.STUDENT_CREATE,
   "/welcome/student/list": P.STUDENT_READ,
+  "/welcome/student/view": P.STUDENT_FORM_VIEW,
   "/welcome/student/promote": P.STUDENT_PROMOTE,
   "/welcome/student/subject": P.SUBJECT_MANAGE,
 
