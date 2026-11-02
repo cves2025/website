@@ -53,6 +53,23 @@ const DOWNLOADS_PATH = "/welcome/settings/downloads";
 /** Page opened by the "Home Banner" item of the account menu. */
 const BANNER_PATH = "/welcome/settings/banner";
 
+/** Same breakpoint as Tailwind's `md:` (where the desktop sidebar starts). */
+const DESKTOP_QUERY = "(min-width: 768px)";
+
+/** True on desktop widths; follows window resizes. */
+function useIsDesktop(): boolean {
+  const [isDesktop, setIsDesktop] = useState(
+    () => window.matchMedia(DESKTOP_QUERY).matches
+  );
+  useEffect(() => {
+    const query = window.matchMedia(DESKTOP_QUERY);
+    const handleChange = () => setIsDesktop(query.matches);
+    query.addEventListener("change", handleChange);
+    return () => query.removeEventListener("change", handleChange);
+  }, []);
+  return isDesktop;
+}
+
 interface SidebarProps {
   open: boolean;
   onClose: () => void;
@@ -90,7 +107,10 @@ const [collapsed, setCollapsed] = useState(true);
 // While collapsed, hovering opens it (the page shrinks like a normal open);
 // leaving closes it again.
 const [hovering, setHovering] = useState(false);
-const isCollapsed = collapsed && !hovering;
+// Collapsing is a desktop-only idea: the mobile drawer always opens in full,
+// so its groups must expand instead of jumping to their first page.
+const isDesktop = useIsDesktop();
+const isCollapsed = isDesktop && collapsed && !hovering;
 const hoverTimer = useRef<number | null>(null);
 
   const clearHoverTimer = () => {
