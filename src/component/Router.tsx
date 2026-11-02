@@ -47,6 +47,9 @@ import DeskSlip from './panel/exams/desk-slip/DeskSlip'
 import RequireAccess from '../routes/RequireAccess'
 import RequireRoutePermission from '../routes/RequireRoutePermission'
 import GeneratedResultCards from './panel/exams/GeneratedResultCards'
+import MarkAttendance from './panel/attendance/MarkAttendance'
+import AttendanceReport from './panel/attendance/AttendanceReport'
+import HolidayCalendar from './panel/attendance/HolidayCalendar'
 
 function Router() {
   return (
@@ -74,6 +77,9 @@ function Router() {
           <Route path="student/view" element={<StudentView />} />
           <Route path="student/promote" element={<StudentPromote />} />
           <Route path="student/subject" element={<Subject />} />
+          <Route path="attendance/mark" element={<MarkAttendance />} />
+          <Route path="attendance/report" element={<AttendanceReport />} />
+          <Route path="attendance/holidays" element={<HolidayCalendar />} />
           <Route path="settings" element={<Settings />} />
           <Route path="settings/permissions" element={<Permissions />} />
           <Route path="settings/profile" element={<Profile />} />

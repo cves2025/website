@@ -380,3 +380,40 @@ export type SuggestedRemarksDoc = {
   remarksByExam?: SavedMap;
   dateByExam?: SavedDistributionMap;
 };
+// --------------------------- Attendance -------------------------------------
+
+/** P = Present, A = Absent, L = Leave (informed absence, counts as absent). */
+export type AttendanceStatus = "P" | "A" | "L";
+
+/** One `dailyAttendance` document: a whole section on one date. */
+export interface DailyAttendanceDoc {
+  session: string;
+  className: string;
+  section: string;
+  /** "yyyy-MM-dd" */
+  date: string;
+  /** studentId -> status. A student missing here was not on the list that day. */
+  records: Record<string, AttendanceStatus>;
+  markedBy: string;
+  markedByName: string;
+  updatedAt?: unknown;
+}
+
+export interface Holiday {
+  id: string;
+  name: string;
+  /** "yyyy-MM-dd", inclusive. */
+  from: string;
+  /** "yyyy-MM-dd", inclusive; equal to `from` for a one-day holiday. */
+  to: string;
+  /** Classes on holiday; empty = the whole school. */
+  classes: string[];
+}
+
+/** The `holidayCalendar/{session}` document. */
+export interface HolidayCalendar {
+  session: string;
+  /** Weekdays that are always off (0 = Sunday ... 6 = Saturday). */
+  weeklyOff: number[];
+  holidays: Holiday[];
+}

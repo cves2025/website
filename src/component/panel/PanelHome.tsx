@@ -6,6 +6,7 @@ import {
   FaClipboardList,
   FaFileAlt,
 } from "react-icons/fa";
+import AttendanceTodayCard from "./attendance/AttendanceTodayCard";
 
 const CARDS = [
   {
@@ -56,6 +57,8 @@ function PanelHome() {
           Select an option from the sidebar to continue.
         </p>
       </div>
+
+      <AttendanceTodayCard />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {CARDS.map((card) => (

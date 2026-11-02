@@ -5,6 +5,7 @@ import {
   FaChalkboardTeacher,
   FaAddressCard,
   FaClipboardList,
+  FaCalendarCheck,
 } from "react-icons/fa";
 
 export const BRAND = {
@@ -33,6 +34,16 @@ export const MENU: MenuItem[] = [
       { label: "Student List", path: "/welcome/student/list" },
       { label: "Promote Student", path: "/welcome/student/promote" },
       { label: "Subject", path: "/welcome/student/subject" },
+    ],
+  },
+  {
+    label: "Attendance",
+    icon: <FaCalendarCheck />,
+    accent: BRAND.blue,
+    subLinks: [
+      { label: "Mark Attendance", path: "/welcome/attendance/mark" },
+      { label: "Attendance Report", path: "/welcome/attendance/report" },
+      { label: "Holiday Calendar", path: "/welcome/attendance/holidays" },
     ],
   },
   {

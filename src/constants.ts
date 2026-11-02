@@ -11,6 +11,10 @@ export const COLLECTION = {
   MARKS: "marks",
   PANEL_SETTINGS: "panelSettings",
   ATTENDANCE: "attendance",
+  /** Daily attendance: one document per class + section + date. */
+  DAILY_ATTENDANCE: "dailyAttendance",
+  /** Holiday calendar of a session (weekly off + holidays), id = session. */
+  HOLIDAY_CALENDAR: "holidayCalendar",
   ROLL_NUMBER: "rollNumber",
   /** School news shown on the Home page, managed from Settings > News. */
   NEWS: "news",

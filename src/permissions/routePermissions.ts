@@ -38,6 +38,10 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   "/welcome/exam-settings": P.EXAM_SETTINGS,
   "/welcome/exam-settings/admit-card-template": P.EXAM_SETTINGS,
   "/welcome/exam-settings/result-template": P.EXAM_SETTINGS,
+
+  "/welcome/attendance/mark": P.ATTENDANCE_MARK,
+  "/welcome/attendance/report": P.ATTENDANCE_VIEW,
+  "/welcome/attendance/holidays": P.HOLIDAY_MANAGE,
 };
 
 const normalize = (path: string) =>

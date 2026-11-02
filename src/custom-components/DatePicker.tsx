@@ -19,6 +19,10 @@ interface DatePickerProps {
   disabled?: boolean;
   /** Classes for the trigger box. */
   className?: string;
+  /** Earliest selectable date, "yyyy-MM-dd". */
+  min?: string;
+  /** Latest selectable date, "yyyy-MM-dd". */
+  max?: string;
   "aria-invalid"?: boolean;
 }
 
@@ -52,10 +56,14 @@ function DatePicker({
   id,
   disabled,
   className,
+  min,
+  max,
   ...aria
 }: DatePickerProps) {
   const [open, setOpen] = useState(false);
   const selected = parseDate(value);
+  const minDate = min ? parseDate(min) : undefined;
+  const maxDate = max ? parseDate(max) : undefined;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -82,8 +90,15 @@ function DatePicker({
       >
         <Calendar
           mode="single"
+          // Always 6 week rows, so the height (and the prev / next buttons)
+          // stay put while moving between months.
+          fixedWeeks
           selected={selected}
-          defaultMonth={selected}
+          defaultMonth={selected ?? maxDate}
+          disabled={[
+            ...(minDate ? [{ before: minDate }] : []),
+            ...(maxDate ? [{ after: maxDate }] : []),
+          ]}
           onSelect={(date) => {
             onChange(date ? format(date, "yyyy-MM-dd") : "");
             setOpen(false);

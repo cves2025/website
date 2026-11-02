@@ -30,6 +30,9 @@ export const PERMISSIONS = {
   GALLERY_MANAGE: "gallery.manage",
   DOWNLOADS_MANAGE: "downloads.manage",
   BANNER_MANAGE: "banner.manage",
+  ATTENDANCE_MARK: "attendance.mark",
+  ATTENDANCE_VIEW: "attendance.view",
+  HOLIDAY_MANAGE: "holiday.manage",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

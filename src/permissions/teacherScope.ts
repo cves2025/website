@@ -83,3 +83,15 @@ export function isClassTeacherOf(
       String(a.classTeacherOf ?? "").trim() === String(className ?? "").trim()
   );
 }
+/** The (class, section) pairs a teacher is class teacher of. */
+export function classTeacherSections(
+  scope: AccessScope
+): { className: string; section: string }[] {
+  if (scope.kind !== "assigned") return [];
+  return scope.assignments
+    .filter((a) => a.isClassTeacher && String(a.classTeacherOf ?? "").trim())
+    .map((a) => ({
+      className: String(a.classTeacherOf).trim(),
+      section: a.section,
+    }));
+}

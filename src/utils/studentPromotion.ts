@@ -26,6 +26,7 @@ import {
   type LiveSubject,
 } from "./marksService";
 import { buildResultTable } from "./resultCardModel";
+import { fetchStudentDailyAttendanceRefs } from "./attendanceService";
 import { generateClassRollNumbers } from "./rollNumbers";
 import type { ExamDoc, ExamSheetDoc, MarksDoc } from "./type";
 
@@ -48,8 +49,8 @@ import type { ExamDoc, ExamSheetDoc, MarksDoc } from "./type";
  * for the last class and creates no new enrollment.
  *
  * Undo deletes the new enrollment together with every marks / attendance
- * document of the student in the new session, then marks the old enrollment
- * "active" again.
+ * document of the student in the new session, takes the student out of the
+ * new session's daily attendance, then marks the old enrollment "active" again.
  */
 
 /** Target-class value meaning "Passed Out / TC" (no new enrollment). */
@@ -657,6 +658,22 @@ export async function undoPromotions(
           : [];
       examDocs.forEach((reference) => writer.delete(reference));
       examDocsDeleted += examDocs.length;
+
+      // Daily attendance keeps a whole section in one document, so only the
+      // student's entry is removed from the new session's days.
+      if (target.exists() && typeof data.studentId === "string" && data.studentId) {
+        const dailyDocs = await fetchStudentDailyAttendanceRefs(
+          promotion.toAcademicYear,
+          String(target.data().className ?? ""),
+          String(target.data().section ?? ""),
+          data.studentId,
+        );
+        dailyDocs.forEach((reference) =>
+          writer.update(reference, {
+            [`records.${data.studentId}`]: deleteField(),
+          }),
+        );
+      }
 
       if (target.exists()) writer.delete(targetRef);
 

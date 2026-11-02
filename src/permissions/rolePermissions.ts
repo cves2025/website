@@ -9,6 +9,9 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     P.MARKS_VIEW,
     P.RESULT_VIEW,
     P.PROFILE_VIEW,
+    // ON for every teacher; the Mark page still only offers the sections
+    // the teacher is class teacher of.
+    P.ATTENDANCE_MARK,
   ],
   student: [P.ADMITCARD_VIEW, P.RESULT_VIEW, P.SETTINGS_ACCESS],
   parent: [P.ADMITCARD_VIEW, P.RESULT_VIEW, P.SETTINGS_ACCESS],
@@ -18,6 +21,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
 export const CLASS_TEACHER_BONUS: Permission[] = [
   P.ADMITCARD_VIEW,
   P.CROSSLIST_VIEW,
+  P.ATTENDANCE_VIEW,
 ];
 
 /**

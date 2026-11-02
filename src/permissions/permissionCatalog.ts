@@ -75,6 +75,29 @@ export const TEACHER_PERMISSION_GROUPS: PermissionCatalogGroup[] = [
     ],
   },
   {
+    label: "Attendance",
+    items: [
+      {
+        permission: P.ATTENDANCE_MARK,
+        label: "Mark Attendance",
+        description:
+          "Mark today's attendance of the section they are class teacher of.",
+      },
+      {
+        permission: P.ATTENDANCE_VIEW,
+        label: "Attendance Report",
+        description:
+          "See the monthly attendance of the section they are class teacher of.",
+      },
+      {
+        permission: P.HOLIDAY_MANAGE,
+        label: "Holiday Calendar",
+        description:
+          "Set the weekly off days and add, edit and delete the holidays of the school.",
+      },
+    ],
+  },
+  {
     label: "Teacher",
     items: [
       {
