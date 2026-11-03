@@ -22,6 +22,8 @@ export interface SelectDropdownOption {
   value: string;
   /** Extra text the search box also matches (only used when `searchable`). */
   keywords?: string;
+  /** Shown but not selectable (plain dropdown only). */
+  disabled?: boolean;
 }
 
 interface SelectDropdownProps {
@@ -308,6 +310,7 @@ const SelectDropdown = forwardRef<HTMLButtonElement, SelectDropdownProps>(
             <SelectItem
               key={opt.value}
               value={toSelectValue(opt.value)}
+              disabled={opt.disabled}
               className="cursor-pointer focus:bg-primaryPink focus:text-white data-[state=checked]:bg-primaryPink data-[state=checked]:font-semibold data-[state=checked]:text-white"
             >
               {opt.label}

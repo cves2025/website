@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   doc,
   DocumentData,
@@ -8,9 +8,9 @@ import {
 } from "firebase/firestore";
 import {
   Control,
+  Controller,
   FieldPath,
   FieldValues,
-  RegisterOptions,
   SubmitHandler,
   useController,
   useForm,
@@ -21,10 +21,10 @@ import { FaEdit, FaTrash } from "react-icons/fa";
 import { API_BASE_URL, authHeaders } from "../../context/api";
 import {
   CLASSES,
+  CLASS_OPTIONS,
   COLLECTION,
   EMAIL_PATTERN,
   GENDER_OPTIONS,
-  PHONE_PATTERN,
   TEACHER_DESIGNATIONS,
   TEACHER_STATUS,
 } from "../../../constants";
@@ -33,6 +33,9 @@ import CustomButton from "../../../custom-components/CustomButton";
 import CustomInput from "../../../custom-components/CustomInput";
 import CustomSelect from "../../../custom-components/CustomSelect";
 import CustomTextarea from "../../../custom-components/CustomTextarea";
+import DatePicker, { INVALID_DATE } from "../../../custom-components/DatePicker";
+import SelectDropdown from "../../../custom-components/SelectDropdown";
+import { Switch } from "@/components/ui/switch";
 import FormMessage from "../../../custom-components/FormMessage";
 import Modal from "../../../custom-components/Modal";
 import PageHeader from "../../../custom-components/PageHeader";
@@ -52,6 +55,22 @@ import type {
 } from "../../../utils/type";
 import { toDateOrNull } from "../../../utils/toDateOrNull";
 import {
+  INDIAN_MOBILE_PATTERN,
+  assignmentOwners,
+  classTeacherKey,
+  emailConflict,
+  findAssignmentConflict,
+  subjectAssignmentKey,
+  type AssignmentOwners,
+  employeeIdConflict,
+  loadUserIdentities,
+  nextEmployeeId,
+  normalizeEmail,
+  normalizeEmployeeId,
+  toMobileDigits,
+  type UserIdentity,
+} from "../../../utils/teacherIdentity";
+import {
   TEACHER_SECTIONS,
   createEmptySectionAssignment,
   createEmptySectionAssignments,
@@ -68,6 +87,9 @@ const CLASS_CHOICES: SearchableOption[] = CLASSES.map((className) => ({
   value: className,
   label: toClassLabel(className),
 }));
+
+/** A Subject Teacher only teaches subjects; only a Class Teacher can be a class teacher. */
+const SUBJECT_TEACHER = "Subject Teacher";
 
 const EMPTY_TEACHER: TeacherFormValues = {
   firstName: "",
@@ -107,7 +129,7 @@ function teacherDocToForm(
     designation: stringField("designation"),
     status: stringField("status") || "Active",
     email: stringField("email"),
-    phone: stringField("phone"),
+    phone: toMobileDigits(stringField("phone")),
     joiningDate: toDateOrNull(data.joiningDate),
     address: stringField("address"),
     photo: stringField("photo"),
@@ -121,15 +143,27 @@ function teacherDocToForm(
   };
 }
 
+/** Subjects of a class; ones another teacher holds in this section are locked. */
 function toSubjectChoices(
   subjects: TeacherSubjectOption[],
-  selected: string[]
+  selected: string[],
+  ownerOf: (subject: string) => string | undefined
 ): SearchableOption[] {
-  const choices: SearchableOption[] = subjects.map((subject) => ({
-    value: subject.name,
-    label: subject.name,
-    hint: subject.type,
-  }));
+  const choices: SearchableOption[] = subjects.map((subject) => {
+    const owner = ownerOf(subject.name);
+    const isSelected = selected.includes(subject.name);
+    return {
+      value: subject.name,
+      label: subject.name,
+      hint: owner
+        ? isSelected
+          ? `Also with ${owner}`
+          : `Assigned to ${owner}`
+        : subject.type,
+      // A selected one stays clickable so it can still be removed.
+      disabled: Boolean(owner) && !isSelected,
+    };
+  });
 
   selected.forEach((name) => {
     if (choices.some((choice) => choice.value === name)) return;
@@ -140,7 +174,7 @@ function toSubjectChoices(
 }
 
 function toDateInputValue(value: Date | null): string {
-  if (!value) return "";
+  if (!value || Number.isNaN(value.getTime())) return "";
   const year = value.getFullYear();
   const month = String(value.getMonth() + 1).padStart(2, "0");
   const day = String(value.getDate()).padStart(2, "0");
@@ -148,6 +182,9 @@ function toDateInputValue(value: Date | null): string {
 }
 
 function toDateValue(value: string): Date | null {
+  // Typed text that is not a date yet: kept as an Invalid Date so the
+  // field shows an error instead of silently dropping it.
+  if (value === INVALID_DATE) return new Date(Number.NaN);
   const parts = value.split("-").map(Number);
   if (parts.length !== 3 || parts.some((part) => Number.isNaN(part))) {
     return null;
@@ -156,33 +193,47 @@ function toDateValue(value: string): Date | null {
   return new Date(year, month - 1, day);
 }
 
+const isInvalidDate = (value: unknown) =>
+  value instanceof Date && Number.isNaN(value.getTime());
+
 interface DateInputProps<T extends FieldValues = FieldValues> {
   control: Control<T>;
   name: FieldPath<T>;
   label?: string;
   required?: boolean;
-  rules?: RegisterOptions<T, FieldPath<T>>;
+  /** Earliest / latest allowed date, "yyyy-MM-dd". */
+  min?: string;
+  max?: string;
   wrapperClassName?: string;
 }
 
+/** shadcn calendar with month / year dropdowns, or type DD/MM/YYYY. */
 function DateInput<T extends FieldValues = FieldValues>({
   control,
   name,
   label,
   required = false,
-  rules = {},
+  min,
+  max,
   wrapperClassName = "",
 }: DateInputProps<T>) {
   const { field, fieldState } = useController<T, FieldPath<T>>({
     control,
     name,
-    rules,
+    rules: {
+      validate: (value: unknown) =>
+        isInvalidDate(value)
+          ? "Enter a valid date as DD/MM/YYYY."
+          : !required || value instanceof Date || `${label ?? "Date"} is required.`,
+    },
   });
 
   const value = field.value as Date | null;
-  const current = value instanceof Date ? toDateInputValue(value) : "";
-  const invalid = Boolean(fieldState.error);
-  const isRequired = required || Boolean(rules.required);
+  const current = isInvalidDate(value)
+    ? INVALID_DATE
+    : value instanceof Date
+      ? toDateInputValue(value)
+      : "";
 
   return (
     <div className={`flex w-full flex-col gap-1.5 ${wrapperClassName}`}>
@@ -192,29 +243,36 @@ function DateInput<T extends FieldValues = FieldValues>({
           className="block text-sm font-semibold text-gray-700"
         >
           {label}
-          {isRequired && <span className="ml-0.5 text-red-500">*</span>}
+          {required && <span className="ml-0.5 text-red-500">*</span>}
         </label>
       )}
-      <input
+      <DatePicker
         id={name}
-        type="date"
-        ref={field.ref}
+        typeable
+        yearDropdown
         value={current}
-        aria-invalid={invalid}
-        onChange={(event) => field.onChange(toDateValue(event.target.value))}
-        className={`w-full rounded-md border bg-white px-3 py-2 text-sm text-gray-800 shadow-sm transition-colors focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-100 ${
-          invalid
-            ? "border-red-400 focus:border-red-500 focus:ring-red-500/40"
-            : "border-gray-300 focus:border-blue-500 focus:ring-blue-500/50"
-        }`}
+        min={min}
+        max={max}
+        onChange={(next) => field.onChange(toDateValue(next))}
+        onBlur={field.onBlur}
+        aria-invalid={Boolean(fieldState.error)}
       />
-      {fieldState.error && (
+      {fieldState.error ? (
         <p className="text-xs font-medium text-red-600">
           {fieldState.error.message}
         </p>
+      ) : (
+        <p className="text-xs text-gray-500">Type DD/MM/YYYY or pick from the calendar.</p>
       )}
     </div>
   );
+}
+
+/** "yyyy-MM-dd" of today moved by whole years (date limits of the pickers). */
+function yearsFromToday(years: number): string {
+  const date = new Date();
+  date.setFullYear(date.getFullYear() + years);
+  return toDateInputValue(date);
 }
 
 interface SectionAssignmentCardProps {
@@ -222,6 +280,10 @@ interface SectionAssignmentCardProps {
   assignment: TeacherSectionAssignment;
   subjectsOfClass: (className: string) => TeacherSubjectOption[];
   loadingSubjects: boolean;
+  /** Class / subject assignments of the other teachers. */
+  owners: AssignmentOwners;
+  /** False for a Subject Teacher. */
+  canBeClassTeacher: boolean;
   onToggleClassTeacher: (active: boolean) => void;
   onClassTeacherClassChange: (className: string) => void;
   onClassesChange: (classNames: string[]) => void;
@@ -234,6 +296,8 @@ function SectionAssignmentCard({
   assignment,
   subjectsOfClass,
   loadingSubjects,
+  owners,
+  canBeClassTeacher,
   onToggleClassTeacher,
   onClassTeacherClassChange,
   onClassesChange,
@@ -241,6 +305,28 @@ function SectionAssignmentCard({
   onReset,
 }: SectionAssignmentCardProps) {
   const selectedClasses = assignment.classes.map((entry) => entry.className);
+  const subjectOwner = (className: string, subject: string) =>
+    owners.subject.get(subjectAssignmentKey(section, className, subject));
+
+  // A class already taken by another class teacher of this section is locked.
+  const classTeacherChoices = CLASS_OPTIONS.map((option) => {
+    const owner = owners.classTeacher.get(classTeacherKey(section, option.value));
+    return owner && option.value !== assignment.classTeacherOf
+      ? { ...option, label: `${option.label} - ${owner}`, disabled: true }
+      : option;
+  });
+  const classTeacherOwner = assignment.classTeacherOf
+    ? owners.classTeacher.get(classTeacherKey(section, assignment.classTeacherOf))
+    : undefined;
+
+  // Classes whose every subject is taken in this section are only marked.
+  const classChoices = CLASS_CHOICES.map((option) => {
+    const subjects = subjectsOfClass(option.value);
+    const allTaken =
+      subjects.length > 0 &&
+      subjects.every((subject) => subjectOwner(option.value, subject.name));
+    return allTaken ? { ...option, hint: "All subjects assigned" } : option;
+  });
   const teachingCount = assignment.classes.reduce(
     (total, entry) => total + entry.subjects.length,
     0
@@ -271,22 +357,14 @@ function SectionAssignmentCard({
           <span className="block text-sm font-semibold text-gray-700">
             Class Teacher of Section {section}
           </span>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={assignment.isClassTeacher}
-              onClick={() => onToggleClassTeacher(!assignment.isClassTeacher)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                assignment.isClassTeacher ? "bg-blue-600" : "bg-gray-300"
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-                  assignment.isClassTeacher ? "translate-x-6" : "translate-x-1"
-                }`}
-              />
-            </button>
+          <div className="flex items-center gap-3 py-2">
+            <Switch
+              checked={assignment.isClassTeacher}
+              onCheckedChange={onToggleClassTeacher}
+              // Turning it off is always allowed.
+              disabled={!canBeClassTeacher && !assignment.isClassTeacher}
+              aria-label={`Class Teacher of Section ${section}`}
+            />
             <span
               className={`text-sm font-semibold ${
                 assignment.isClassTeacher ? "text-green-700" : "text-gray-600"
@@ -295,6 +373,17 @@ function SectionAssignmentCard({
               {assignment.isClassTeacher ? "Yes" : "No"}
             </span>
           </div>
+          {!canBeClassTeacher && (
+            <p
+              className={`text-xs font-medium ${
+                assignment.isClassTeacher ? "text-red-600" : "text-gray-500"
+              }`}
+            >
+              {assignment.isClassTeacher
+                ? "A Subject Teacher cannot be a class teacher. Turn this off or change the designation."
+                : "Only a Class Teacher can be the class teacher of a class."}
+            </p>
+          )}
         </div>
 
         <div className="flex w-full flex-col gap-1.5">
@@ -302,31 +391,30 @@ function SectionAssignmentCard({
             htmlFor={`section-${section}-class-teacher-class`}
             className="block text-sm font-semibold text-gray-700"
           >
-            Class Teacher Class
+            Class
+            {assignment.isClassTeacher && (
+              <span className="ml-0.5 text-red-500">*</span>
+            )}
           </label>
-          <select
+          <SelectDropdown
             id={`section-${section}-class-teacher-class`}
             value={assignment.classTeacherOf}
             disabled={!assignment.isClassTeacher}
-            onChange={(event) => onClassTeacherClassChange(event.target.value)}
-            className={`w-full rounded-md border bg-white px-3 py-2 text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-100 ${
-              assignment.isClassTeacher
-                ? "border-gray-300 text-gray-800 focus:border-blue-500 focus:ring-blue-500/50"
-                : "border-gray-300 text-gray-400"
-            }`}
-          >
-            <option value="">Select class</option>
-            {CLASSES.map((className) => (
-              <option key={className} value={className}>
-                {toClassLabel(className)}
-              </option>
-            ))}
-          </select>
+            onValueChange={onClassTeacherClassChange}
+            placeholder="Select class"
+            options={classTeacherChoices}
+            aria-invalid={Boolean(classTeacherOwner)}
+          />
+          {classTeacherOwner && (
+            <p className="text-xs font-medium text-red-600">
+              {classTeacherOwner} is already the class teacher of this class.
+            </p>
+          )}
         </div>
 
         <SearchableMultiSelect
           id={`section-${section}-classes`}
-          options={CLASS_CHOICES}
+          options={classChoices}
           values={selectedClasses}
           onChange={onClassesChange}
           label={`Classes Taught in Section ${section}`}
@@ -375,7 +463,8 @@ function SectionAssignmentCard({
                   id={`section-${section}-class-${entry.className}-subjects`}
                   options={toSubjectChoices(
                     subjectsOfClass(entry.className),
-                    entry.subjects
+                    entry.subjects,
+                    (subject) => subjectOwner(entry.className, subject)
                   )}
                   values={entry.subjects}
                   onChange={(values) =>
@@ -426,7 +515,13 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
     setValue,
     watch,
     formState: { isSubmitting, isDirty },
-  } = useForm<TeacherFormValues>({ defaultValues: EMPTY_TEACHER });
+    setError,
+    getValues,
+  } = useForm<TeacherFormValues>({
+    defaultValues: EMPTY_TEACHER,
+    // Duplicate employee ID / email are checked as soon as a field is left.
+    mode: "onTouched",
+  });
 
   const photoUrl = watch("photo");
   const [activeSection, setActiveSection] = useState(TEACHER_SECTIONS[0]);
@@ -439,7 +534,33 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
   const [movedFromLegacy, setMovedFromLegacy] = useState(false);
   const { subjectsOfClass, loadingSubjects } = useClassSubjects();
 
+  useEffect(() => {
+    let cancelled = false;
+    loadUserIdentities()
+      .then((users) => {
+        if (cancelled) return;
+        setIdentities(users);
+        // A new teacher gets the next free employee ID (still editable).
+        if (!initialEditId && getValues("employeeId") === "") {
+          setValue("employeeId", nextEmployeeId(users));
+        }
+      })
+      .catch((loadError) => {
+        console.error("Failed to load teacher IDs:", loadError);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [initialEditId]);
+
+  // Every user (deleted too) for the employee ID / email / assignment checks.
+  const [identities, setIdentities] = useState<UserIdentity[] | null>(null);
   const isFormDirty = isDirty || photoFile !== null || photoRemoved;
+  const canBeClassTeacher = watch("designation") !== SUBJECT_TEACHER;
+  const owners = useMemo(
+    () => assignmentOwners(identities ?? [], initialEditId),
+    [identities, initialEditId]
+  );
 
   const activeAssignment =
     sectionAssignments.find((item) => item.section === activeSection) ??
@@ -544,7 +665,10 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
   };
 
   const handleReset = () => {
-    reset(EMPTY_TEACHER);
+    reset({
+      ...EMPTY_TEACHER,
+      employeeId: identities ? nextEmployeeId(identities) : "",
+    });
     setSectionAssignments(createEmptySectionAssignments());
     setPhotoFile(null);
     setPhotoRemoved(false);
@@ -567,8 +691,46 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
       );
       return;
     }
+    const classTeacherSection = sectionPayload.find((item) => item.isClassTeacher);
+    if (data.designation === SUBJECT_TEACHER && classTeacherSection) {
+      setActiveSection(classTeacherSection.section);
+      setSubmitError(
+        `A Subject Teacher cannot be a class teacher. Turn off "Class Teacher of Section ${classTeacherSection.section}" or change the designation to Class Teacher.`
+      );
+      return;
+    }
 
     const legacyFields = toLegacyTeacherFields(sectionPayload);
+
+    // Checked again on fresh data: another admin may have saved meanwhile.
+    let freshUsers: UserIdentity[];
+    try {
+      freshUsers = await loadUserIdentities();
+      setIdentities(freshUsers);
+    } catch (checkError) {
+      console.error("Failed to check teacher IDs:", checkError);
+      setSubmitError("Could not check the employee ID. Please try again.");
+      return;
+    }
+    const idTaken = employeeIdConflict(freshUsers, data.employeeId, initialEditId);
+    const emailTaken = initialEditId
+      ? null
+      : emailConflict(freshUsers, data.email, null);
+    if (idTaken) setError("employeeId", { message: idTaken }, { shouldFocus: true });
+    if (emailTaken) setError("email", { message: emailTaken }, { shouldFocus: !idTaken });
+    if (idTaken || emailTaken) return;
+
+    const assignmentTaken = findAssignmentConflict(
+      sectionPayload,
+      assignmentOwners(freshUsers, initialEditId)
+    );
+    if (assignmentTaken) {
+      setActiveSection(assignmentTaken.section);
+      setSubmitError(
+        `${assignmentTaken.message} Remove it from that teacher first.`
+      );
+      return;
+    }
 
     try {
       let photo = data.photo;
@@ -583,11 +745,11 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
         lastName: data.lastName.trim(),
         gender: data.gender,
         dateOfBirth: toDateInputValue(data.dateOfBirth),
-        employeeId: data.employeeId.trim(),
+        employeeId: normalizeEmployeeId(data.employeeId),
         designation: data.designation,
         status: data.status || "Active",
-        email: data.email.trim(),
-        phone: data.phone.trim(),
+        email: initialEditId ? data.email.trim() : normalizeEmail(data.email),
+        phone: toMobileDigits(data.phone),
         joiningDate: toDateInputValue(data.joiningDate),
         address: data.address.trim(),
         photo,
@@ -660,7 +822,20 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
             control={control}
             name="employeeId"
             label="Employee ID"
-            placeholder="e.g. EMP-2026-001"
+            required
+            placeholder={identities ? "e.g. CVES-T-001" : "Loading next ID..."}
+            // Saved in capitals (normalizeEmployeeId); shown that way while typing.
+            className="uppercase placeholder:normal-case"
+            rules={{
+              validate: (value) => {
+                if (String(value).trim() === "") return "Employee ID is required.";
+                return (
+                  (identities &&
+                    employeeIdConflict(identities, String(value), initialEditId)) ||
+                  true
+                );
+              },
+            }}
           />
           <CustomSelect
             control={control}
@@ -694,12 +869,23 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
             type="email"
             required
             placeholder="Email address"
+            // The email is the login ID, so it is fixed after the account is created.
+            disabled={Boolean(initialEditId)}
+            title={
+              initialEditId
+                ? "The email is the login ID and cannot be changed here."
+                : undefined
+            }
             rules={{
               required: "Email is required.",
               pattern: {
                 value: EMAIL_PATTERN,
                 message: "Enter a valid email address.",
               },
+              validate: (value) =>
+                initialEditId || !identities
+                  ? true
+                  : emailConflict(identities, String(value), null) || true,
             }}
           />
           {!initialEditId && (
@@ -719,28 +905,70 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
               }}
             />
           )}
-          <CustomInput
+          <Controller
             control={control}
             name="phone"
-            label="Phone Number"
-            type="tel"
-            placeholder="Mobile number"
             rules={{
-              pattern: {
-                value: PHONE_PATTERN,
-                message: "Phone can contain only digits, spaces, + or -",
-              },
+              validate: (value) =>
+                value === "" ||
+                INDIAN_MOBILE_PATTERN.test(value) ||
+                "Enter a valid 10 digit mobile number (starting with 6-9).",
             }}
+            render={({ field, fieldState }) => (
+              <div className="flex w-full flex-col gap-1.5">
+                <label
+                  htmlFor="phone"
+                  className="block text-sm font-semibold text-gray-700"
+                >
+                  Phone Number
+                </label>
+                <div
+                  className={`flex w-full overflow-hidden rounded-md border bg-white shadow-sm transition-colors focus-within:ring-2 ${
+                    fieldState.error
+                      ? "border-red-400 focus-within:border-red-500 focus-within:ring-red-500/40"
+                      : "border-gray-300 focus-within:border-blue-500 focus-within:ring-blue-500/50"
+                  }`}
+                >
+                  <span className="flex items-center border-r border-gray-300 bg-gray-50 px-3 text-sm font-semibold text-gray-600">
+                    +91
+                  </span>
+                  <input
+                    id="phone"
+                    ref={field.ref}
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    placeholder="10 digit mobile number"
+                    value={field.value}
+                    onChange={(event) =>
+                      field.onChange(toMobileDigits(event.target.value).slice(0, 10))
+                    }
+                    onBlur={field.onBlur}
+                    aria-invalid={Boolean(fieldState.error)}
+                    className="min-w-0 flex-1 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none"
+                  />
+                </div>
+                {fieldState.error && (
+                  <p className="text-xs font-medium text-red-600">
+                    {fieldState.error.message}
+                  </p>
+                )}
+              </div>
+            )}
           />
           <DateInput
             control={control}
             name="dateOfBirth"
             label="Date of Birth"
+            min="1940-01-01"
+            max={yearsFromToday(-18)}
           />
           <DateInput
             control={control}
             name="joiningDate"
             label="Joining Date"
+            min="1980-01-01"
+            max={yearsFromToday(1)}
           />
           <CustomInput
             control={control}
@@ -806,6 +1034,8 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
               assignment={activeAssignment}
               subjectsOfClass={subjectsOfClass}
               loadingSubjects={loadingSubjects}
+              owners={owners}
+              canBeClassTeacher={canBeClassTeacher}
               onToggleClassTeacher={(active) =>
                 handleToggleClassTeacher(activeSection, active)
               }
