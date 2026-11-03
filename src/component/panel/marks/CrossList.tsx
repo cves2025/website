@@ -1169,10 +1169,11 @@ function CrossListBlock({
       )}
 
       {/* A real scroll box (height capped) so the sticky header has something to
-          stick to - an overflow-x-only wrapper would swallow position: sticky. */}
+          stick to - an overflow-x-only wrapper would swallow position: sticky.
+          `isolate` keeps the sticky z-index below the mobile sidebar. */}
       <Table
         className="min-w-[900px] cross-list-register print:min-w-0"
-        containerClassName="max-h-[75vh] print:max-h-none print:overflow-visible"
+        containerClassName="isolate max-h-[75vh] print:max-h-none print:overflow-visible"
       >
         <TableHeader className="sticky top-0 z-30 print:static">
           <TableRow className="bg-primaryBlue text-white hover:bg-primaryBlue">

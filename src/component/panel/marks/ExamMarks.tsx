@@ -1304,9 +1304,10 @@ function ExamMarks() {
           </div>
         ) : (
           <div className="mt-4">
-            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div className="isolate overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
               {/* The table scrolls inside its own box so the header row and the
-                  # / Student Name columns can stay stuck while scrolling. */}
+                  # / Student Name columns can stay stuck while scrolling.
+                  `isolate` keeps their z-index below the mobile sidebar. */}
               <Table
                 className="min-w-[980px]"
                 containerClassName="max-h-[65vh]"
