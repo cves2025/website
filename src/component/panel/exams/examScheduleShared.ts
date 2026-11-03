@@ -94,7 +94,8 @@ export function toSubjectOptions(
   docs.forEach((documentSnapshot) => {
     const data = documentSnapshot.data();
     const name = typeof data.name === "string" ? data.name.trim() : "";
-    if (!name) return;
+    // Archived subjects are not offered for new exam schedules.
+    if (!name || data.archived === true) return;
 
     const className =
       typeof data.className === "string" ? data.className.trim() : "";
@@ -561,7 +562,7 @@ export function useSubjectOptions(): {
           const className =
             typeof data.className === "string" ? data.className.trim() : "";
           const type = typeof data.type === "string" ? data.type : "";
-          if (!name || !className || !type) return;
+          if (!name || !className || !type || data.archived === true) return;
           const key = `${name.toLowerCase()}::${type.toLowerCase()}`;
           const classes = classesByType.get(key) ?? [];
           if (!classes.includes(className)) classes.push(className);

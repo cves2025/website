@@ -36,7 +36,7 @@ export function useClassSubjects(): UseClassSubjectsResult {
           const className =
             typeof data.className === "string" ? data.className.trim() : "";
           const name = typeof data.name === "string" ? data.name.trim() : "";
-          if (!className || !name) return;
+          if (!className || !name || data.archived === true) return;
 
           const key = `${className.toLowerCase()}::${name.toLowerCase()}`;
           if (seen.has(key)) return;

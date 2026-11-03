@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import {
   collection,
@@ -11,6 +11,7 @@ import {
   query,
   QueryDocumentSnapshot,
   serverTimestamp,
+  updateDoc,
   where,
   writeBatch,
 } from "firebase/firestore";
@@ -24,9 +25,10 @@ import SearchableMultiSelect, {
 } from "../../../custom-components/SearchableMultiSelect";
 import { CLASSES, COLLECTION } from "../../../constants";
 import { db } from "../../../firebase/config";
+import { isSubjectInUse } from "../../../utils/marksService";
 import PageHeader from "../../../custom-components/PageHeader";
 import Button from "../../../custom-components/Button";
-import { Pencil, Trash2 } from "lucide-react";
+import { ArchiveRestore, Pencil, Trash2 } from "lucide-react";
 import { Button as UIButton } from "@/components/ui/button";
 import {
   Table,
@@ -78,6 +80,8 @@ interface SubjectDoc {
   displayInAdmitCard?: boolean;
   displayInMarksEntry?: boolean;
   displayInReportCard?: boolean;
+  /** Archived subjects keep old results but are left out of new exams. */
+  archived?: boolean;
 }
 
 interface SubjectFormValues {
@@ -131,6 +135,7 @@ const toSubjectDoc = (
     displayInAdmitCard: data.displayInAdmitCard === true,
     displayInMarksEntry: data.displayInMarksEntry === true,
     displayInReportCard: data.displayInReportCard !== false,
+    archived: data.archived === true,
   };
 };
 
@@ -163,6 +168,7 @@ const subjectNameKey = (value: string) =>
  *    subjects that are both shown in Marks Entry;
  *  - Report Card Order clashes only between two subjects that are both shown
  *    in the Report Card.
+ * An archived subject still blocks its Name + Type, but frees its orders.
  * `ignoreId` is the subject being edited - its old values never conflict with
  * its new ones.
  */
@@ -192,7 +198,9 @@ function findSubjectConflicts(
     );
     if (sameName) {
       conflicts.name.push(
-        `${label} already has "${sameName.name}" (${sameName.type}).`,
+        sameName.archived
+          ? `${label} already has "${sameName.name}" (${sameName.type}) archived - restore it instead.`
+          : `${label} already has "${sameName.name}" (${sameName.type}).`,
       );
     }
 
@@ -200,6 +208,7 @@ function findSubjectConflicts(
       draft.displayInMarksEntry && draft.order !== undefined
       ? others.find(
           (subject) =>
+            !subject.archived &&
             subject.displayInMarksEntry === true &&
             subject.order === draft.order,
         )
@@ -213,6 +222,7 @@ function findSubjectConflicts(
     if (draft.displayInReportCard && draft.reportCardOrder !== undefined) {
       const sameReportOrder = others.find(
         (subject) =>
+          !subject.archived &&
           subject.displayInReportCard !== false &&
           subject.reportCardOrder === draft.reportCardOrder,
       );
@@ -293,6 +303,11 @@ function Subject() {
     null,
   );
   const [deleting, setDeleting] = useState(false);
+  /* Whether the subject in the delete modal has marks / exam sheets
+     (null while checking). A used subject is archived instead of deleted. */
+  const [deleteInUse, setDeleteInUse] = useState<boolean | null>(null);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const deleteCheckIdRef = useRef<string | null>(null);
 
   /* Real-time listener: keeps the subject list in sync with Firestore. */
   useEffect(() => {
@@ -307,7 +322,7 @@ function Subject() {
       subjectsQuery,
       (snapshot) => {
         // Sorted here: orderBy("order") would drop the subjects without an
-        // order. Those are listed last.
+        // order. Those are listed last, archived subjects after them.
         setSubjects(
           snapshot.docs
             .map((documentSnapshot) =>
@@ -315,6 +330,7 @@ function Subject() {
             )
             .sort(
               (a, b) =>
+                Number(a.archived === true) - Number(b.archived === true) ||
                 (a.order ?? Number.MAX_SAFE_INTEGER) -
                   (b.order ?? Number.MAX_SAFE_INTEGER) ||
                 a.name.localeCompare(b.name),
@@ -581,21 +597,78 @@ function Subject() {
 
   const handleDeleteClick = (subject: SubjectDoc) => {
     setSubjectToDelete(subject);
+    setDeleteInUse(null);
+    deleteCheckIdRef.current = subject.id;
+    void isSubjectInUse(subject.id, subject.className).then((inUse) => {
+      if (deleteCheckIdRef.current === subject.id) setDeleteInUse(inUse);
+    });
   };
 
+  /* A subject with saved marks is archived (old results keep it); only an
+     unused subject is deleted permanently. */
   const handleConfirmDelete = async () => {
-    if (!subjectToDelete) return;
+    if (!subjectToDelete || deleteInUse === null) return;
+    const archive = deleteInUse && !subjectToDelete.archived;
 
     setDeleting(true);
     try {
-      await deleteDoc(doc(db, COLLECTION.SUBJECTS, subjectToDelete.id));
-      toast.success(`"${subjectToDelete.name}" deleted.`);
+      if (archive) {
+        await updateDoc(doc(db, COLLECTION.SUBJECTS, subjectToDelete.id), {
+          archived: true,
+          updatedAt: serverTimestamp(),
+        });
+        toast.success(`"${subjectToDelete.name}" archived.`);
+      } else if (!deleteInUse) {
+        await deleteDoc(doc(db, COLLECTION.SUBJECTS, subjectToDelete.id));
+        toast.success(`"${subjectToDelete.name}" deleted.`);
+      }
       setSubjectToDelete(null);
     } catch (error) {
       console.error("Failed to delete subject:", error);
-      toast.error("Failed to delete subject. Please try again.");
+      toast.error(
+        archive
+          ? "Failed to archive subject. Please try again."
+          : "Failed to delete subject. Please try again.",
+      );
     } finally {
       setDeleting(false);
+    }
+  };
+
+  /* Restores an archived subject unless its orders are now used by another
+     subject of the class. */
+  const handleRestore = async (subject: SubjectDoc) => {
+    const conflicts = findSubjectConflicts(
+      {
+        name: subject.name,
+        type: subject.type,
+        order: subject.order,
+        reportCardOrder: subject.reportCardOrder,
+        displayInMarksEntry: subject.displayInMarksEntry === true,
+        displayInReportCard: subject.displayInReportCard !== false,
+      },
+      [subject.className],
+      new Map([[subject.className, subjects]]),
+      subject.id,
+    );
+    const messages = [...conflicts.order, ...conflicts.reportCardOrder];
+    if (messages.length > 0) {
+      toast.error(`${messages[0]} Change the order before restoring.`);
+      return;
+    }
+
+    setRestoringId(subject.id);
+    try {
+      await updateDoc(doc(db, COLLECTION.SUBJECTS, subject.id), {
+        archived: deleteField(),
+        updatedAt: serverTimestamp(),
+      });
+      toast.success(`"${subject.name}" restored.`);
+    } catch (error) {
+      console.error("Failed to restore subject:", error);
+      toast.error("Failed to restore subject. Please try again.");
+    } finally {
+      setRestoringId(null);
     }
   };
 
@@ -693,10 +766,21 @@ function Subject() {
             </TableHeader>
             <TableBody>
               {subjects.map((subject, index) => (
-                <TableRow key={subject.id}>
+                <TableRow
+                  key={subject.id}
+                  className={subject.archived ? "bg-gray-50 opacity-60" : ""}
+                >
                   <TableCell className="text-gray-500">{index + 1}</TableCell>
                   <TableCell className="font-medium text-gray-800">
                     {subject.name}
+                    {subject.archived && (
+                      <span
+                        className="ml-2 rounded bg-gray-200 px-2 py-0.5 text-xs font-bold text-gray-600"
+                        title="Archived - kept on old results, left out of new exams"
+                      >
+                        Archived
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <span
@@ -749,6 +833,19 @@ function Subject() {
                       >
                         <Pencil className="h-4 w-4" />
                       </UIButton>
+                      {subject.archived && (
+                        <UIButton
+                          type="button"
+                          size="icon"
+                          onClick={() => void handleRestore(subject)}
+                          disabled={restoringId === subject.id}
+                          aria-label={`Restore ${subject.name}`}
+                          title="Restore"
+                          className="h-8 w-8 bg-green-600 text-white hover:bg-green-700"
+                        >
+                          <ArchiveRestore className="h-4 w-4" />
+                        </UIButton>
+                      )}
                       <UIButton
                         type="button"
                         size="icon"
@@ -902,14 +999,26 @@ function Subject() {
       <Modal
         isOpen={subjectToDelete !== null}
         onClose={handleDeleteModalClose}
-        title="Delete Subject"
-        description={
-          subjectToDelete
-            ? `Are you sure you want to permanently delete "${subjectToDelete.name}" from Class ${subjectToDelete.className}?`
-            : "Are you sure you want to permanently delete this subject?"
+        title={
+          deleteInUse && !subjectToDelete?.archived
+            ? "Archive Subject"
+            : "Delete Subject"
         }
-        cancelText="Cancel"
-        submitText="Delete"
+        description={
+          !subjectToDelete
+            ? ""
+            : deleteInUse === null
+              ? `Checking whether "${subjectToDelete.name}" has saved marks...`
+              : deleteInUse && subjectToDelete.archived
+                ? `"${subjectToDelete.name}" has saved marks, so it cannot be deleted. It stays archived: old result cards keep it, new exams leave it out.`
+                : deleteInUse
+                  ? `"${subjectToDelete.name}" has saved marks, so it cannot be deleted. Archive it instead: it is removed from Marks Entry, exam schedules and new exams, while old result cards keep it. You can restore it later.`
+                  : `Are you sure you want to permanently delete "${subjectToDelete.name}" from Class ${subjectToDelete.className}? It has no saved marks.`
+        }
+        cancelText={deleteInUse === true && subjectToDelete?.archived === true ? "Close" : "Cancel"}
+        submitText={deleteInUse ? "Archive" : "Delete"}
+        hideSubmit={deleteInUse === true && subjectToDelete?.archived === true}
+        submitDisabled={deleteInUse === null}
         loading={deleting}
         onSubmit={handleConfirmDelete}
       />

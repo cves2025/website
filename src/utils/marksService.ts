@@ -18,6 +18,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
   query,
   type QueryConstraint,
   runTransaction,
@@ -477,6 +478,8 @@ export interface LiveSubject {
   displayInMarksEntry: boolean;
   /** Only an explicit "Show in Report Card = No" hides a subject. A missing field means shown. */
   hideInReportCard: boolean;
+  /** Archived on the Subjects page: kept on old sheets, never added to new ones. */
+  archived: boolean;
 }
 
 /** Reads the current subjects of a class from the LIVE subjects collection. */
@@ -505,8 +508,53 @@ export async function loadLiveSubjects(
           : undefined,
       displayInMarksEntry: data.displayInMarksEntry === true,
       hideInReportCard: data.displayInReportCard === false,
+      archived: data.archived === true,
     };
   });
+}
+
+/**
+ * True when a subject is used by saved marks or by a frozen exam sheet, so
+ * deleting it would lose result data (it can only be archived). Any read
+ * error counts as "used".
+ */
+export async function isSubjectInUse(
+  subjectId: string,
+  className: string,
+): Promise<boolean> {
+  try {
+    const [marks, sheets] = await Promise.all([
+      getDocs(
+        query(
+          collection(db, COLLECTION.MARKS),
+          where(`subjectMarks.${subjectId}`, "!=", null),
+          limit(1),
+        ),
+      ),
+      getDocs(
+        query(
+          collection(db, COLLECTION.EXAM_SHEETS),
+          where("className", "==", className),
+        ),
+      ),
+    ]);
+    if (!marks.empty) return true;
+    return sheets.docs.some((sheet) => {
+      const subjects: unknown = sheet.data().subjects;
+      return (
+        Array.isArray(subjects) &&
+        subjects.some(
+          (column) =>
+            typeof column === "object" &&
+            column !== null &&
+            (column as { id?: unknown }).id === subjectId,
+        )
+      );
+    });
+  } catch (error) {
+    console.error("Failed to check subject usage:", error);
+    return true;
+  }
 }
 
 /**
@@ -542,6 +590,7 @@ export function reportCardSheet(params: {
       (live) =>
         !inSheet.has(live.id) &&
         live.name &&
+        !live.archived &&
         !live.hideInReportCard &&
         live.reportCardOrder !== undefined,
     )
@@ -590,6 +639,7 @@ export function syncSheetWithLiveSubjects(params: {
   liveSubjects.forEach((live) => {
     if (
       inSheet.has(live.id) ||
+      live.archived ||
       live.hideInReportCard ||
       !live.displayInMarksEntry ||
       !live.hasOrder

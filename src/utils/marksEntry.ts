@@ -107,6 +107,8 @@ export function toSubjectColumnBase(
 ): SubjectColumnBase | null {
   const { id, data } = subject;
   if (data.displayInMarksEntry !== true) return null;
+  // An archived subject is kept only for old results.
+  if (data.archived === true) return null;
   // A subject without an Order is not shown in Marks Entry.
   if (typeof data.order !== "number" || data.order <= 0) return null;
   const reportCardOrder = data.reportCardOrder;
