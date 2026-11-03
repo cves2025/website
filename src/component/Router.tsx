@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import ScrollToTop from './ScrollToTop'
 import Home from './Home'
 import Gallery from './Gallery'
@@ -21,7 +21,6 @@ import StudentView from './panel/students/StudentView'
 import Subject from './panel/students/Subject'
 import ExamList from './panel/exams/ExamList'
 import AddTeacher from './panel/teacher/AddTeacher'
-import TeachersList from './panel/TeachersList'
 import AdmitCard from './panel/exams/AdmitCard'
 import ExamSchedule from './panel/exams/ExamSchedule'
 import GeneratedAdmitCards from './panel/exams/GeneratedAdmitCards'
@@ -89,7 +88,8 @@ function Router() {
           <Route path="settings/banner" element={<HomeBannerManager />} />
           <Route path="exam/list" element={<ExamList />} />
           <Route path="teacher/add" element={<AddTeacher />} />
-          <Route path="teacher/list" element={<TeachersList />} />
+          {/* The teachers list lives on Add Teacher; old links land there. */}
+          <Route path="teacher/list" element={<Navigate to="/welcome/teacher/add" replace />} />
           <Route path="admit-card" element={<AdmitCard />} />
           <Route path="desk-slip" element={<DeskSlip />} />
           <Route path="admit-card/schedule" element={<ExamSchedule />} />

@@ -52,7 +52,6 @@ export const MENU: MenuItem[] = [
     accent: BRAND.blue,
     subLinks: [
       { label: "Add Teacher", path: "/welcome/teacher/add" },
-      { label: "Teachers List", path: "/welcome/teacher/list" },
     ],
   },
   {

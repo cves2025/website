@@ -19,7 +19,6 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   "/welcome/student/subject": P.SUBJECT_MANAGE,
 
   "/welcome/teacher/add": P.TEACHER_CREATE,
-  "/welcome/teacher/list": P.TEACHER_READ,
 
   "/welcome/id-card/students": P.IDCARD_STUDENT,
   "/welcome/id-card/teachers": P.IDCARD_TEACHER,

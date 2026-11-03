@@ -98,16 +98,6 @@ export const TEACHER_PERMISSION_GROUPS: PermissionCatalogGroup[] = [
     ],
   },
   {
-    label: "Teacher",
-    items: [
-      {
-        permission: P.TEACHER_READ,
-        label: "Teachers List",
-        description: "See the list of all teachers.",
-      },
-    ],
-  },
-  {
     label: "ID Card",
     items: [
       {

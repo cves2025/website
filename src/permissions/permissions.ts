@@ -8,7 +8,6 @@ export const PERMISSIONS = {
   STUDENT_PROMOTE: "student.promote",
   SUBJECT_MANAGE: "subject.manage",
   TEACHER_CREATE: "teacher.create",
-  TEACHER_READ: "teacher.read",
   IDCARD_STUDENT: "idcard.student",
   IDCARD_TEACHER: "idcard.teacher",
   IDCARD_STAFF: "idcard.staff",
