@@ -25,6 +25,7 @@ import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore";
 import { COLLECTION } from "../constants";
 import { db } from "../firebase/config";
 import { deleteNewsImage, uploadNewsImage } from "../firebase/newsImages";
+import { isRichText, sanitizeRichText } from "./richText";
 
 export interface NewsItem {
   id: string;
@@ -95,9 +96,10 @@ export function subscribeNews(
 }
 
 function cleanFields(fields: NewsFields) {
+  const text = fields.text.trim();
   return {
     heading: fields.heading.trim(),
-    text: fields.text.trim(),
+    text: isRichText(text) ? sanitizeRichText(text) : text,
     newsDate: fields.newsDate,
     isPublished: fields.isPublished,
   };

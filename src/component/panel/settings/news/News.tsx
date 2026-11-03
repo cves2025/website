@@ -5,6 +5,7 @@ import { Pencil, Trash2 } from "lucide-react";
 import Button from "../../../../custom-components/Button";
 import Modal from "../../../../custom-components/Modal";
 import PageHeader from "../../../../custom-components/PageHeader";
+import RichText from "../../../../custom-components/RichText";
 import { Button as UIButton } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import schoolLogo from "../../../../assets/image/schoolLogo.jpg";
@@ -167,9 +168,10 @@ function News() {
                   <p className="text-xs font-semibold text-gray-500">
                     {formatDate(news.newsDate)}
                   </p>
-                  <p className="mt-1 line-clamp-3 whitespace-pre-line text-sm text-gray-700">
-                    {news.text}
-                  </p>
+                  <RichText
+                    value={news.text}
+                    className="mt-1 line-clamp-3 text-sm text-gray-700"
+                  />
                 </div>
                 <div className="flex shrink-0 items-center gap-3 sm:flex-col sm:items-end sm:justify-between">
                   <label className="flex items-center gap-2 text-xs font-semibold text-gray-600">

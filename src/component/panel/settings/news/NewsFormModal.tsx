@@ -1,10 +1,11 @@
 import { useContext, useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 
 import Modal from "../../../../custom-components/Modal";
 import CustomInput from "../../../../custom-components/CustomInput";
-import CustomTextarea from "../../../../custom-components/CustomTextarea";
+import RichTextEditor from "../../../../custom-components/RichTextEditor";
+import { richTextToPlain } from "../../../../utils/richText";
 import PhotoUploadBox from "../../../../custom-components/admission/PhotoUploadBox";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -138,18 +139,40 @@ function NewsFormModal({ isOpen, news, onClose }: NewsFormModalProps) {
             required
             disabled={saving}
           />
-          <CustomTextarea
+          <Controller
             control={control}
             name="text"
-            label="News"
-            rows={6}
-            placeholder="Write the news here..."
             rules={{
               validate: (value) =>
-                String(value).trim() !== "" || "Please write the news.",
+                richTextToPlain(String(value)).trim() !== "" ||
+                "Please write the news.",
             }}
-            required
-            disabled={saving}
+            render={({ field, fieldState }) => (
+              <div className="flex w-full flex-col gap-1.5">
+                <label
+                  htmlFor="newsText"
+                  className="block text-sm font-semibold text-gray-700"
+                >
+                  News
+                  <span className="ml-0.5 text-red-500">*</span>
+                </label>
+                <RichTextEditor
+                  id="newsText"
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  focusRef={field.ref}
+                  placeholder="Write the news here..."
+                  disabled={saving}
+                  invalid={Boolean(fieldState.error)}
+                />
+                {fieldState.error && (
+                  <p className="text-xs font-medium text-red-600">
+                    {fieldState.error.message}
+                  </p>
+                )}
+              </div>
+            )}
           />
           <div className="flex items-center justify-between gap-3 rounded-md border border-gray-200 px-3 py-2">
             <div>

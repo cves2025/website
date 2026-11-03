@@ -1,3 +1,5 @@
+import RichText from "../custom-components/RichText";
+
 interface NewsCardProps {
   newsImage: string;
   newHeading: string;
@@ -36,7 +38,7 @@ function NewsCard({
         </div>
         <div className="flex flex-col items-start justify-center gap-y-1 w-full">
           <p className="font-bold text-sm lg:text-2xl">{newHeading}</p>
-          <p className="text-sm lg:text-xl whitespace-pre-line">{newText}</p>
+          <RichText value={newText} className="w-full text-sm lg:text-xl" />
           <p className="font-bold text-sm lg:text-xl">{formattedDate}</p>
         </div>
       </div>
