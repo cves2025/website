@@ -483,9 +483,8 @@ function buildCell(
 }
 
 /**
- * Report card ke liye sort key. Defined (>0) reportCardOrder wale subjects
- * pehle ascending order mein aate hain; undefined / 0 wale Number.MAX_SAFE_INTEGER
- * lete hain, jo comparator ko unhe ordered subjects ke baad (bottom) rakhta hai.
+ * Report card order as a number: defined (>0) values as they are, undefined /
+ * 0 as Number.MAX_SAFE_INTEGER (= not on the report card).
  */
 function reportCardSortKey(value: number | undefined): number {
   return typeof value === "number" && value > 0
@@ -493,51 +492,59 @@ function reportCardSortKey(value: number | undefined): number {
     : Number.MAX_SAFE_INTEGER;
 }
 
+/** One line of the report card: a subject, or a subject group (Written + Oral). */
+interface ReportCardUnit {
+  slots: Slot[];
+  /** Report card order (MAX_SAFE_INTEGER when not set). */
+  position: number;
+  order: number;
+  name: string;
+  partRank: number;
+}
+
+/**
+ * Report card order is the line number on the report card: a subject with
+ * report card order 4 is printed 4th (buildResultTable leaves out subjects
+ * without one). In the grouped layout a line is a subject group, so its
+ * Written and Oral rows always stay together.
+ */
 function sortSlots(slots: Slot[], groupByName: boolean): Slot[] {
-  if (!groupByName) {
-    return [...slots].sort(
-      (a, b) =>
-        reportCardSortKey(a.reportCardOrder) -
-          reportCardSortKey(b.reportCardOrder) ||
-        a.order - b.order ||
-        partRank(a.type) - partRank(b.type) ||
-        a.subject.localeCompare(b.subject)
-    );
-  }
-
-  // A subject group sits at the position of its lowest `order`, so the
-  // Written and Oral rows of one subject always stay together. The same
-  // applies to the report card order, so a subject (group) whose report card
-  // order is defined floats above the ones that have none.
-  const groupOrder = new Map<string, number>();
-  const groupReportCardOrder = new Map<string, number>();
+  const units = new Map<string, ReportCardUnit>();
   slots.forEach((slot) => {
-    const name = normalize(slot.subject);
-    groupOrder.set(
-      name,
-      Math.min(groupOrder.get(name) ?? Number.MAX_SAFE_INTEGER, slot.order)
-    );
-    groupReportCardOrder.set(
-      name,
-      Math.min(
-        groupReportCardOrder.get(name) ?? Number.MAX_SAFE_INTEGER,
-        reportCardSortKey(slot.reportCardOrder)
-      )
-    );
+    const key = groupByName ? normalize(slot.subject) : slot.key;
+    const unit = units.get(key);
+    if (unit) {
+      unit.slots.push(slot);
+      unit.position = Math.min(unit.position, reportCardSortKey(slot.reportCardOrder));
+      unit.order = Math.min(unit.order, slot.order);
+      unit.partRank = Math.min(unit.partRank, partRank(slot.type));
+    } else {
+      units.set(key, {
+        slots: [slot],
+        position: reportCardSortKey(slot.reportCardOrder),
+        order: slot.order,
+        name: normalize(slot.subject),
+        partRank: partRank(slot.type),
+      });
+    }
   });
 
-  return [...slots].sort((a, b) => {
-    const nameA = normalize(a.subject);
-    const nameB = normalize(b.subject);
-    return (
-      (groupReportCardOrder.get(nameA) ?? Number.MAX_SAFE_INTEGER) -
-        (groupReportCardOrder.get(nameB) ?? Number.MAX_SAFE_INTEGER) ||
-      (groupOrder.get(nameA) ?? 0) - (groupOrder.get(nameB) ?? 0) ||
-      nameA.localeCompare(nameB) ||
-      partRank(a.type) - partRank(b.type) ||
-      a.order - b.order
-    );
-  });
+  const lines = Array.from(units.values()).sort(
+    (a, b) =>
+      a.position - b.position ||
+      a.order - b.order ||
+      a.partRank - b.partRank ||
+      a.name.localeCompare(b.name)
+  );
+
+  return lines.flatMap((unit) =>
+    [...unit.slots].sort(
+      (a, b) =>
+        partRank(a.type) - partRank(b.type) ||
+        a.order - b.order ||
+        a.subject.localeCompare(b.subject)
+    )
+  );
 }
 
 function scoreOf(cells: ResultCell[]): ResultScore {
@@ -608,7 +615,13 @@ export function buildResultTable(params: {
   const slotMap = new Map<string, Slot>();
   const columnsByExam = inputs.map((input) => {
     const columns = new Map<string, ExamSheetSubjectColumn>();
-    (input.sheet?.subjects ?? []).forEach((column) => {
+    // A subject without a report card order is not on the report card (and
+    // not in its totals).
+    const onReportCard = (input.sheet?.subjects ?? []).filter(
+      (column) =>
+        reportCardSortKey(column.reportCardOrder) !== Number.MAX_SAFE_INTEGER
+    );
+    onReportCard.forEach((column) => {
       const key = slotKey(column);
       columns.set(key, column);
       const existing = slotMap.get(key);

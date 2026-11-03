@@ -12,7 +12,6 @@ import {
   QueryDocumentSnapshot,
   serverTimestamp,
   where,
-  orderBy,
   writeBatch,
 } from "firebase/firestore";
 import toast from "react-hot-toast";
@@ -71,8 +70,9 @@ interface SubjectDoc {
   id: string;
   name: string;
   type: SubjectType;
-  order: number;
-  /** Order of this subject inside the report card table (undefined = display at the bottom). */
+  /** Position in Marks Entry (undefined = not shown in Marks Entry). */
+  order?: number;
+  /** Line number of this subject on the report card (undefined = not on the report card). */
   reportCardOrder?: number;
   className: string;
   displayInAdmitCard?: boolean;
@@ -118,7 +118,10 @@ const toSubjectDoc = (
     id: documentSnapshot.id,
     name: typeof data.name === "string" ? data.name : "",
     type: isSubjectType(data.type) ? data.type : "Theory",
-    order: typeof data.order === "number" ? data.order : 1,
+    order:
+      typeof data.order === "number" && data.order > 0
+        ? Math.floor(data.order)
+        : undefined,
     reportCardOrder:
       typeof data.reportCardOrder === "number" && data.reportCardOrder > 0
         ? Math.floor(data.reportCardOrder)
@@ -135,7 +138,7 @@ const toSubjectDoc = (
 interface SubjectDraft {
   name: string;
   type: SubjectType;
-  order: number;
+  order?: number;
   reportCardOrder?: number;
   displayInMarksEntry: boolean;
   displayInReportCard: boolean;
@@ -193,7 +196,8 @@ function findSubjectConflicts(
       );
     }
 
-    const sameOrder = draft.displayInMarksEntry
+    const sameOrder =
+      draft.displayInMarksEntry && draft.order !== undefined
       ? others.find(
           (subject) =>
             subject.displayInMarksEntry === true &&
@@ -297,16 +301,24 @@ function Subject() {
     const subjectsQuery = query(
       collection(db, COLLECTION.SUBJECTS),
       where("className", "==", selectedClass),
-      orderBy("order", "asc"),
     );
 
     const unsubscribe = onSnapshot(
       subjectsQuery,
       (snapshot) => {
+        // Sorted here: orderBy("order") would drop the subjects without an
+        // order. Those are listed last.
         setSubjects(
-          snapshot.docs.map((documentSnapshot) =>
-            toSubjectDoc(documentSnapshot, selectedClass),
-          ),
+          snapshot.docs
+            .map((documentSnapshot) =>
+              toSubjectDoc(documentSnapshot, selectedClass),
+            )
+            .sort(
+              (a, b) =>
+                (a.order ?? Number.MAX_SAFE_INTEGER) -
+                  (b.order ?? Number.MAX_SAFE_INTEGER) ||
+                a.name.localeCompare(b.name),
+            ),
         );
         setLoading(false);
       },
@@ -323,7 +335,7 @@ function Subject() {
     setEditingId(null);
     const nextOrder =
       subjects.length > 0
-        ? Math.max(...subjects.map((subject) => subject.order)) + 1
+        ? Math.max(0, ...subjects.map((subject) => subject.order ?? 0)) + 1
         : 1;
     // Sahi default: max defined report card order + 1. Koi bhi report card
     // order define nahi hua to existing order hi default rakhte hain.
@@ -354,7 +366,7 @@ function Subject() {
     reset({
       name: subject.name,
       type: subject.type,
-      order: String(subject.order),
+      order: subject.order ? String(subject.order) : "",
       reportCardOrder: subject.reportCardOrder
         ? String(subject.reportCardOrder)
         : "",
@@ -391,12 +403,17 @@ function Subject() {
     const name = data.name.trim();
     if (!name) return;
 
-    // Normalize to a positive integer so the Order column always has a value.
-    const order = Math.max(1, Math.floor(Number(data.order) || 1));
+    // Optional "Order": the position in Marks Entry. Empty means the subject
+    // is not shown in Marks Entry. Non-empty values become a positive integer.
+    const orderRaw = String(data.order ?? "").trim();
+    const order =
+      orderRaw !== "" && Number.isFinite(Number(orderRaw))
+        ? Math.max(1, Math.floor(Number(orderRaw)))
+        : undefined;
 
-    // Optional "Report Card Order". Empty means the subject has no fixed
-    // position, so the report card shows it at the bottom (after the ordered
-    // subjects). Non-empty values are normalized to a positive integer.
+    // Optional "Report Card Order": the line number on the report card. Empty
+    // means the subject is not shown on the report card.
+    // Non-empty values are normalized to a positive integer.
     const reportCardOrderRaw = String(data.reportCardOrder ?? "").trim();
     const reportCardOrder =
       reportCardOrderRaw !== "" && Number.isFinite(Number(reportCardOrderRaw))
@@ -460,7 +477,7 @@ function Subject() {
           batch.update(doc(db, COLLECTION.SUBJECTS, editingId), {
             name,
             type: data.type,
-            order,
+            ...(order === undefined ? { order: deleteField() } : { order }),
             className: originalClass,
             displayInAdmitCard,
             displayInMarksEntry,
@@ -476,7 +493,7 @@ function Subject() {
             batch.set(doc(collection(db, COLLECTION.SUBJECTS)), {
               name,
               type: data.type,
-              order,
+              ...(order === undefined ? {} : { order }),
               className,
               displayInAdmitCard,
               displayInMarksEntry,
@@ -491,7 +508,7 @@ function Subject() {
           batch.update(doc(db, COLLECTION.SUBJECTS, editingId), {
             name,
             type: data.type,
-            order,
+            ...(order === undefined ? { order: deleteField() } : { order }),
             className: firstClass,
             displayInAdmitCard,
             displayInMarksEntry,
@@ -505,7 +522,7 @@ function Subject() {
             batch.set(doc(collection(db, COLLECTION.SUBJECTS)), {
               name,
               type: data.type,
-              order,
+              ...(order === undefined ? {} : { order }),
               className,
               displayInAdmitCard,
               displayInMarksEntry,
@@ -536,7 +553,7 @@ function Subject() {
           batch.set(subjectRef, {
             name,
             type: data.type,
-            order,
+            ...(order === undefined ? {} : { order }),
             className,
             displayInAdmitCard,
             displayInMarksEntry,
@@ -690,9 +707,18 @@ function Subject() {
                   </TableCell>
                   <TableCell>
                     <span
-                      className={`rounded px-2 py-1 text-xs font-bold ${SUBJECT_TYPE_BADGE[subject.type]}`}
+                      className={`rounded px-2 py-1 text-xs font-bold ${
+                        subject.order
+                          ? SUBJECT_TYPE_BADGE[subject.type]
+                          : "bg-gray-200 text-gray-500"
+                      }`}
+                      title={
+                        subject.order
+                          ? "Marks Entry order"
+                          : "No order - not shown in Marks Entry"
+                      }
                     >
-                      {subject.order}
+                      {subject.order ?? "—"}
                     </span>
                   </TableCell>
                   <TableCell>
@@ -705,7 +731,7 @@ function Subject() {
                       title={
                         subject.reportCardOrder
                           ? "Report card order"
-                          : "No report card order - shown at the bottom of the report card"
+                          : "No report card order - not shown on the report card"
                       }
                     >
                       {subject.reportCardOrder ?? "—"}
@@ -785,13 +811,16 @@ function Subject() {
             min={1}
             placeholder="e.g. 1"
             rules={{
-              required: "Order is required",
               pattern: {
                 value: /^\d+$/,
                 message: "Order must be a positive whole number",
               },
             }}
           />
+          <p className="-mt-2 text-xs text-gray-400">
+            The position of this subject in Marks Entry. Leave it empty to
+            hide the subject from Marks Entry.
+          </p>
           <CustomInput
             control={control}
             name="reportCardOrder"
@@ -801,9 +830,8 @@ function Subject() {
             placeholder="e.g. 1"
           />
           <p className="-mt-2 text-xs text-gray-400">
-            The position of this subject on the report card. Leave it empty to
-            show the subject at the bottom of the report card, after the
-            ordered subjects.
+            The line number of this subject on the report card (4 = 4th
+            subject). Leave it empty to hide the subject from the report card.
           </p>
           <Controller
             control={control}

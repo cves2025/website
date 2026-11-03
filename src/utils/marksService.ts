@@ -259,7 +259,7 @@ export interface ExamSheetSubjectInput {
   name: string;
   type: string;
   order: number;
-  /** Optional report card order (undefined = shown after the ordered subjects). */
+  /** Optional report card line number (undefined = not on the report card). */
   reportCardOrder?: number;
   displayInMarksEntry?: boolean;
 }
@@ -444,7 +444,7 @@ export async function getExamSheet(
  * LIVE subjects collection. Result cards overlay these on the frozen exam sheet
  * columns, so updating a subject's report card order is reflected immediately,
  * even when the exam sheet snapshot was created earlier. A subject whose order
- * is missing/cleared maps to undefined, which places it below the ordered ones.
+ * is missing/cleared maps to undefined, which keeps it off the report card.
  */
 export async function loadSubjectReportCardOrders(
   className: string,
@@ -471,6 +471,8 @@ export interface LiveSubject {
   name: string;
   type: string;
   order: number;
+  /** False when the subject has no Order (it is not shown in Marks Entry). */
+  hasOrder: boolean;
   reportCardOrder?: number;
   displayInMarksEntry: boolean;
   /** Only an explicit "Show in Report Card = No" hides a subject. A missing field means shown. */
@@ -496,6 +498,7 @@ export async function loadLiveSubjects(
       name: typeof data.name === "string" ? data.name : "",
       type: typeof data.type === "string" ? data.type : "",
       order: typeof data.order === "number" ? data.order : 1,
+      hasOrder: typeof data.order === "number" && data.order > 0,
       reportCardOrder:
         typeof rawOrder === "number" && rawOrder > 0
           ? Math.floor(rawOrder)
@@ -543,7 +546,8 @@ export function syncSheetWithLiveSubjects(params: {
     if (
       inSheet.has(live.id) ||
       live.hideInReportCard ||
-      !live.displayInMarksEntry
+      !live.displayInMarksEntry ||
+      !live.hasOrder
     )
       return;
     if (!live.name) return;

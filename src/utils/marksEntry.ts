@@ -52,7 +52,7 @@ export interface MarksSubjectColumn {
   name: string;
   type: string;
   order: number;
-  /** Optional report card order (undefined = report card ke bottom mein). */
+  /** Optional report card line number (undefined = not on the report card). */
   reportCardOrder?: number;
   /** Scholastic subjects keep one grade cell and no component inputs. */
   isGrade: boolean;
@@ -107,12 +107,14 @@ export function toSubjectColumnBase(
 ): SubjectColumnBase | null {
   const { id, data } = subject;
   if (data.displayInMarksEntry !== true) return null;
+  // A subject without an Order is not shown in Marks Entry.
+  if (typeof data.order !== "number" || data.order <= 0) return null;
   const reportCardOrder = data.reportCardOrder;
   return {
     id,
     name: typeof data.name === "string" ? data.name : "",
     type: typeof data.type === "string" ? data.type : "",
-    order: typeof data.order === "number" ? data.order : 1,
+    order: Math.floor(data.order),
     reportCardOrder:
       typeof reportCardOrder === "number" && reportCardOrder > 0
         ? Math.floor(reportCardOrder)

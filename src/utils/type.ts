@@ -323,8 +323,8 @@ export interface ExamSheetSubjectColumn {
   type: string;
   order: number;
   /**
-   * Order of this subject inside the report card table. Missing / 0 = no
-   * fixed position, so the report card shows it after the ordered subjects.
+   * Line number of this subject on the report card. Missing / 0 = the
+   * subject is not shown on the report card.
    */
   reportCardOrder?: number;
   maxMarks: number;
