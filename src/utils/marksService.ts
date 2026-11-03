@@ -510,6 +510,51 @@ export async function loadLiveSubjects(
 }
 
 /**
+ * The subject columns of a result card: the synced exam sheet plus every live
+ * subject that has a report card order - a report card subject is always
+ * printed, with or without marks. Works before any marks were saved for the
+ * exam (no frozen sheet yet); null only when there is nothing to print.
+ */
+export function reportCardSheet(params: {
+  sheet: ExamSheetDoc | null;
+  session: string;
+  exam: ExamDoc;
+  className: string;
+  liveSubjects: readonly LiveSubject[];
+  subjectIdsWithMarks: ReadonlySet<string>;
+}): ExamSheetDoc | null {
+  const { sheet, session, exam, className, liveSubjects } = params;
+  const base: ExamSheetDoc = sheet
+    ? syncSheetWithLiveSubjects({ ...params, sheet })
+    : {
+        id: buildExamSheetId(session, exam.id, className),
+        session,
+        examId: exam.id,
+        examName: exam.examName,
+        className,
+        createdAt: null,
+        subjects: [],
+      };
+
+  const inSheet = new Set(base.subjects.map((column) => column.id));
+  const missing = liveSubjects
+    .filter(
+      (live) =>
+        !inSheet.has(live.id) &&
+        live.name &&
+        !live.hideInReportCard &&
+        live.reportCardOrder !== undefined,
+    )
+    .map((live) => toSheetColumn(live, exam, className));
+  if (!sheet && missing.length === 0) return null;
+
+  const subjects = [...base.subjects, ...missing].sort(
+    (a, b) => a.order - b.order || a.name.localeCompare(b.name),
+  );
+  return { ...base, subjects };
+}
+
+/**
  * Returns a copy of a frozen exam sheet that matches the live Subjects page:
  * - subjects with "Show in Report Card" = No are removed,
  * - the live report card order is applied,

@@ -3,7 +3,7 @@ import {
   getExamSheet,
   loadLiveSubjects,
   loadMarksForExam,
-  syncSheetWithLiveSubjects,
+  reportCardSheet,
   type LiveSubject,
 } from "../utils/marksService";
 import type { ResultExamInput } from "../utils/resultCardModel";
@@ -42,8 +42,9 @@ const EMPTY: LoadedData = { sheets: {}, marks: {}, liveSubjects: [] };
  * in memory, so printing 40 cards costs the same as printing one.
  *
  * The live subjects of the class are loaded as well and applied on the frozen
- * sheets once per exam (see syncSheetWithLiveSubjects): report card order,
- * "Show in Report Card" and subjects created after the sheet was frozen.
+ * sheets once per exam (see reportCardSheet): report card order, "Show in
+ * Report Card", and every subject with a report card order - with or without
+ * marks.
  *
  * Marks are read without exam rules on purpose: the result card recomputes
  * every total itself from `subjectMarks`.
@@ -121,18 +122,15 @@ export function useResultCardData({
     const result: Record<string, ExamSheetDoc | null> = {};
     exams.forEach((exam) => {
       const sheet = data.sheets[exam.id] ?? null;
-      if (!sheet) {
-        result[exam.id] = null;
-        return;
-      }
       const subjectIdsWithMarks = new Set<string>();
       data.marks[exam.id]?.forEach((marksDoc) => {
         Object.keys(marksDoc.subjectMarks ?? {}).forEach((id) =>
           subjectIdsWithMarks.add(id)
         );
       });
-      result[exam.id] = syncSheetWithLiveSubjects({
+      result[exam.id] = reportCardSheet({
         sheet,
+        session,
         exam,
         className,
         liveSubjects: data.liveSubjects,
@@ -140,7 +138,7 @@ export function useResultCardData({
       });
     });
     return result;
-  }, [exams, data, className]);
+  }, [exams, data, session, className]);
 
   const inputsFor = useCallback(
     (studentUid: string): ResultExamInput[] =>
