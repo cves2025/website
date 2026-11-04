@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRightLeft, Printer } from "lucide-react";
+import { ArrowRightLeft, Check, Printer } from "lucide-react";
+import { FaWhatsapp } from "react-icons/fa";
 
 import PageHeader from "../../../custom-components/PageHeader";
 import SelectDropdown from "../../../custom-components/SelectDropdown";
@@ -19,7 +20,7 @@ import {
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import { formatRupees, monthLabel } from "../../../utils/feeStructure";
 import { feeTotals } from "../../../utils/feeAccount";
-import { currentSessionMonth, duesUpTo } from "../../../utils/feeReport";
+import { currentSessionMonth, dueReminderLink, duesUpTo } from "../../../utils/feeReport";
 import useDuesReport from "../../../hooks/useDuesReport";
 import type { FeeStudent } from "../../../utils/type";
 import { labelClass } from "../attendance/attendanceShared";
@@ -57,6 +58,8 @@ function DuesReport() {
   const [upToMonth, setUpToMonth] = useState(() => currentSessionMonth(sessions[0]?.value ?? ""));
   const [onlyDues, setOnlyDues] = useState(true);
   const [carryOpen, setCarryOpen] = useState(false);
+  // Reminders opened on this visit, so the admin can go down the list.
+  const [reminded, setReminded] = useState<Set<string>>(() => new Set());
 
   const { rows, loading, error, reload } = useDuesReport(
     session,
@@ -191,6 +194,7 @@ function DuesReport() {
                     <th className="px-3 py-2 font-semibold">Pending months</th>
                     <th className="px-3 py-2 text-right font-semibold">Due till {monthLabel(upToMonth)}</th>
                     <th className="px-3 py-2 text-right font-semibold">Session due</th>
+                    <th className="px-3 py-2 text-center font-semibold print:hidden">Remind</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -220,6 +224,20 @@ function DuesReport() {
                       <td className="px-3 py-2 text-right text-gray-700">
                         {row.sessionDue ? formatRupees(row.sessionDue) : "-"}
                       </td>
+                      <td className="px-3 py-2 text-center print:hidden">
+                        <ReminderButton
+                          link={
+                            row.upTo.due
+                              ? dueReminderLink(row, row.upTo.due, row.upTo.months, upToMonth)
+                              : ""
+                          }
+                          hasDue={row.upTo.due > 0}
+                          sent={reminded.has(row.student.studentId)}
+                          onSent={() =>
+                            setReminded((prev) => new Set(prev).add(row.student.studentId))
+                          }
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -234,6 +252,7 @@ function DuesReport() {
                     <td className="px-3 py-2 text-right">
                       {formatRupees(shown.reduce((sum, row) => sum + row.sessionDue, 0))}
                     </td>
+                    <td className="print:hidden" />
                   </tr>
                 </tfoot>
               </table>
@@ -249,6 +268,37 @@ function DuesReport() {
         onDone={reload}
       />
     </div>
+  );
+}
+
+interface ReminderButtonProps {
+  /** wa.me link; "" when the parent's phone is missing or not valid. */
+  link: string;
+  hasDue: boolean;
+  sent: boolean;
+  onSent: () => void;
+}
+
+/** Opens WhatsApp with the fee reminder for the parent. */
+function ReminderButton({ link, hasDue, sent, onSent }: ReminderButtonProps) {
+  if (!hasDue) return <span className="text-gray-300">-</span>;
+  if (!link) {
+    return <span className="text-xs text-gray-400" title="No valid mobile number on the admission form">No number</span>;
+  }
+  return (
+    <a
+      href={link}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={onSent}
+      title="Send the fee reminder on WhatsApp"
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+        sent ? "bg-gray-100 text-gray-600" : "bg-green-500 text-white hover:bg-green-600"
+      }`}
+    >
+      {sent ? <Check className="h-3.5 w-3.5" /> : <FaWhatsapp className="h-3.5 w-3.5" />}
+      {sent ? "Sent" : "Send"}
+    </a>
   );
 }
 

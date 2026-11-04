@@ -211,3 +211,6 @@ export const PAYMENT_MODE_OPTIONS = PAYMENT_MODES.map((mode) => ({ value: mode, 
 
 /** Letterhead of the fee receipt. */
 export const SCHOOL_NAME = "CHILDREN'S VALLEY ENGLISH SCHOOL";
+
+/** School name inside messages (e.g. the WhatsApp fee reminder). */
+export const SCHOOL_DISPLAY_NAME = "Children's Valley English School";

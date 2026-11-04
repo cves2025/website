@@ -593,6 +593,8 @@ export interface DuesReportRow {
   account: FeeAccount;
   /** False while the account is only built from the fee structure. */
   saved: boolean;
+  /** Parent's phone from the enrollment ("" when missing). */
+  phone: string;
 }
 
 /** One student whose previous-session dues can be carried forward. */

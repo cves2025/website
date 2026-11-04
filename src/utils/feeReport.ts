@@ -1,7 +1,14 @@
 /**
  * Pure logic of the fee reports: dues up to a month and collection totals.
  */
-import { PAYMENT_MODES, SESSION_MONTHS } from "../constants";
+import {
+  PAYMENT_MODES,
+  SCHOOL_CONTACT,
+  SCHOOL_DISPLAY_NAME,
+  SESSION_MONTHS,
+} from "../constants";
+import { formatRupees, monthLabel } from "./feeStructure";
+import { toOrdinalLabel } from "./toOrdinalLabel";
 import { feeTotals, lineDue, previousDuesLineId } from "./feeAccount";
 import type {
   CarryForwardItem,
@@ -102,4 +109,52 @@ export function planCarryForward(
       return amount > 0 ? [{ student: row.student, fromAccount, toAccount: row.account, amount }] : [];
     })
     .sort((a, b) => b.amount - a.amount);
+}
+
+/**
+ * An Indian mobile number in WhatsApp form ("919876543210"), or "" when the
+ * phone is not a valid 10-digit mobile (with or without 0 / +91 in front).
+ */
+export function toWhatsAppNumber(phone: string): string {
+  let digits = phone.replace(/\D/g, "");
+  if (digits.length === 12 && digits.startsWith("91")) digits = digits.slice(2);
+  else if (digits.length === 11 && digits.startsWith("0")) digits = digits.slice(1);
+  return /^[6-9]\d{9}$/.test(digits) ? `91${digits}` : "";
+}
+
+/** The fee reminder sent to a parent on WhatsApp. */
+export function dueReminderMessage(
+  row: DuesReportRow,
+  due: number,
+  months: number[],
+  upToMonth: number
+): string {
+  const { student } = row;
+  const monthNames = months.map((month) => monthLabel(month)).join(", ");
+  return [
+    "Dear Parent,",
+    "",
+    `This is a gentle reminder that the school fee of ${student.studentName} ` +
+      `(Class ${toOrdinalLabel(student.className)}-${student.section}) is pending.`,
+    "",
+    `Amount due till ${monthLabel(upToMonth)}: ${formatRupees(due)}`,
+    ...(monthNames ? [`Pending months: ${monthNames}`] : []),
+    "",
+    "Kindly pay at the earliest. Please ignore this message if already paid.",
+    "",
+    `${SCHOOL_DISPLAY_NAME}`,
+    `Ph. ${SCHOOL_CONTACT.PHONE}`,
+  ].join("\n");
+}
+
+/** wa.me link that opens WhatsApp with the reminder for the parent ("" = no valid number). */
+export function dueReminderLink(
+  row: DuesReportRow,
+  due: number,
+  months: number[],
+  upToMonth: number
+): string {
+  const number = toWhatsAppNumber(row.phone);
+  if (!number) return "";
+  return `https://wa.me/${number}?text=${encodeURIComponent(dueReminderMessage(row, due, months, upToMonth))}`;
 }

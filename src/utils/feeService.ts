@@ -389,12 +389,15 @@ export async function loadDuesReport(
   ]);
   const today = todayKey();
 
+  const phones = new Map<string, string>();
   const students: FeeStudent[] = enrollmentSnap.docs
     .filter((item) => item.data().isDeleted !== true)
     .map((item) => {
       const data = item.data();
+      const studentId = toText(data.studentId).trim() || item.id;
+      phones.set(studentId, String(data.phone ?? "").trim());
       return {
-        studentId: toText(data.studentId).trim() || item.id,
+        studentId,
         studentName: String(
           data.studentName || `${data.firstName ?? ""} ${data.lastName ?? ""}`
         ).trim(),
@@ -434,6 +437,7 @@ export async function loadDuesReport(
           today
         ),
         saved: Boolean(account),
+        phone: phones.get(student.studentId) ?? "",
       };
     })
     .sort(
