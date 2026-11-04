@@ -36,20 +36,24 @@ import {
   feeAccountId,
   feeTotals,
   formatReceiptNo,
+  revertAllocations,
   sortFeeLines,
 } from "./feeAccount";
-import { emptyFeeStructure, toAmount } from "./feeStructure";
+import type { FeeChange } from "./feeAccount";
+import { emptyFeeStructure, formatRupees, toAmount } from "./feeStructure";
 import type {
   ClassFee,
   ExamFeeItem,
   FeeAccount,
   FeeHead,
   FeeLine,
+  FeeLogEntry,
   FeePayment,
   FeePaymentInput,
   FeeSettings,
   FeeStructure,
   FeeStudent,
+  FeeTransport,
 } from "./type";
 
 const toAmountMap = (value: unknown): Record<string, number> => {
@@ -186,8 +190,31 @@ function toFeeLine(value: unknown): FeeLine | null {
     discount: toAmount(line.discount),
     paid: toAmount(line.paid),
     waived: line.waived === true,
+    discountReason: toText(line.discountReason),
+    waiveReason: toText(line.waiveReason),
   };
 }
+
+function toTransport(value: unknown): FeeTransport | null {
+  if (!value || typeof value !== "object") return null;
+  const data = value as Record<string, unknown>;
+  const fromMonth = Number(data.fromMonth);
+  const toMonth = Number(data.toMonth);
+  const amount = toAmount(data.amount);
+  if (!amount || !SESSION_MONTHS.includes(fromMonth) || !SESSION_MONTHS.includes(toMonth)) {
+    return null;
+  }
+  return { amount, fromMonth, toMonth };
+}
+
+const toLog = (value: unknown): FeeLogEntry[] =>
+  Array.isArray(value)
+    ? value.map((item: Record<string, unknown>) => ({
+        at: toText(item?.at),
+        byName: toText(item?.byName),
+        text: toText(item?.text),
+      }))
+    : [];
 
 function toFeeAccount(id: string, data: DocumentData): FeeAccount {
   return {
@@ -202,6 +229,10 @@ function toFeeAccount(id: string, data: DocumentData): FeeAccount {
     lines: Array.isArray(data.lines)
       ? sortFeeLines(data.lines.map(toFeeLine).filter((line): line is FeeLine => line !== null))
       : [],
+    specialMonthlyFee:
+      typeof data.specialMonthlyFee === "number" ? toAmount(data.specialMonthlyFee) : null,
+    transport: toTransport(data.transport),
+    log: toLog(data.log),
   };
 }
 
@@ -232,6 +263,8 @@ function toFeePayment(id: string, data: DocumentData): FeePayment {
       : [],
     status: data.status === "cancelled" ? "cancelled" : "active",
     collectedByName: toText(data.collectedByName),
+    cancelReason: toText(data.cancelReason),
+    cancelledByName: toText(data.cancelledByName),
   };
 }
 
@@ -277,6 +310,9 @@ export async function loadFeeAccount(
       session,
       ...pickStudent(student),
       lines: buildFeeLines(structure, student.className, chargeAdmission),
+      specialMonthlyFee: null,
+      transport: null,
+      log: [],
     },
     saved: false,
   };
@@ -297,6 +333,32 @@ export async function loadFeePayment(id: string): Promise<FeePayment | null> {
   return snapshot.exists() ? toFeePayment(snapshot.id, snapshot.data()) : null;
 }
 
+/** Most recent change-log entries kept on an account. */
+const LOG_LIMIT = 200;
+
+/** Who saves a fee change. */
+export interface FeeActor {
+  uid: string;
+  name: string;
+}
+
+/** The fields written for an account (`isNew` adds `createdAt`). */
+function accountFields(account: FeeAccount, actor: FeeActor, isNew: boolean) {
+  return {
+    ...pickStudent(account),
+    session: account.session,
+    lines: account.lines,
+    specialMonthlyFee: account.specialMonthlyFee,
+    transport: account.transport,
+    log: account.log.slice(-LOG_LIMIT),
+    // Kept on the account for the dues report (no need to read lines).
+    totals: feeTotals(account.lines),
+    ...(isNew ? { createdAt: serverTimestamp() } : {}),
+    updatedAt: serverTimestamp(),
+    updatedBy: actor.uid,
+  };
+}
+
 /** Thrown by collectFeePayment when the amount is more than the lines owe. */
 export const FEE_OVERPAID = "FEE_OVERPAID";
 
@@ -313,7 +375,7 @@ export async function collectFeePayment(
   account: FeeAccount,
   input: FeePaymentInput,
   receiptPrefix: string,
-  collectedBy: { uid: string; name: string }
+  collectedBy: FeeActor
 ): Promise<FeePayment> {
   const accountRef = doc(db, COLLECTION.FEE_ACCOUNTS, account.id);
   const counterRef = doc(db, COLLECTION.FEE_COUNTERS, account.session);
@@ -346,22 +408,15 @@ export async function collectFeePayment(
       allocations,
       status: "active",
       collectedByName: collectedBy.name,
+      cancelReason: "",
+      cancelledByName: "",
     };
     const { id: paymentId, ...paymentData } = payment;
 
     transaction.set(counterRef, { session: account.session, lastSerial: serial });
     transaction.set(
       accountRef,
-      {
-        ...pickStudent(current),
-        session: current.session,
-        lines,
-        // Kept on the account for the dues report (no need to read lines).
-        totals: feeTotals(lines),
-        ...(accountSnap.exists() ? {} : { createdAt: serverTimestamp() }),
-        updatedAt: serverTimestamp(),
-        updatedBy: collectedBy.uid,
-      },
+      accountFields({ ...current, lines }, collectedBy, !accountSnap.exists()),
       { merge: true }
     );
     transaction.set(doc(db, COLLECTION.FEE_PAYMENTS, paymentId), {
@@ -370,5 +425,79 @@ export async function collectFeePayment(
       createdBy: collectedBy.uid,
     });
     return payment;
+  });
+}
+
+/**
+ * Applies an adjustment (discount, waive, special fee ...) to the account as
+ * it is in Firestore at that moment - or to `account` when it is not saved
+ * yet - and saves it with a change-log entry.
+ *
+ * @returns how many lines the change had to leave alone (see FeeChange)
+ */
+export async function updateFeeAccount(
+  account: FeeAccount,
+  change: (current: FeeAccount) => FeeChange,
+  actor: FeeActor
+): Promise<number> {
+  const accountRef = doc(db, COLLECTION.FEE_ACCOUNTS, account.id);
+  return runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(accountRef);
+    const current: FeeAccount = snapshot.exists()
+      ? { ...toFeeAccount(account.id, snapshot.data()), ...pickStudent(account) }
+      : account;
+    const result = change(current);
+    const entry: FeeLogEntry = { at: new Date().toISOString(), byName: actor.name, text: result.text };
+    transaction.set(
+      accountRef,
+      accountFields({ ...result.account, log: [...current.log, entry] }, actor, !snapshot.exists())
+    );
+    return result.skipped;
+  });
+}
+
+/**
+ * Cancels a receipt: it stays in Firestore (marked cancelled, with the
+ * reason) and the amounts it paid become due again on the account.
+ */
+export async function cancelFeePayment(
+  payment: FeePayment,
+  reason: string,
+  actor: FeeActor
+): Promise<void> {
+  const paymentRef = doc(db, COLLECTION.FEE_PAYMENTS, payment.id);
+  const accountRef = doc(db, COLLECTION.FEE_ACCOUNTS, payment.accountId);
+  await runTransaction(db, async (transaction) => {
+    const paymentSnap = await transaction.get(paymentRef);
+    const accountSnap = await transaction.get(accountRef);
+    if (!paymentSnap.exists() || !accountSnap.exists()) throw new Error("FEE_NOT_FOUND");
+    if (paymentSnap.data().status === "cancelled") return;
+
+    const current = toFeeAccount(payment.accountId, accountSnap.data());
+    const allocations = toFeePayment(payment.id, paymentSnap.data()).allocations;
+    const entry: FeeLogEntry = {
+      at: new Date().toISOString(),
+      byName: actor.name,
+      text: `Receipt ${payment.receiptNo} (${formatRupees(payment.amount)}) cancelled - ${reason.trim()}`,
+    };
+    transaction.update(paymentRef, {
+      status: "cancelled",
+      cancelReason: reason.trim(),
+      cancelledByName: actor.name,
+      cancelledBy: actor.uid,
+      cancelledAt: serverTimestamp(),
+    });
+    transaction.set(
+      accountRef,
+      accountFields(
+        {
+          ...current,
+          lines: revertAllocations(current.lines, allocations),
+          log: [...current.log, entry],
+        },
+        actor,
+        false
+      )
+    );
   });
 }

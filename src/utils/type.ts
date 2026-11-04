@@ -478,7 +478,26 @@ export interface FeeLine {
   amount: number;
   discount: number;
   paid: number;
+  /** Waived (fee maafi): whatever is still due on the line is let go. */
   waived: boolean;
+  discountReason: string;
+  waiveReason: string;
+}
+
+/** Transport fee of a student: the same amount every month in the range. */
+export interface FeeTransport {
+  amount: number;
+  /** First and last calendar month of the range (inclusive, session order). */
+  fromMonth: number;
+  toMonth: number;
+}
+
+/** One entry of an account's change log (discount, waive, special fee ...). */
+export interface FeeLogEntry {
+  /** ISO date-time. */
+  at: string;
+  byName: string;
+  text: string;
 }
 
 /** The `feeAccounts/{session}_{studentId}` document. */
@@ -492,6 +511,10 @@ export interface FeeAccount {
   admissionNo: string;
   fatherName: string;
   lines: FeeLine[];
+  /** Monthly fee this student pays instead of the class fee; null = class fee. */
+  specialMonthlyFee: number | null;
+  transport: FeeTransport | null;
+  log: FeeLogEntry[];
 }
 
 /** Totals of an account; `due` never counts waived lines. */
@@ -535,6 +558,8 @@ export interface FeePayment {
   allocations: FeeAllocation[];
   status: "active" | "cancelled";
   collectedByName: string;
+  cancelReason: string;
+  cancelledByName: string;
 }
 
 /** Who a fee account belongs to (copied onto the account and receipts). */

@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { Printer } from "lucide-react";
+import { Printer, XCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import Loader from "../../../custom-components/Loader";
@@ -12,10 +12,11 @@ interface PaymentHistoryProps {
   payments: FeePayment[];
   loading: boolean;
   error: string | null;
+  onCancel: (payment: FeePayment) => void;
 }
 
-/** Receipts of a fee account, newest first, each with a print link. */
-function PaymentHistory({ payments, loading, error }: PaymentHistoryProps) {
+/** Receipts of a fee account, newest first, each with print and cancel. */
+function PaymentHistory({ payments, loading, error, onCancel }: PaymentHistoryProps) {
   return (
     <section className="rounded-lg border border-gray-200 bg-white">
       <h2 className="border-b border-gray-100 p-4 font-bold text-gray-800">
@@ -49,14 +50,31 @@ function PaymentHistory({ payments, loading, error }: PaymentHistoryProps) {
                   {payment.reference ? ` (${payment.reference})` : ""} ·{" "}
                   {payment.allocations.map((item) => item.label).join(", ")}
                 </p>
+                {payment.status === "cancelled" && (
+                  <p className="text-sm text-red-600">
+                    Cancelled by {payment.cancelledByName || "-"}: {payment.cancelReason}
+                  </p>
+                )}
               </div>
-              <Link
-                to={`${FEE_RECEIPT_PATH}?id=${encodeURIComponent(payment.id)}`}
-                className="flex shrink-0 items-center gap-2 self-start rounded-md border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 sm:self-auto"
-              >
-                <Printer className="h-4 w-4" />
-                Receipt
-              </Link>
+              <div className="flex shrink-0 gap-2 self-start sm:self-auto">
+                {payment.status === "active" && (
+                  <button
+                    type="button"
+                    onClick={() => onCancel(payment)}
+                    className="flex items-center gap-2 rounded-md border border-red-200 px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-50"
+                  >
+                    <XCircle className="h-4 w-4" />
+                    Cancel
+                  </button>
+                )}
+                <Link
+                  to={`${FEE_RECEIPT_PATH}?id=${encodeURIComponent(payment.id)}`}
+                  className="flex items-center gap-2 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  <Printer className="h-4 w-4" />
+                  Receipt
+                </Link>
+              </div>
             </li>
           ))}
         </ul>

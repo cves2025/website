@@ -88,13 +88,15 @@ Half-Yearly Exam     300      100       -       -    200
 - [x] **Fee Receipt** (print / PDF): two copies on one A4 page (Student Copy + Office Copy), school letterhead, receipt no., date, student details, lines paid, total in figures and words, payment mode, signature.
 
 #### Step 3: Student fee adjustments
-- [ ] Special monthly fee for the whole year.
-- [ ] Transport: on/off, monthly amount, starting month.
-- [ ] Discount on a line (fixed amount + reason).
-- [ ] Waive a line (Monthly, Transport or both for a month) + reason; undo a waive.
-- [ ] Extra Charge (re-admission, annual charge or anything else): name, amount, month.
-- [ ] Cancel a receipt (with a reason).
-- [ ] Recalculate the unpaid lines when the Fee Structure changes (paid lines stay as they are).
+All on the Collect Fee page, each saved with an entry in the account's **change log** (who, when, what).
+An amount never drops below what was already paid + discounted on a line; such lines are left as they are and the admin is told how many.
+- [x] Special monthly fee for the whole year (and Remove to go back to the class fee).
+- [x] Transport: monthly amount and a month range (from / to); Remove stops it. Unpaid lines outside the range are removed.
+- [x] Discount on a line (fixed amount + reason; 0 removes it).
+- [x] Waive a line + reason, or tick several lines (e.g. a month's Monthly and Transport) and waive them together; undo a waive.
+- [x] Extra Charge (re-admission, annual charge or anything else): name, amount, optional month. Removable while nothing is paid on it.
+- [x] Cancel a receipt (with a reason). The receipt stays, marked CANCELLED, and its amounts become due again.
+- [x] Refresh from Fee Structure: updates monthly, exam and admission fees to the current structure (special fee, transport, discounts and extra charges stay).
 
 #### Step 4: Reports
 - [ ] **Dues Report**: due per student, filterable by class, section and month; defaulter list.

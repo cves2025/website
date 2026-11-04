@@ -1,14 +1,27 @@
+import { Ban, RotateCcw, Tag, Trash2 } from "lucide-react";
+
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatRupees } from "../../../utils/feeStructure";
-import { feeTotals, lineDue, lineMonthLabel } from "../../../utils/feeAccount";
+import {
+  feeTotals,
+  lineDue,
+  lineMonthLabel,
+  maxDiscount as maxDiscountOf,
+} from "../../../utils/feeAccount";
 import type { FeeAccount, FeeLine } from "../../../utils/type";
 
 interface FeeAccountTableProps {
   account: FeeAccount;
   selected: string[];
   onSelectedChange: (lineIds: string[]) => void;
+  onDiscount: (line: FeeLine) => void;
+  onWaive: (line: FeeLine, waived: boolean) => void;
+  onRemove: (line: FeeLine) => void;
   disabled?: boolean;
 }
+
+const actionClass =
+  "rounded-full p-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40";
 
 function lineStatus(line: FeeLine): { label: string; className: string } {
   if (line.waived) return { label: "Waived", className: "bg-gray-100 text-gray-600" };
@@ -20,9 +33,18 @@ function lineStatus(line: FeeLine): { label: string; className: string } {
 
 /**
  * Summary tiles and every line of a fee account. Lines that still owe money
- * can be ticked to pay them.
+ * can be ticked to pay or waive them; each line has its discount / waive
+ * actions (and remove, for an extra charge nothing was paid on).
  */
-function FeeAccountTable({ account, selected, onSelectedChange, disabled }: FeeAccountTableProps) {
+function FeeAccountTable({
+  account,
+  selected,
+  onSelectedChange,
+  onDiscount,
+  onWaive,
+  onRemove,
+  disabled,
+}: FeeAccountTableProps) {
   const totals = feeTotals(account.lines);
   const dueIds = account.lines.filter((line) => lineDue(line) > 0).map((line) => line.id);
   const allSelected = dueIds.length > 0 && dueIds.every((id) => selected.includes(id));
@@ -53,7 +75,7 @@ function FeeAccountTable({ account, selected, onSelectedChange, disabled }: FeeA
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
-        <table className="w-full min-w-[640px] text-sm">
+        <table className="w-full min-w-[760px] text-sm">
           <thead className="bg-gray-50 text-left text-gray-600">
             <tr>
               <th className="w-10 px-3 py-2">
@@ -71,6 +93,7 @@ function FeeAccountTable({ account, selected, onSelectedChange, disabled }: FeeA
               <th className="px-3 py-2 text-right font-semibold">Paid</th>
               <th className="px-3 py-2 text-right font-semibold">Due</th>
               <th className="px-3 py-2 font-semibold">Status</th>
+              <th className="px-3 py-2 text-right font-semibold">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -91,7 +114,15 @@ function FeeAccountTable({ account, selected, onSelectedChange, disabled }: FeeA
                       onCheckedChange={(value) => toggle(line.id, value === true)}
                     />
                   </td>
-                  <td className="px-3 py-2 font-medium text-gray-800">{line.label}</td>
+                  <td className="px-3 py-2">
+                    <p className={`font-medium ${line.waived ? "text-gray-500" : "text-gray-800"}`}>{line.label}</p>
+                    {line.discountReason && !line.waived && (
+                      <p className="text-xs text-blue-700">Discount: {line.discountReason}</p>
+                    )}
+                    {line.waived && line.waiveReason && (
+                      <p className="text-xs text-gray-500">Waived: {line.waiveReason}</p>
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-gray-600">{lineMonthLabel(line, account.session) || "-"}</td>
                   <td className="px-3 py-2 text-right">{formatRupees(line.amount)}</td>
                   <td className="px-3 py-2 text-right">{line.discount ? formatRupees(line.discount) : "-"}</td>
@@ -101,6 +132,44 @@ function FeeAccountTable({ account, selected, onSelectedChange, disabled }: FeeA
                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${status.className}`}>
                       {status.label}
                     </span>
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="flex justify-end gap-1">
+                      {!line.waived && (
+                        <button
+                          type="button"
+                          disabled={disabled || (maxDiscountOf(line) === 0 && line.discount === 0)}
+                          onClick={() => onDiscount(line)}
+                          title="Discount"
+                          aria-label={`Discount on ${line.label}`}
+                          className={`${actionClass} text-blue-600 hover:bg-blue-50`}
+                        >
+                          <Tag className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        disabled={disabled || (!line.waived && due === 0)}
+                        onClick={() => onWaive(line, !line.waived)}
+                        title={line.waived ? "Undo waive" : "Waive (fee maafi)"}
+                        aria-label={`${line.waived ? "Undo waive of" : "Waive"} ${line.label}`}
+                        className={`${actionClass} ${line.waived ? "text-green-600 hover:bg-green-50" : "text-amber-600 hover:bg-amber-50"}`}
+                      >
+                        {line.waived ? <RotateCcw className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
+                      </button>
+                      {line.head === "extra" && (
+                        <button
+                          type="button"
+                          disabled={disabled || line.paid > 0}
+                          onClick={() => onRemove(line)}
+                          title={line.paid > 0 ? "Money is paid on this charge" : "Remove extra charge"}
+                          aria-label={`Remove ${line.label}`}
+                          className={`${actionClass} text-red-600 hover:bg-red-50`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );

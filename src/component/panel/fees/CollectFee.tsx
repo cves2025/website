@@ -1,7 +1,8 @@
 import { useContext, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { CheckCircle2 } from "lucide-react";
+import { format } from "date-fns";
+import { Bus, CheckCircle2, PlusCircle, RefreshCw, Tags } from "lucide-react";
 
 import PageHeader from "../../../custom-components/PageHeader";
 import SelectDropdown from "../../../custom-components/SelectDropdown";
@@ -19,17 +20,24 @@ import {
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import { todayKey } from "../../../utils/holidayCalendar";
-import { formatRupees, toAmount } from "../../../utils/feeStructure";
+import { formatRupees, monthLabel, toAmount } from "../../../utils/feeStructure";
 import { allocatePayment, feeTotals, lineDue } from "../../../utils/feeAccount";
-import { FEE_OVERPAID, collectFeePayment } from "../../../utils/feeService";
+import {
+  FEE_OVERPAID,
+  cancelFeePayment,
+  collectFeePayment,
+} from "../../../utils/feeService";
 import useSectionStudents from "../../../hooks/useSectionStudents";
 import useFeeAccount from "../../../hooks/useFeeAccount";
 import useAccountPayments from "../../../hooks/useAccountPayments";
 import useFeeSettings from "../../../hooks/useFeeSettings";
+import useFeeStructure from "../../../hooks/useFeeStructure";
 import type { FeePayment, FeeStudent, PaymentMode } from "../../../utils/type";
 import { inputClass, labelClass } from "../attendance/attendanceShared";
 import FeeAccountTable from "./FeeAccountTable";
 import PaymentHistory from "./PaymentHistory";
+import FeeAdjustDialog from "./FeeAdjustDialog";
+import type { FeeAdjustment } from "./FeeAdjustDialog";
 
 const sessions = generateAcademicYears();
 const SECTION_OPTIONS = SECTIONS.map((section) => ({ value: section, label: section }));
@@ -54,7 +62,9 @@ const emptyForm = (): PaymentForm => ({
  * Collect Fee (admin only): pick a student, see the fee account of the
  * session and take a payment - for ticked lines, or any amount that is
  * adjusted against the oldest due lines first (partial and advance payments
- * both work). Every payment gets a receipt number.
+ * both work). Every payment gets a receipt number. The account is adjusted
+ * here too: special monthly fee, transport, extra charges, discounts,
+ * waives and cancelling a receipt, each written to the account's change log.
  */
 function CollectFee() {
   const { user } = useContext(myContext);
@@ -91,12 +101,17 @@ function CollectFee() {
   const account = feeAccount.account;
   const history = useAccountPayments(feeAccount.saved && account ? account.id : "");
   const { settings, loading: settingsLoading } = useFeeSettings();
+  const { structure } = useFeeStructure(session);
 
   const [selected, setSelected] = useState<string[]>([]);
   const [form, setForm] = useState<PaymentForm>(emptyForm);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [receipt, setReceipt] = useState<FeePayment | null>(null);
+  const [adjustment, setAdjustment] = useState<FeeAdjustment | null>(null);
+  const [toCancel, setToCancel] = useState<FeePayment | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelling, setCancelling] = useState(false);
 
   // A new student or session starts with a clean form.
   useEffect(() => {
@@ -198,6 +213,38 @@ function CollectFee() {
     }
   };
 
+  const refreshAccount = () => {
+    setSelected([]);
+    setForm((prev) => ({ ...prev, amount: "" }));
+    feeAccount.reload();
+    history.reload();
+  };
+
+  const handleCancelReceipt = async () => {
+    if (!user || !toCancel) return;
+    if (!cancelReason.trim()) {
+      toast.error("Enter the reason for cancelling.");
+      document.getElementById("cancelReason")?.focus();
+      return;
+    }
+    setCancelling(true);
+    try {
+      await cancelFeePayment(toCancel, cancelReason, {
+        uid: user.uid,
+        name: user.fullName || user.email || "",
+      });
+      toast.success(`Receipt ${toCancel.receiptNo} cancelled.`);
+      setToCancel(null);
+      setCancelReason("");
+      refreshAccount();
+    } catch (cause) {
+      console.error("Failed to cancel receipt:", cause);
+      toast.error("Could not cancel the receipt. Please try again.");
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   const studentOptions = students.map((item) => ({
     value: item.studentId,
     label: `${item.rollNumber ? `${item.rollNumber}. ` : ""}${item.studentName}`,
@@ -281,12 +328,47 @@ function CollectFee() {
         </div>
       ) : (
         <>
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
-            <p className="text-lg font-bold text-gray-800">{account.studentName}</p>
-            <p className="text-sm text-gray-500">
-              Class {toOrdinalLabel(account.className)}-{account.section} · Adm. No.{" "}
-              {account.admissionNo || "-"} · Father: {account.fatherName || "-"} · Session {session}
-            </p>
+          <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-lg font-bold text-gray-800">{account.studentName}</p>
+              <p className="text-sm text-gray-500">
+                Class {toOrdinalLabel(account.className)}-{account.section} · Adm. No.{" "}
+                {account.admissionNo || "-"} · Father: {account.fatherName || "-"} · Session {session}
+              </p>
+              <div className="mt-1 flex flex-wrap gap-2 text-xs font-semibold empty:hidden">
+                {account.specialMonthlyFee !== null && (
+                  <span className="rounded-full bg-purple-100 px-2 py-0.5 text-purple-700">
+                    Special fee {formatRupees(account.specialMonthlyFee)}/month
+                  </span>
+                )}
+                {account.transport && (
+                  <span className="rounded-full bg-sky-100 px-2 py-0.5 text-sky-700">
+                    Transport {formatRupees(account.transport.amount)}/month (
+                    {monthLabel(account.transport.fromMonth)} - {monthLabel(account.transport.toMonth)})
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { kind: "special" as const, label: "Special Fee", icon: Tags },
+                { kind: "transport" as const, label: "Transport", icon: Bus },
+                { kind: "extra" as const, label: "Extra Charge", icon: PlusCircle },
+                { kind: "refresh" as const, label: "Refresh", icon: RefreshCw },
+              ].map(({ kind, label, icon: Icon }) => (
+                <button
+                  key={kind}
+                  type="button"
+                  disabled={saving}
+                  onClick={() => setAdjustment({ kind })}
+                  title={kind === "refresh" ? "Refresh the fees from the Fee Structure" : undefined}
+                  className="flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {account.lines.length === 0 ? (
@@ -304,6 +386,9 @@ function CollectFee() {
                 account={account}
                 selected={selected}
                 onSelectedChange={handleSelectedChange}
+                onDiscount={(line) => setAdjustment({ kind: "discount", line })}
+                onWaive={(line, waived) => setAdjustment({ kind: "waive", lineIds: [line.id], waived })}
+                onRemove={(line) => setAdjustment({ kind: "removeExtra", line })}
                 disabled={saving}
               />
 
@@ -375,7 +460,17 @@ function CollectFee() {
                     />
                   </div>
                 </div>
-                <div className="mt-4 flex justify-end">
+                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                  {selected.length > 0 && (
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => setAdjustment({ kind: "waive", lineIds: selected, waived: true })}
+                      className="rounded-md border border-amber-300 px-5 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                    >
+                      Waive ticked ({selected.length})
+                    </button>
+                  )}
                   <button
                     type="button"
                     disabled={saving || settingsLoading || !amount || totals?.due === 0}
@@ -389,9 +484,75 @@ function CollectFee() {
             </>
           )}
 
-          <PaymentHistory payments={history.payments} loading={history.loading} error={history.error} />
+          <PaymentHistory
+            payments={history.payments}
+            loading={history.loading}
+            error={history.error}
+            onCancel={(payment) => {
+              setCancelReason("");
+              setToCancel(payment);
+            }}
+          />
+
+          {account.log.length > 0 && (
+            <details className="rounded-lg border border-gray-200 bg-white">
+              <summary className="cursor-pointer p-4 font-bold text-gray-800">
+                Change log ({account.log.length})
+              </summary>
+              <ul className="divide-y divide-gray-100 border-t border-gray-100 text-sm">
+                {[...account.log].reverse().map((entry, index) => (
+                  <li key={`${entry.at}-${index}`} className="px-4 py-2">
+                    <p className="text-gray-800">{entry.text}</p>
+                    <p className="text-xs text-gray-500">
+                      {entry.at ? format(new Date(entry.at), "d MMM yyyy, h:mm a") : "-"} · {entry.byName || "-"}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+
+          <FeeAdjustDialog
+            adjustment={adjustment}
+            account={account}
+            structure={structure}
+            onClose={() => setAdjustment(null)}
+            onSaved={refreshAccount}
+          />
         </>
       )}
+
+      <Modal
+        isOpen={toCancel !== null}
+        onClose={() => {
+          if (!cancelling) setToCancel(null);
+        }}
+        title="Cancel Receipt"
+        description={
+          toCancel
+            ? `Cancel receipt ${toCancel.receiptNo} of ${formatRupees(toCancel.amount)}? The receipt is kept (marked cancelled) and these fees become due again.`
+            : ""
+        }
+        cancelText="Back"
+        submitText="Cancel Receipt"
+        submitClassName="bg-red-600 hover:bg-red-700"
+        loading={cancelling}
+        onSubmit={() => void handleCancelReceipt()}
+      >
+        <div className="mt-4">
+          <label htmlFor="cancelReason" className={labelClass}>
+            Reason <span className="ml-0.5 text-red-500">*</span>
+          </label>
+          <input
+            id="cancelReason"
+            className={inputClass}
+            maxLength={150}
+            placeholder="e.g. Wrong student, wrong amount"
+            value={cancelReason}
+            onChange={(event) => setCancelReason(event.target.value)}
+          />
+        </div>
+      </Modal>
 
       <Modal
         isOpen={confirmOpen}
