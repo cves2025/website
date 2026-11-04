@@ -77,14 +77,15 @@ Half-Yearly Exam     300      100       -       -    200
 - [x] **Fee Settings**: due day, late fee on/off + amount, receipt prefix.
 
 #### Step 2: Fee Account, Collect Fee and Receipt
-- [ ] Create a student's Fee Account from the structure (12 monthly lines, exam lines, admission fee for new admissions).
-- [ ] **Collect Fee** page:
-  - Search for a student by name, ID or class/section.
-  - See the account: every line with fee, discount, waived, paid and due.
-  - Pick lines or enter an amount (partial and advance payments allowed).
+- [x] Build a student's Fee Account from the structure (12 monthly lines, exam lines, admission fee for new admissions). The account is only written to Firestore on its first payment; until then it is built on screen, so structure changes still reach it.
+- [x] **Collect Fee** page:
+  - Pick a student by session, class, section and a searchable student list (name, admission no. or father's name).
+  - See the account: every line with fee, discount, paid, due and status.
+  - Tick lines or enter an amount (partial and advance payments allowed; with nothing ticked the oldest due lines are paid first).
   - Payment mode: Cash / UPI / Cheque / Bank transfer, plus a reference no. and a note.
-  - Save, generate the receipt number, and print the receipt.
-- [ ] **Fee Receipt** (print / PDF): school letterhead, receipt no., date, student details, lines paid, total in figures and words, payment mode, signature.
+  - Confirm, save in one transaction with the next receipt number, and print the receipt.
+  - Payment history of the student with a reprint link.
+- [x] **Fee Receipt** (print / PDF): two copies on one A4 page (Student Copy + Office Copy), school letterhead, receipt no., date, student details, lines paid, total in figures and words, payment mode, signature.
 
 #### Step 3: Student fee adjustments
 - [ ] Special monthly fee for the whole year.
@@ -92,7 +93,6 @@ Half-Yearly Exam     300      100       -       -    200
 - [ ] Discount on a line (fixed amount + reason).
 - [ ] Waive a line (Monthly, Transport or both for a month) + reason; undo a waive.
 - [ ] Extra Charge (re-admission, annual charge or anything else): name, amount, month.
-- [ ] Payment history of the student; reprint any receipt.
 - [ ] Cancel a receipt (with a reason).
 - [ ] Recalculate the unpaid lines when the Fee Structure changes (paid lines stay as they are).
 

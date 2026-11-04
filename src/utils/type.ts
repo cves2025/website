@@ -457,3 +457,103 @@ export interface FeeSettings {
   /** First part of the receipt number, e.g. "CVES" -> CVES/2026-27/0001. */
   receiptPrefix: string;
 }
+
+export type FeeHead =
+  | "previousDues"
+  | "admission"
+  | "monthly"
+  | "transport"
+  | "exam"
+  | "extra"
+  | "lateFee";
+
+/** One charge on a student's fee account, e.g. "April - Monthly Fee". */
+export interface FeeLine {
+  /** Stable id inside the account, e.g. "monthly-4", "exam-{examFeeId}". */
+  id: string;
+  head: FeeHead;
+  label: string;
+  /** Calendar month the line belongs to (1-12); null = not month-bound. */
+  month: number | null;
+  amount: number;
+  discount: number;
+  paid: number;
+  waived: boolean;
+}
+
+/** The `feeAccounts/{session}_{studentId}` document. */
+export interface FeeAccount {
+  id: string;
+  session: string;
+  studentId: string;
+  studentName: string;
+  className: string;
+  section: string;
+  admissionNo: string;
+  fatherName: string;
+  lines: FeeLine[];
+}
+
+/** Totals of an account; `due` never counts waived lines. */
+export interface FeeTotals {
+  amount: number;
+  discount: number;
+  paid: number;
+  due: number;
+}
+
+export type PaymentMode = "Cash" | "UPI" | "Cheque" | "Bank Transfer";
+
+/** How much of a payment went to one line. */
+export interface FeeAllocation {
+  lineId: string;
+  label: string;
+  amount: number;
+}
+
+/** The `feePayments/{session}_{serial}` document (one fee receipt). */
+export interface FeePayment {
+  id: string;
+  receiptNo: string;
+  /** Running number of the receipt inside the session (1, 2, 3 ...). */
+  serial: number;
+  session: string;
+  accountId: string;
+  studentId: string;
+  studentName: string;
+  className: string;
+  section: string;
+  admissionNo: string;
+  fatherName: string;
+  /** Payment date, "yyyy-MM-dd". */
+  date: string;
+  mode: PaymentMode;
+  /** UPI / cheque / bank reference number. */
+  reference: string;
+  note: string;
+  amount: number;
+  allocations: FeeAllocation[];
+  status: "active" | "cancelled";
+  collectedByName: string;
+}
+
+/** Who a fee account belongs to (copied onto the account and receipts). */
+export interface FeeStudent {
+  studentId: string;
+  studentName: string;
+  className: string;
+  section: string;
+  admissionNo: string;
+  fatherName: string;
+}
+
+/** What the admin enters on the Collect Fee page. */
+export interface FeePaymentInput {
+  amount: number;
+  /** Lines the payment is for; null = oldest due lines first. */
+  lineIds: string[] | null;
+  date: string;
+  mode: PaymentMode;
+  reference: string;
+  note: string;
+}

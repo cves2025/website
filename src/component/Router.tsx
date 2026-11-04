@@ -50,6 +50,8 @@ import MarkAttendance from './panel/attendance/MarkAttendance'
 import AttendanceReport from './panel/attendance/AttendanceReport'
 import HolidayCalendar from './panel/attendance/HolidayCalendar'
 import FeeStructure from './panel/fees/FeeStructure'
+import CollectFee from './panel/fees/CollectFee'
+import FeeReceipt from './panel/fees/FeeReceipt'
 import FeeSettings from './panel/fees/FeeSettings'
 
 function Router() {
@@ -81,6 +83,8 @@ function Router() {
           <Route path="attendance/mark" element={<MarkAttendance />} />
           <Route path="attendance/report" element={<AttendanceReport />} />
           <Route path="attendance/holidays" element={<HolidayCalendar />} />
+          <Route path="fees/collect" element={<CollectFee />} />
+          <Route path="fees/receipt" element={<FeeReceipt />} />
           <Route path="fees/structure" element={<FeeStructure />} />
           <Route path="fees/settings" element={<FeeSettings />} />
           <Route path="settings" element={<Settings />} />

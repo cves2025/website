@@ -24,11 +24,8 @@ import {
   monthLabel,
   toAmount,
 } from "../../../utils/feeStructure";
-import {
-  feeStructureExists,
-  loadFeeStructure,
-  saveFeeStructure,
-} from "../../../utils/feeService";
+import { saveFeeStructure } from "../../../utils/feeService";
+import useFeeStructure from "../../../hooks/useFeeStructure";
 import type { ClassFee, ExamFeeItem, FeeStructure as Structure } from "../../../utils/type";
 import { inputClass, labelClass } from "../attendance/attendanceShared";
 
@@ -55,40 +52,23 @@ const sameStructure = (a: Structure, b: Structure) =>
 function FeeStructure() {
   const { user } = useContext(myContext);
   const [session, setSession] = useState(currentSessions[0]?.value ?? "");
+  const { structure, loading, error } = useFeeStructure(session);
+  const fromSession = previousSession(session);
+  const previous = useFeeStructure(fromSession);
   const [saved, setSaved] = useState<Structure>(() => emptyFeeStructure(session));
   const [draft, setDraft] = useState<Structure>(saved);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [pendingSession, setPendingSession] = useState<string | null>(null);
   const [copyOpen, setCopyOpen] = useState(false);
-  const [copying, setCopying] = useState(false);
   const [examToDelete, setExamToDelete] = useState<ExamFeeItem | null>(null);
 
   const dirty = !sameStructure(saved, draft);
 
+  // A newly loaded session replaces the page.
   useEffect(() => {
-    if (!session) return;
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    loadFeeStructure(session)
-      .then((data) => {
-        if (cancelled) return;
-        setSaved(data);
-        setDraft(data);
-      })
-      .catch((cause) => {
-        console.error("Failed to load fee structure:", cause);
-        if (!cancelled) setError("Fee structure could not be loaded.");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [session]);
+    setSaved(structure);
+    setDraft(structure);
+  }, [structure]);
 
   const classFee = (className: string): ClassFee =>
     draft.classes[className] ?? EMPTY_CLASS_FEE;
@@ -123,32 +103,18 @@ function FeeStructure() {
     else setSession(value);
   };
 
-  const handleCopy = async () => {
-    const from = previousSession(session);
-    setCopying(true);
-    try {
-      if (!(await feeStructureExists(from))) {
-        toast.error(`No fee structure saved for ${from}.`);
-        return;
-      }
-      const source = await loadFeeStructure(from);
-      setDraft({
-        session,
-        classes: source.classes,
-        // New ids, so the copied exam fees are not linked to the old session.
-        examFees: source.examFees.map((item, index) => ({
-          ...item,
-          id: `${Date.now()}${index}`,
-        })),
-      });
-      setCopyOpen(false);
-      toast.success(`Copied from ${from}. Check the amounts and save.`);
-    } catch (cause) {
-      console.error("Failed to copy fee structure:", cause);
-      toast.error("Could not copy. Please try again.");
-    } finally {
-      setCopying(false);
-    }
+  const handleCopy = () => {
+    setDraft({
+      session,
+      classes: previous.structure.classes,
+      // New ids, so the copied exam fees are not linked to the old session.
+      examFees: previous.structure.examFees.map((item, index) => ({
+        ...item,
+        id: `${Date.now()}${index}`,
+      })),
+    });
+    setCopyOpen(false);
+    toast.success(`Copied from ${fromSession}. Check the amounts and save.`);
   };
 
   const handleSave = async () => {
@@ -198,12 +164,13 @@ function FeeStructure() {
         </div>
         <button
           type="button"
-          disabled={loading || saving}
+          disabled={loading || saving || previous.loading || !previous.saved}
+          title={previous.saved ? undefined : `No fee structure saved for ${fromSession}`}
           onClick={() => setCopyOpen(true)}
           className="flex items-center justify-center gap-2 rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
         >
           <Copy className="h-4 w-4" />
-          Copy from {previousSession(session)}
+          Copy from {fromSession}
         </button>
       </div>
 
@@ -355,15 +322,12 @@ function FeeStructure() {
 
       <Modal
         isOpen={copyOpen}
-        onClose={() => {
-          if (!copying) setCopyOpen(false);
-        }}
+        onClose={() => setCopyOpen(false)}
         title="Copy Fee Structure"
-        description={`Replace the fees on this page with the fee structure of ${previousSession(session)}? Nothing is saved until you click Save.`}
+        description={`Replace the fees on this page with the fee structure of ${fromSession}? Nothing is saved until you click Save.`}
         cancelText="Cancel"
         submitText="Copy"
-        loading={copying}
-        onSubmit={() => void handleCopy()}
+        onSubmit={handleCopy}
       />
 
       <Modal

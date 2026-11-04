@@ -52,6 +52,7 @@ export const MENU: MenuItem[] = [
     icon: <FaRupeeSign />,
     accent: BRAND.green,
     subLinks: [
+      { label: "Collect Fee", path: "/welcome/fees/collect" },
       { label: "Fee Structure", path: "/welcome/fees/structure" },
       { label: "Fee Settings", path: "/welcome/fees/settings" },
     ],

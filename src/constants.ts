@@ -1,4 +1,4 @@
-import type { ClassFee, FeeSettings } from "./utils/type";
+import type { ClassFee, FeeHead, FeeSettings, PaymentMode } from "./utils/type";
 
 export const COLLECTION = {
   STUDENTS: "students",
@@ -28,6 +28,12 @@ export const COLLECTION = {
   FEE_STRUCTURES: "feeStructures",
   /** School-wide fee settings, one document: FEE_SETTINGS_DOC. */
   FEE_SETTINGS: "feeSettings",
+  /** One fee account per student and session, id = {session}_{studentId}. */
+  FEE_ACCOUNTS: "feeAccounts",
+  /** One document per fee receipt, id = {session}_{serial}. */
+  FEE_PAYMENTS: "feePayments",
+  /** Last receipt serial of a session, id = session. */
+  FEE_COUNTERS: "feeCounters",
 };
 
 export const PRE_DEFINED_DOC_ID = {
@@ -128,6 +134,14 @@ export const PHONE_PATTERN: RegExp = /^[0-9+\-\s()]*$/;
 export const ADD_STUDENT_PATH = "/welcome/student/add";
 /** View / print one student's admission form: `?id=<enrollmentId>`. */
 export const VIEW_STUDENT_PATH = "/welcome/student/view";
+
+export const FEE_STRUCTURE_PATH = "/welcome/fees/structure";
+
+export const FEE_COLLECT_PATH = "/welcome/fees/collect";
+
+/** Printable receipt; the payment id goes in `?id=`. */
+export const FEE_RECEIPT_PATH = "/welcome/fees/receipt";
+
 /** School location and contact details shown on the Contact page. */
 export const SCHOOL_CONTACT = {
   ADDRESS:
@@ -175,3 +189,21 @@ export const DEFAULT_FEE_SETTINGS: FeeSettings = {
 /** Number input for a rupee amount inside a table cell (fee pages). */
 export const AMOUNT_INPUT_CLASS =
   "w-full max-w-[140px] rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50";
+
+/** Name of a fee head on the account and the receipt. */
+export const FEE_HEAD_LABELS: Record<FeeHead, string> = {
+  previousDues: "Previous Dues",
+  admission: "Admission Fee",
+  monthly: "Monthly Fee",
+  transport: "Transport Fee",
+  exam: "Exam Fee",
+  extra: "Extra Charge",
+  lateFee: "Late Fee",
+};
+
+export const PAYMENT_MODES: PaymentMode[] = ["Cash", "UPI", "Cheque", "Bank Transfer"];
+
+export const PAYMENT_MODE_OPTIONS = PAYMENT_MODES.map((mode) => ({ value: mode, label: mode }));
+
+/** Letterhead of the fee receipt. */
+export const SCHOOL_NAME = "CHILDREN'S VALLEY ENGLISH SCHOOL";

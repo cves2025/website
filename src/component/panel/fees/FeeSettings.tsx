@@ -10,7 +10,8 @@ import { generateAcademicYears } from "../../../utils/generateAcademicYears";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import { DEFAULT_FEE_SETTINGS } from "../../../constants";
 import { formatRupees, toAmount } from "../../../utils/feeStructure";
-import { loadFeeSettings, saveFeeSettings } from "../../../utils/feeService";
+import { saveFeeSettings } from "../../../utils/feeService";
+import useFeeSettings from "../../../hooks/useFeeSettings";
 import type { FeeSettings as Settings } from "../../../utils/type";
 import { inputClass, labelClass } from "../attendance/attendanceShared";
 
@@ -27,34 +28,18 @@ const currentSession = generateAcademicYears()[0]?.value ?? "2026-27";
  */
 function FeeSettings() {
   const { user } = useContext(myContext);
+  const { settings, loading, error } = useFeeSettings();
   const [saved, setSaved] = useState<Settings>(DEFAULT_FEE_SETTINGS);
   const [draft, setDraft] = useState<Settings>(DEFAULT_FEE_SETTINGS);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const dirty = JSON.stringify(saved) !== JSON.stringify(draft);
   const prefix = draft.receiptPrefix.trim();
 
   useEffect(() => {
-    let cancelled = false;
-    loadFeeSettings()
-      .then((data) => {
-        if (cancelled) return;
-        setSaved(data);
-        setDraft(data);
-      })
-      .catch((cause) => {
-        console.error("Failed to load fee settings:", cause);
-        if (!cancelled) setError("Fee settings could not be loaded.");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    setSaved(settings);
+    setDraft(settings);
+  }, [settings]);
 
   const handleSave = async () => {
     if (!user) return;
