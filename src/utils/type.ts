@@ -417,3 +417,43 @@ export interface HolidayCalendar {
   weeklyOff: number[];
   holidays: Holiday[];
 }
+
+/* ------------------------------------------------------------------ fees -- */
+
+/** Admission and monthly (tuition) fee of one class, in rupees. */
+export interface ClassFee {
+  admission: number;
+  monthly: number;
+}
+
+/**
+ * One exam fee of a session (e.g. "Half-Yearly Exam" in September). The
+ * admin decides how many there are, their month and the amount per class.
+ */
+export interface ExamFeeItem {
+  id: string;
+  name: string;
+  /** Calendar month, 1 = January ... 12 = December. */
+  month: number;
+  /** className -> amount; a missing class means 0. */
+  amounts: Record<string, number>;
+}
+
+/** The `feeStructures/{session}` document. */
+export interface FeeStructure {
+  session: string;
+  /** className -> fees; a missing class means 0 for both. */
+  classes: Record<string, ClassFee>;
+  examFees: ExamFeeItem[];
+}
+
+/** The `feeSettings/general` document. */
+export interface FeeSettings {
+  /** Day of the month by which the monthly fee is due (1-28). */
+  dueDay: number;
+  lateFeeEnabled: boolean;
+  /** Fixed late fee for each month not paid by the due day. */
+  lateFeeAmount: number;
+  /** First part of the receipt number, e.g. "CVES" -> CVES/2026-27/0001. */
+  receiptPrefix: string;
+}

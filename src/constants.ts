@@ -1,3 +1,5 @@
+import type { ClassFee, FeeSettings } from "./utils/type";
+
 export const COLLECTION = {
   STUDENTS: "students",
   ENROLLMENTS: "enrollments",
@@ -22,6 +24,10 @@ export const COLLECTION = {
   GALLERY: "gallery",
   /** Syllabus / time table PDFs of the Downloads page (Settings > Downloads). */
   DOWNLOADS: "downloads",
+  /** Fee heads and amounts of a session, id = session (Fees > Fee Structure). */
+  FEE_STRUCTURES: "feeStructures",
+  /** School-wide fee settings, one document: FEE_SETTINGS_DOC. */
+  FEE_SETTINGS: "feeSettings",
 };
 
 export const PRE_DEFINED_DOC_ID = {
@@ -42,6 +48,8 @@ export const STAMP_SIGN_PRINCIPLE_DOC = "principle";
 export const ADMIT_CARD_SETTINGS_DOC = "admitCard";
 /** Document id inside COLLECTION.SETTINGS with the Home page banner slides. */
 export const HOME_BANNER_SETTINGS_DOC = "homeBanner";
+/** Document id inside COLLECTION.FEE_SETTINGS (due day, late fee, receipt prefix). */
+export const FEE_SETTINGS_DOC = "general";
 
 /** Field names of the "stampSign"/"principle" document. */
 export const STAMP_SIGN_FIELDS = {
@@ -128,3 +136,42 @@ export const SCHOOL_CONTACT = {
   LAT: 25.306506678904515,
   LNG: 82.97486022881107,
 };
+
+/* ------------------------------------------------------------------ fees -- */
+
+/** Months of a session in order, April -> March (1 = January). */
+export const SESSION_MONTHS: number[] = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+
+export const MONTH_LABELS: string[] = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/** Month dropdown options in session order. */
+export const SESSION_MONTH_OPTIONS = SESSION_MONTHS.map((month) => ({
+  value: String(month),
+  label: MONTH_LABELS[month - 1],
+}));
+
+export const EMPTY_CLASS_FEE: ClassFee = { admission: 0, monthly: 0 };
+
+export const DEFAULT_FEE_SETTINGS: FeeSettings = {
+  dueDay: 10,
+  lateFeeEnabled: false,
+  lateFeeAmount: 0,
+  receiptPrefix: "CVES",
+};
+
+/** Number input for a rupee amount inside a table cell (fee pages). */
+export const AMOUNT_INPUT_CLASS =
+  "w-full max-w-[140px] rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50";

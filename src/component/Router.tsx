@@ -49,6 +49,8 @@ import GeneratedResultCards from './panel/exams/GeneratedResultCards'
 import MarkAttendance from './panel/attendance/MarkAttendance'
 import AttendanceReport from './panel/attendance/AttendanceReport'
 import HolidayCalendar from './panel/attendance/HolidayCalendar'
+import FeeStructure from './panel/fees/FeeStructure'
+import FeeSettings from './panel/fees/FeeSettings'
 
 function Router() {
   return (
@@ -79,6 +81,8 @@ function Router() {
           <Route path="attendance/mark" element={<MarkAttendance />} />
           <Route path="attendance/report" element={<AttendanceReport />} />
           <Route path="attendance/holidays" element={<HolidayCalendar />} />
+          <Route path="fees/structure" element={<FeeStructure />} />
+          <Route path="fees/settings" element={<FeeSettings />} />
           <Route path="settings" element={<Settings />} />
           <Route path="settings/permissions" element={<Permissions />} />
           <Route path="settings/profile" element={<Profile />} />

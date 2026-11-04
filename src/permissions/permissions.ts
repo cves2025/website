@@ -32,6 +32,7 @@ export const PERMISSIONS = {
   ATTENDANCE_MARK: "attendance.mark",
   ATTENDANCE_VIEW: "attendance.view",
   HOLIDAY_MANAGE: "holiday.manage",
+  FEE_MANAGE: "fee.manage",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

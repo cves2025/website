@@ -6,6 +6,7 @@ import {
   FaAddressCard,
   FaClipboardList,
   FaCalendarCheck,
+  FaRupeeSign,
 } from "react-icons/fa";
 
 export const BRAND = {
@@ -44,6 +45,15 @@ export const MENU: MenuItem[] = [
       { label: "Mark Attendance", path: "/welcome/attendance/mark" },
       { label: "Attendance Report", path: "/welcome/attendance/report" },
       { label: "Holiday Calendar", path: "/welcome/attendance/holidays" },
+    ],
+  },
+  {
+    label: "Fees",
+    icon: <FaRupeeSign />,
+    accent: BRAND.green,
+    subLinks: [
+      { label: "Fee Structure", path: "/welcome/fees/structure" },
+      { label: "Fee Settings", path: "/welcome/fees/settings" },
     ],
   },
   {
