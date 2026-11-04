@@ -53,6 +53,8 @@ export const MENU: MenuItem[] = [
     accent: BRAND.green,
     subLinks: [
       { label: "Collect Fee", path: "/welcome/fees/collect" },
+      { label: "Dues Report", path: "/welcome/fees/dues" },
+      { label: "Collection Report", path: "/welcome/fees/collection" },
       { label: "Fee Structure", path: "/welcome/fees/structure" },
       { label: "Fee Settings", path: "/welcome/fees/settings" },
     ],

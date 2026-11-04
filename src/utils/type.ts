@@ -582,3 +582,11 @@ export interface FeePaymentInput {
   reference: string;
   note: string;
 }
+
+/** One student of the Dues Report with the fee account of the session. */
+export interface DuesReportRow {
+  student: FeeStudent;
+  /** 0 when roll numbers are not generated yet. */
+  rollNumber: number;
+  account: FeeAccount;
+}

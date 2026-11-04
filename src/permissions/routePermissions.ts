@@ -44,6 +44,8 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
 
   "/welcome/fees/collect": P.FEE_MANAGE,
   "/welcome/fees/receipt": P.FEE_MANAGE,
+  "/welcome/fees/dues": P.FEE_MANAGE,
+  "/welcome/fees/collection": P.FEE_MANAGE,
   "/welcome/fees/structure": P.FEE_MANAGE,
   "/welcome/fees/settings": P.FEE_MANAGE,
 };

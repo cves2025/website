@@ -99,8 +99,8 @@ An amount never drops below what was already paid + discounted on a line; such l
 - [x] Refresh from Fee Structure: updates monthly, exam and admission fees to the current structure (special fee, transport, discounts and extra charges stay).
 
 #### Step 4: Reports
-- [ ] **Dues Report**: due per student, filterable by class, section and month; defaulter list.
-- [ ] **Collection Report**: total collected for a day, a month or a date range, split by payment mode, with a list of receipts.
+- [x] **Dues Report**: due per student up to a chosen month (pending months listed) and the remaining due of the session; filter by session, class and section, "only with dues" switch, totals, print (A4 landscape). Students who have not paid anything yet are included (their fees come from the fee structure). A name opens Collect Fee for that student.
+- [x] **Collection Report**: total collected in a date range (Today / This month shortcuts), split by payment mode and by fee head, with the list of receipts; filter by mode, print. Cancelled receipts are listed but not counted.
 
 #### Step 5: Carry forward, late fee and the Pay Fee page
 - [ ] Bring the previous session's unpaid total in as a Previous Dues line (once per student).

@@ -22,6 +22,7 @@ import {
 import type { DocumentData } from "firebase/firestore";
 
 import {
+  CLASSES,
   COLLECTION,
   DEFAULT_FEE_SETTINGS,
   FEE_SETTINGS_DOC,
@@ -41,8 +42,10 @@ import {
 } from "./feeAccount";
 import type { FeeChange } from "./feeAccount";
 import { emptyFeeStructure, formatRupees, toAmount } from "./feeStructure";
+import { loadRollNumbers } from "./rollNumbers";
 import type {
   ClassFee,
+  DuesReportRow,
   ExamFeeItem,
   FeeAccount,
   FeeHead,
@@ -268,18 +271,41 @@ function toFeePayment(id: string, data: DocumentData): FeePayment {
   };
 }
 
+/** Firestore accepts at most 30 values in a single `in` filter. */
+const IDS_PER_IN_QUERY = 30;
+
 /**
- * True when the student has no enrollment in an earlier session, i.e. was
- * admitted in `session` and owes the admission fee.
+ * The students (of `studentIds`) with an enrollment in a session before
+ * `session` - i.e. not admitted in `session`, so no admission fee.
  */
-async function isNewAdmission(studentId: string, session: string): Promise<boolean> {
-  const snapshot = await getDocs(
-    query(collection(db, COLLECTION.ENROLLMENTS), where("studentId", "==", studentId))
+async function studentsEnrolledBefore(
+  studentIds: string[],
+  session: string
+): Promise<Set<string>> {
+  const chunks: string[][] = [];
+  for (let index = 0; index < studentIds.length; index += IDS_PER_IN_QUERY) {
+    chunks.push(studentIds.slice(index, index + IDS_PER_IN_QUERY));
+  }
+  const snapshots = await Promise.all(
+    chunks.map((ids) =>
+      getDocs(query(collection(db, COLLECTION.ENROLLMENTS), where("studentId", "in", ids)))
+    )
   );
-  return !snapshot.docs.some((item) => {
-    const data = item.data();
-    return data.isDeleted !== true && toText(data.academicYear) < session;
-  });
+  const earlier = new Set<string>();
+  snapshots.forEach((snapshot) =>
+    snapshot.docs.forEach((item) => {
+      const data = item.data();
+      if (data.isDeleted !== true && toText(data.academicYear) < session) {
+        earlier.add(toText(data.studentId));
+      }
+    })
+  );
+  return earlier;
+}
+
+/** True when the student was admitted in `session` (owes the admission fee). */
+async function isNewAdmission(studentId: string, session: string): Promise<boolean> {
+  return !(await studentsEnrolledBefore([studentId], session)).has(studentId);
 }
 
 /**
@@ -304,18 +330,109 @@ export async function loadFeeAccount(
     fetchFeeStructure(session),
     isNewAdmission(student.studentId, session),
   ]);
-  return {
-    account: {
-      id,
-      session,
-      ...pickStudent(student),
-      lines: buildFeeLines(structure, student.className, chargeAdmission),
-      specialMonthlyFee: null,
-      transport: null,
-      log: [],
-    },
-    saved: false,
-  };
+  return { account: unsavedAccount(session, student, structure, chargeAdmission), saved: false };
+}
+
+/** An account that only exists on screen (no payment or change saved yet). */
+const unsavedAccount = (
+  session: string,
+  student: FeeStudent,
+  structure: FeeStructure,
+  chargeAdmission: boolean
+): FeeAccount => ({
+  id: feeAccountId(session, student.studentId),
+  session,
+  ...pickStudent(student),
+  lines: buildFeeLines(structure, student.className, chargeAdmission),
+  specialMonthlyFee: null,
+  transport: null,
+  log: [],
+});
+
+/**
+ * Every student of a session (optionally one class / section) with the fee
+ * account: the saved one, or one built from the fee structure for students
+ * who have not paid anything yet - so they are on the dues report too.
+ * Students are in class order, then by roll number and name.
+ */
+export async function loadDuesReport(
+  session: string,
+  className: string,
+  section: string
+): Promise<DuesReportRow[]> {
+  const filters = [where("academicYear", "==", session)];
+  if (className) filters.push(where("className", "==", className));
+  if (section) filters.push(where("section", "==", section));
+
+  const [enrollmentSnap, accountSnap, { structure }] = await Promise.all([
+    getDocs(query(collection(db, COLLECTION.ENROLLMENTS), ...filters)),
+    getDocs(query(collection(db, COLLECTION.FEE_ACCOUNTS), where("session", "==", session))),
+    fetchFeeStructure(session),
+  ]);
+
+  const students: FeeStudent[] = enrollmentSnap.docs
+    .filter((item) => item.data().isDeleted !== true)
+    .map((item) => {
+      const data = item.data();
+      return {
+        studentId: toText(data.studentId).trim() || item.id,
+        studentName: String(
+          data.studentName || `${data.firstName ?? ""} ${data.lastName ?? ""}`
+        ).trim(),
+        className: toText(data.className),
+        section: toText(data.section),
+        admissionNo: String(data.enrollment ?? ""),
+        fatherName: toText(data.fatherName),
+      };
+    });
+
+  const saved = new Map(
+    accountSnap.docs.map((item) => {
+      const account = toFeeAccount(item.id, item.data());
+      return [account.studentId, account] as const;
+    })
+  );
+  const unsavedIds = students
+    .filter((student) => !saved.has(student.studentId))
+    .map((student) => student.studentId);
+  const [enrolledBefore, rollNumbers] = await Promise.all([
+    studentsEnrolledBefore(unsavedIds, session),
+    loadRollNumbers(session, [...new Set(students.map((student) => student.className))]),
+  ]);
+
+  const classOrder = (name: string) => CLASSES.indexOf(name);
+  return students
+    .map((student) => {
+      const account = saved.get(student.studentId);
+      return {
+        student,
+        rollNumber: rollNumbers.get(student.studentId) ?? 0,
+        account: account
+          ? { ...account, ...pickStudent(student), session }
+          : unsavedAccount(session, student, structure, !enrolledBefore.has(student.studentId)),
+      };
+    })
+    .sort(
+      (a, b) =>
+        classOrder(a.student.className) - classOrder(b.student.className) ||
+        a.student.section.localeCompare(b.student.section) ||
+        (a.rollNumber || Infinity) - (b.rollNumber || Infinity) ||
+        a.student.studentName.localeCompare(b.student.studentName)
+    );
+}
+
+/** Receipts dated `from` to `to` ("yyyy-MM-dd", inclusive), newest first. */
+export async function loadPaymentsBetween(from: string, to: string): Promise<FeePayment[]> {
+  const snapshot = await getDocs(
+    query(
+      collection(db, COLLECTION.FEE_PAYMENTS),
+      where("date", ">=", from),
+      where("date", "<=", to)
+    )
+  );
+  return snapshot.docs
+    .map((item) => toFeePayment(item.id, item.data()))
+    .sort((a, b) => b.date.localeCompare(a.date) || b.serial - a.serial);
 }
 
 /** Receipts of one fee account, newest first. */
