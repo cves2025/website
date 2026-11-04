@@ -262,6 +262,11 @@ async function loadSubjectsOfClasses(
 function Subject() {
   const [selectedClass, setSelectedClass] = useState(CLASSES[0]);
   const [subjects, setSubjects] = useState<SubjectDoc[]>([]);
+  const [view, setView] = useState<"active" | "archived">("active");
+  const shownSubjects = subjects.filter(
+    (subject) => (subject.archived === true) === (view === "archived"),
+  );
+  const activeCount = subjects.filter((subject) => !subject.archived).length;
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -322,7 +327,7 @@ function Subject() {
       subjectsQuery,
       (snapshot) => {
         // Sorted here: orderBy("order") would drop the subjects without an
-        // order. Those are listed last, archived subjects after them.
+        // order. Those are listed last.
         setSubjects(
           snapshot.docs
             .map((documentSnapshot) =>
@@ -330,7 +335,6 @@ function Subject() {
             )
             .sort(
               (a, b) =>
-                Number(a.archived === true) - Number(b.archived === true) ||
                 (a.order ?? Number.MAX_SAFE_INTEGER) -
                   (b.order ?? Number.MAX_SAFE_INTEGER) ||
                 a.name.localeCompare(b.name),
@@ -706,7 +710,10 @@ function Subject() {
             <button
               key={cls}
               type="button"
-              onClick={() => setSelectedClass(cls)}
+              onClick={() => {
+                setSelectedClass(cls);
+                setView("active");
+              }}
               className={`rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${
                 selectedClass === cls
                   ? "bg-blue-600 text-white shadow-sm"
@@ -722,29 +729,64 @@ function Subject() {
       {/* Subject management card */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-200 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex w-full items-center justify-between gap-2">
+          <div className="flex w-full flex-wrap items-center justify-between gap-2">
             <h3 className="font-bold text-gray-800">
               Class {selectedClass} Subjects
             </h3>
-            <p className="text-xs text-gray-500">
-              {loading
-                ? "Loading..."
-                : `${subjects.length} subject${subjects.length === 1 ? "" : "s"}`}
-            </p>
+            {/* Archived subjects live in their own tab, off the main list. */}
+            <div className="flex gap-1 rounded-lg bg-gray-100 p-1" role="tablist">
+              {(
+                [
+                  ["active", "Subjects", activeCount],
+                  ["archived", "Archived", subjects.length - activeCount],
+                ] as const
+              ).map(([value, label, count]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={view === value}
+                  onClick={() => setView(value)}
+                  className={`rounded-md px-3 py-1 text-sm font-semibold transition-colors ${
+                    view === value
+                      ? "bg-white text-blue-700 shadow-sm"
+                      : "text-gray-600 hover:text-gray-800"
+                  }`}
+                >
+                  {label}
+                  <span className="ml-1.5 text-xs text-gray-500">
+                    {loading ? "" : count}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
         {loading ? (
           <div className="px-4 py-10 text-center">
             <p className="text-gray-500 font-semibold">Loading subjects...</p>
           </div>
-        ) : subjects.length === 0 ? (
+        ) : shownSubjects.length === 0 ? (
           <div className="rounded-md border border-dashed border-gray-300 p-10 text-center">
-            <p className="text-gray-500 font-semibold">
-              No subjects added for Class {selectedClass} yet.
-            </p>
-            <p className="text-sm text-gray-400 mt-1">
-              Click &quot;+ Add Subject&quot; to add the first subject.
-            </p>
+            {view === "archived" ? (
+              <>
+                <p className="text-gray-500 font-semibold">
+                  No archived subjects in Class {selectedClass}.
+                </p>
+                <p className="text-sm text-gray-400 mt-1">
+                  A subject with saved marks is archived here instead of being deleted.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-gray-500 font-semibold">
+                  No subjects added for Class {selectedClass} yet.
+                </p>
+                <p className="text-sm text-gray-400 mt-1">
+                  Click &quot;+ Add Subject&quot; to add the first subject.
+                </p>
+              </>
+            )}
           </div>
         ) : (
           <Table className="min-w-[640px]">
@@ -765,22 +807,11 @@ function Subject() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {subjects.map((subject, index) => (
-                <TableRow
-                  key={subject.id}
-                  className={subject.archived ? "bg-gray-50 opacity-60" : ""}
-                >
+              {shownSubjects.map((subject, index) => (
+                <TableRow key={subject.id}>
                   <TableCell className="text-gray-500">{index + 1}</TableCell>
                   <TableCell className="font-medium text-gray-800">
                     {subject.name}
-                    {subject.archived && (
-                      <span
-                        className="ml-2 rounded bg-gray-200 px-2 py-0.5 text-xs font-bold text-gray-600"
-                        title="Archived - kept on old results, left out of new exams"
-                      >
-                        Archived
-                      </span>
-                    )}
                   </TableCell>
                   <TableCell>
                     <span
