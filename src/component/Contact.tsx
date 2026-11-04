@@ -10,7 +10,7 @@ function Contact() {
       title="Contact Children's Valley English School | Varanasi"
       description="Contact Children's Valley English School in Varanasi for admission inquiries, location details, and other information. Visit or call us today."
       />
-      <div className='flex overflow-auto rounded-lg shadow-lg lg:w-1/2'>
+      <div className='flex overflow-hidden rounded-lg shadow-lg lg:w-1/2'>
         <SchoolMap />
       </div>
       {/* <div className='flex items-center justify-center lg:w-1/2'>

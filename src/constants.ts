@@ -120,3 +120,11 @@ export const PHONE_PATTERN: RegExp = /^[0-9+\-\s()]*$/;
 export const ADD_STUDENT_PATH = "/welcome/student/add";
 /** View / print one student's admission form: `?id=<enrollmentId>`. */
 export const VIEW_STUDENT_PATH = "/welcome/student/view";
+/** School location and contact details shown on the Contact page. */
+export const SCHOOL_CONTACT = {
+  ADDRESS:
+    "D-59/295A, near Galaxy Hospital, Nirala Nagar, Mahmoorganj, Varanasi, Uttar Pradesh 221010",
+  PHONE: "09336576690",
+  LAT: 25.306506678904515,
+  LNG: 82.97486022881107,
+};
