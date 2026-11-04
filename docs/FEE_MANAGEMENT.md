@@ -116,7 +116,7 @@ An amount never drops below what was already paid + discounted on a line; such l
 ### Phase 2: Advanced
 - [x] Fee card on the panel dashboard (fee admins only): today's collection (by mode), this month's collection, and the school's dues till the current month. The dues load only when "Show dues" is clicked, because they read every student and account.
 - [x] WhatsApp due reminder: a Send button on each Dues Report row opens WhatsApp for the parent's phone (from the admission form) with a pre-filled message (student, class, amount due, pending months). Rows show "Sent" after the click; a missing or invalid mobile number shows "No number".
-- [ ] Excel export of the Dues and Collection reports.
+- [x] Excel export: Dues Report (the rows on screen, with phone and totals) and Collection Report (a Receipts sheet with every receipt and the fees it paid, and a Summary sheet by payment mode and fee head). Amounts are numbers, so Excel can sum and filter them.
 
 ### Phase 3: Online (later)
 - [ ] Parents see their child's fee account after student login is built.

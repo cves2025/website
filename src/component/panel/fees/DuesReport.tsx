@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRightLeft, Check, Printer } from "lucide-react";
+import { ArrowRightLeft, Check, FileSpreadsheet, Printer } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa";
 
 import PageHeader from "../../../custom-components/PageHeader";
@@ -21,6 +21,7 @@ import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import { formatRupees, monthLabel } from "../../../utils/feeStructure";
 import { feeTotals } from "../../../utils/feeAccount";
 import { currentSessionMonth, dueReminderLink, duesUpTo } from "../../../utils/feeReport";
+import { exportDuesExcel } from "../../../utils/feeExport";
 import useDuesReport from "../../../hooks/useDuesReport";
 import type { FeeStudent } from "../../../utils/type";
 import { labelClass } from "../attendance/attendanceShared";
@@ -144,16 +145,45 @@ function DuesReport() {
             <Switch id="duesOnly" checked={onlyDues} onCheckedChange={setOnlyDues} />
             Only with dues
           </label>
-          <button
-            type="button"
-            disabled={loading || shown.length === 0}
-            onClick={() => window.print()}
-            title="Print"
-            aria-label="Print the dues report"
-            className="mb-0.5 rounded-md border border-gray-300 p-2 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          >
-            <Printer className="h-5 w-5" />
-          </button>
+          <div className="mb-0.5 flex gap-2">
+            <button
+              type="button"
+              disabled={loading || shown.length === 0}
+              onClick={() =>
+                exportDuesExcel(
+                  shown.map((row) => ({
+                    row,
+                    due: row.upTo.due,
+                    months: row.upTo.months,
+                    sessionDue: row.sessionDue,
+                  })),
+                  {
+                    session,
+                    classLabel:
+                      className === ALL
+                        ? "All classes"
+                        : `Class ${toOrdinalLabel(className)}${section === ALL ? "" : `-${section}`}`,
+                    upToMonth,
+                  }
+                )
+              }
+              title="Download Excel"
+              aria-label="Download the dues report as Excel"
+              className="rounded-md border border-gray-300 p-2 text-green-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              <FileSpreadsheet className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              disabled={loading || shown.length === 0}
+              onClick={() => window.print()}
+              title="Print"
+              aria-label="Print the dues report"
+              className="rounded-md border border-gray-300 p-2 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              <Printer className="h-5 w-5" />
+            </button>
+          </div>
         </div>
       </div>
 

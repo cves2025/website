@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { format, startOfMonth } from "date-fns";
-import { Printer } from "lucide-react";
+import { FileSpreadsheet, Printer } from "lucide-react";
 
 import PageHeader from "../../../custom-components/PageHeader";
 import SelectDropdown from "../../../custom-components/SelectDropdown";
@@ -17,6 +17,7 @@ import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import { formatRupees } from "../../../utils/feeStructure";
 import { fromDateKey, toDateKey, todayKey } from "../../../utils/holidayCalendar";
 import { summarizeCollection } from "../../../utils/feeReport";
+import { exportCollectionExcel } from "../../../utils/feeExport";
 import useCollectionReport from "../../../hooks/useCollectionReport";
 import type { FeeHead } from "../../../utils/type";
 import { labelClass } from "../attendance/attendanceShared";
@@ -95,15 +96,32 @@ function CollectionReport() {
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            disabled={loading || shown.length === 0}
-            onClick={() => window.print()}
-            className="flex items-center gap-2 rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          >
-            <Printer className="h-4 w-4" />
-            Print
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={loading || shown.length === 0}
+              onClick={() =>
+                exportCollectionExcel(shown, {
+                  from,
+                  to,
+                  modeLabel: mode === ALL ? "All modes" : mode,
+                })
+              }
+              className="flex items-center gap-2 rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-green-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Excel
+            </button>
+            <button
+              type="button"
+              disabled={loading || shown.length === 0}
+              onClick={() => window.print()}
+              className="flex items-center gap-2 rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              <Printer className="h-4 w-4" />
+              Print
+            </button>
+          </div>
         </div>
       </div>
 
