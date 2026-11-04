@@ -7,6 +7,7 @@ import {
   FaFileAlt,
 } from "react-icons/fa";
 import AttendanceTodayCard from "./attendance/AttendanceTodayCard";
+import FeeTodayCard from "./fees/FeeTodayCard";
 
 const CARDS = [
   {
@@ -59,6 +60,7 @@ function PanelHome() {
       </div>
 
       <AttendanceTodayCard />
+      <FeeTodayCard />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {CARDS.map((card) => (

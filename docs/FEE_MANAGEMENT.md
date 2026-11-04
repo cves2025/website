@@ -114,7 +114,7 @@ An amount never drops below what was already paid + discounted on a line; such l
 - [x] Public **Pay Fee** page reads the monthly fee from the current session's Fee Structure (falls back to the old JSON list until a structure is saved).
 
 ### Phase 2: Advanced
-- [ ] Fee card on the panel dashboard (today's collection, total due).
+- [x] Fee card on the panel dashboard (fee admins only): today's collection (by mode), this month's collection, and the school's dues till the current month. The dues load only when "Show dues" is clicked, because they read every student and account.
 - [ ] WhatsApp due reminder (a link with a pre-filled message to the parent).
 - [ ] Excel export of the Dues and Collection reports.
 

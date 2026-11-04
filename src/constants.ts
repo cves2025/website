@@ -139,6 +139,10 @@ export const FEE_STRUCTURE_PATH = "/welcome/fees/structure";
 
 export const FEE_COLLECT_PATH = "/welcome/fees/collect";
 
+export const FEE_DUES_REPORT_PATH = "/welcome/fees/dues";
+
+export const FEE_COLLECTION_REPORT_PATH = "/welcome/fees/collection";
+
 /** Printable receipt; the payment id goes in `?id=`. */
 export const FEE_RECEIPT_PATH = "/welcome/fees/receipt";
 
