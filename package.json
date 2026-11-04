@@ -13,7 +13,9 @@
     "predeploy": "npm run version:bump && npm run build",
     "deploy": "gh-pages -d dist",
     "build:dev": "tsc && vite build --mode staging",
-    "deploy:dev": "npm run build:dev && firebase deploy --only hosting:dev"
+    "deploy:dev": "npm run build:dev && firebase deploy --only hosting:dev",
+    "deploy:rules:dev": "firebase deploy --only \"firestore:(default)\"",
+    "deploy:rules:prod": "firebase deploy --only firestore:prod"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.4.1",

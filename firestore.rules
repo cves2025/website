@@ -1,12 +1,86 @@
-// TEMPORARY - permissive rules for development. Restore proper role-based rules before production.
 rules_version = '2';
+
+// ===========================================================================
+// Cloud Firestore security rules for CVES
+// ---------------------------------------------------------------------------
+// Fee module: locked to active admins (see the fee section below). The public
+// Pay Fee page may read the fee structure only.
+//
+// TEMPORARY: every other collection is still open, as during development.
+// TODO: lock those per role (admin / teacher) before going to production.
+// ===========================================================================
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // TODO: re-enable proper role-based rules (admins only for school data)
-    // before going to production - see the previous version of this file.
-    match /{document=**} {
-      allow read, write: if true;
+
+    // ---------- helpers ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Same rule as the app (MyContextProvider): role "admin", not deleted,
+    // status "Active" or empty.
+    function isActiveAdmin(profile) {
+      return profile.role == 'admin'
+        && profile.get('isDeleted', false) != true
+        && profile.get('status', 'Active') in ['Active', ''];
+    }
+
+    function isAdmin() {
+      let path = /databases/$(database)/documents/users/$(request.auth.uid);
+      return signedIn() && exists(path) && isActiveAdmin(get(path).data);
+    }
+
+    // ---------- fee module (admin only) ----------
+
+    // Read by the public Pay Fee page; changed on Fees > Fee Structure.
+    match /feeStructures/{session} {
+      allow read: if true;
+      allow create, update: if isAdmin();
+      allow delete: if false;
+    }
+
+    match /feeSettings/{docId} {
+      allow read, create, update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // A student's fee lines of a session. Never deleted.
+    match /feeAccounts/{accountId} {
+      allow read, create, update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // Receipts: never deleted, and once saved the only change allowed is
+    // cancelling an active receipt (status + who / why / when).
+    match /feePayments/{paymentId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.status == 'active';
+      allow update: if isAdmin()
+        && resource.data.status == 'active'
+        && request.resource.data.status == 'cancelled'
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'cancelReason', 'cancelledByName', 'cancelledBy', 'cancelledAt']);
+      allow delete: if false;
+    }
+
+    // Last receipt serial of a session: starts at 1 and only ever goes up by
+    // one, so a receipt number can never be repeated.
+    match /feeCounters/{session} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.lastSerial == 1;
+      allow update: if isAdmin()
+        && request.resource.data.lastSerial == resource.data.lastSerial + 1;
+      allow delete: if false;
+    }
+
+    // ---------- everything else (TEMPORARY, still open) ----------
+    // Rules are OR-ed, so this match must leave the fee collections out,
+    // otherwise it would open them again.
+    match /{collectionName}/{document=**} {
+      allow read, write: if !(collectionName in [
+        'feeStructures', 'feeSettings', 'feeAccounts', 'feePayments', 'feeCounters'
+      ]);
     }
   }
 }

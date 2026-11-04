@@ -62,6 +62,12 @@ Half-Yearly Exam     300      100       -       -    200
 | `feePayments/{receiptId}` | One document per receipt: date, mode, amount, lines paid, status (active/cancelled). |
 | `feeCounters/{session}` | The last receipt serial, increased in a transaction. |
 
+### Security (firestore.rules)
+- `feeStructures`: anyone can read (public Pay Fee page); only an active admin can write.
+- `feeSettings`, `feeAccounts`, `feePayments`, `feeCounters`: only an active admin (`users/{uid}`: role `admin`, not deleted, status `Active` or empty).
+- Nothing in the fee module can be deleted. A receipt can only change by being cancelled. The receipt counter starts at 1 and only goes up by one.
+- Deploy with `npm run deploy:rules:dev` (the `(default)` database) or `npm run deploy:rules:prod` (the `prod` database); each database has its own rules. The other collections of the app are still open (TEMPORARY), so check the prod database's current rules before deploying there.
+
 ---
 
 ## 4. Phases and steps
