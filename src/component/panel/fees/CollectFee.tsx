@@ -30,7 +30,6 @@ import {
 import useSectionStudents from "../../../hooks/useSectionStudents";
 import useFeeAccount from "../../../hooks/useFeeAccount";
 import useAccountPayments from "../../../hooks/useAccountPayments";
-import useFeeSettings from "../../../hooks/useFeeSettings";
 import useFeeStructure from "../../../hooks/useFeeStructure";
 import type { FeePayment, FeeStudent, PaymentMode } from "../../../utils/type";
 import { inputClass, labelClass } from "../attendance/attendanceShared";
@@ -100,7 +99,6 @@ function CollectFee() {
   const feeAccount = useFeeAccount(session, student);
   const account = feeAccount.account;
   const history = useAccountPayments(feeAccount.saved && account ? account.id : "");
-  const { settings, loading: settingsLoading } = useFeeSettings();
   const { structure } = useFeeStructure(session);
 
   const [selected, setSelected] = useState<string[]>([]);
@@ -188,7 +186,6 @@ function CollectFee() {
           reference: needsReference ? form.reference : "",
           note: form.note,
         },
-        settings.receiptPrefix,
         { uid: user.uid, name: user.fullName || user.email || "" }
       );
       setConfirmOpen(false);
@@ -473,7 +470,7 @@ function CollectFee() {
                   )}
                   <button
                     type="button"
-                    disabled={saving || settingsLoading || !amount || totals?.due === 0}
+                    disabled={saving || !amount || totals?.due === 0}
                     onClick={handleReview}
                     className="rounded-md bg-green-600 px-6 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
                   >

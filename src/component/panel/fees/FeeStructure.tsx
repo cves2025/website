@@ -17,6 +17,7 @@ import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import {
   generateAcademicYears,
   nextAcademicYear,
+  previousAcademicYear,
 } from "../../../utils/generateAcademicYears";
 import {
   emptyFeeStructure,
@@ -36,11 +37,6 @@ const sessions = upcoming
   ? [{ value: upcoming, label: `${upcoming} (next)` }, ...currentSessions]
   : currentSessions;
 
-const previousSession = (session: string) => {
-  const start = Number.parseInt(session.slice(0, 4), 10);
-  return `${start - 1}-${String(start).slice(-2)}`;
-};
-
 const sameStructure = (a: Structure, b: Structure) =>
   JSON.stringify([a.classes, a.examFees]) === JSON.stringify([b.classes, b.examFees]);
 
@@ -53,7 +49,7 @@ function FeeStructure() {
   const { user } = useContext(myContext);
   const [session, setSession] = useState(currentSessions[0]?.value ?? "");
   const { structure, loading, error } = useFeeStructure(session);
-  const fromSession = previousSession(session);
+  const fromSession = previousAcademicYear(session);
   const previous = useFeeStructure(fromSession);
   const [saved, setSaved] = useState<Structure>(() => emptyFeeStructure(session));
   const [draft, setDraft] = useState<Structure>(saved);

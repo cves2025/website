@@ -2,8 +2,15 @@
  * Pure logic of the fee reports: dues up to a month and collection totals.
  */
 import { PAYMENT_MODES, SESSION_MONTHS } from "../constants";
-import { lineDue } from "./feeAccount";
-import type { FeeAccount, FeeHead, FeePayment, PaymentMode } from "./type";
+import { feeTotals, lineDue, previousDuesLineId } from "./feeAccount";
+import type {
+  CarryForwardItem,
+  DuesReportRow,
+  FeeAccount,
+  FeeHead,
+  FeePayment,
+  PaymentMode,
+} from "./type";
 
 /** The calendar month the session is in today (March for a past session). */
 export function currentSessionMonth(session: string): number {
@@ -73,4 +80,26 @@ export function summarizeCollection(payments: FeePayment[]): CollectionSummary {
     }
   }
   return summary;
+}
+
+/**
+ * Students of the new session whose dues of the previous session can be
+ * carried forward: they were in both sessions, owe money in the old one and
+ * have no Previous Dues line from it yet. Biggest dues first.
+ */
+export function planCarryForward(
+  rows: DuesReportRow[],
+  previousRows: DuesReportRow[],
+  fromSession: string
+): CarryForwardItem[] {
+  const previous = new Map(previousRows.map((row) => [row.student.studentId, row.account]));
+  const lineId = previousDuesLineId(fromSession);
+  return rows
+    .flatMap((row): CarryForwardItem[] => {
+      const fromAccount = previous.get(row.student.studentId);
+      if (!fromAccount || row.account.lines.some((line) => line.id === lineId)) return [];
+      const amount = feeTotals(fromAccount.lines).due;
+      return amount > 0 ? [{ student: row.student, fromAccount, toAccount: row.account, amount }] : [];
+    })
+    .sort((a, b) => b.amount - a.amount);
 }

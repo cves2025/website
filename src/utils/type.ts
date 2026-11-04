@@ -482,6 +482,8 @@ export interface FeeLine {
   waived: boolean;
   discountReason: string;
   waiveReason: string;
+  /** Session the unpaid part was carried forward to ("" = not carried). */
+  carriedTo: string;
 }
 
 /** Transport fee of a student: the same amount every month in the range. */
@@ -589,4 +591,16 @@ export interface DuesReportRow {
   /** 0 when roll numbers are not generated yet. */
   rollNumber: number;
   account: FeeAccount;
+  /** False while the account is only built from the fee structure. */
+  saved: boolean;
+}
+
+/** One student whose previous-session dues can be carried forward. */
+export interface CarryForwardItem {
+  student: FeeStudent;
+  /** Account in the previous session (where the dues are). */
+  fromAccount: FeeAccount;
+  /** Account in the new session (gets the Previous Dues line). */
+  toAccount: FeeAccount;
+  amount: number;
 }

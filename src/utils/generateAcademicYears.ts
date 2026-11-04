@@ -35,3 +35,10 @@ export function nextAcademicYear(academicYear: string): string {
   if (!Number.isFinite(start)) return "";
   return `${start + 1}-${String(start + 2).slice(-2)}`;
 }
+
+/** The session before `academicYear`, e.g. "2026-27" -> "2025-26". "" for bad input. */
+export function previousAcademicYear(academicYear: string): string {
+  const start = Number.parseInt(academicYear.slice(0, 4), 10);
+  if (!Number.isFinite(start)) return "";
+  return `${start - 1}-${String(start).slice(-2)}`;
+}

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Printer } from "lucide-react";
+import { ArrowRightLeft, Printer } from "lucide-react";
 
 import PageHeader from "../../../custom-components/PageHeader";
 import SelectDropdown from "../../../custom-components/SelectDropdown";
@@ -12,7 +12,10 @@ import {
   SECTIONS,
   SESSION_MONTH_OPTIONS,
 } from "../../../constants";
-import { generateAcademicYears } from "../../../utils/generateAcademicYears";
+import {
+  generateAcademicYears,
+  previousAcademicYear,
+} from "../../../utils/generateAcademicYears";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import { formatRupees, monthLabel } from "../../../utils/feeStructure";
 import { feeTotals } from "../../../utils/feeAccount";
@@ -20,6 +23,7 @@ import { currentSessionMonth, duesUpTo } from "../../../utils/feeReport";
 import useDuesReport from "../../../hooks/useDuesReport";
 import type { FeeStudent } from "../../../utils/type";
 import { labelClass } from "../attendance/attendanceShared";
+import CarryForwardDialog from "./CarryForwardDialog";
 
 const sessions = generateAcademicYears();
 const ALL = "all";
@@ -52,8 +56,9 @@ function DuesReport() {
   const [section, setSection] = useState(ALL);
   const [upToMonth, setUpToMonth] = useState(() => currentSessionMonth(sessions[0]?.value ?? ""));
   const [onlyDues, setOnlyDues] = useState(true);
+  const [carryOpen, setCarryOpen] = useState(false);
 
-  const { rows, loading, error } = useDuesReport(
+  const { rows, loading, error, reload } = useDuesReport(
     session,
     className === ALL ? "" : className,
     section === ALL ? "" : section
@@ -88,6 +93,16 @@ function DuesReport() {
           titleStyle="text-primaryBlue"
           description="Fees still to be paid, up to the selected month. Click a name to collect the fee."
           descriptionStyle="text-gray-500"
+          button={
+            <button
+              type="button"
+              onClick={() => setCarryOpen(true)}
+              className="flex items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              <ArrowRightLeft className="h-4 w-4" />
+              Carry forward from {previousAcademicYear(session)}
+            </button>
+          }
         />
       </div>
 
@@ -226,6 +241,13 @@ function DuesReport() {
           </div>
         </>
       )}
+
+      <CarryForwardDialog
+        isOpen={carryOpen}
+        session={session}
+        onClose={() => setCarryOpen(false)}
+        onDone={reload}
+      />
     </div>
   );
 }

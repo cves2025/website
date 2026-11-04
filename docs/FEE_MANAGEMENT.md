@@ -103,9 +103,9 @@ An amount never drops below what was already paid + discounted on a line; such l
 - [x] **Collection Report**: total collected in a date range (Today / This month shortcuts), split by payment mode and by fee head, with the list of receipts; filter by mode, print. Cancelled receipts are listed but not counted.
 
 #### Step 5: Carry forward, late fee and the Pay Fee page
-- [ ] Bring the previous session's unpaid total in as a Previous Dues line (once per student).
-- [ ] Late fee: when it's ON, add the late fee line for months not paid by the due date.
-- [ ] Public Pay Fee page reads the monthly fee from the Fee Structure.
+- [x] **Carry forward** (Dues Report → "Carry forward from <previous session>"): a preview (students, total) and then, per student in one transaction, the unpaid lines of the old session are marked "Carried to <new session>" (due 0 there, not a waive) and a "Previous Dues (<old session>)" line with that amount is added to the new session. Safe to run again: done students are skipped, students added later are picked up. Students not in the new session (passed out / left) are not carried.
+- [x] **Late fee**: when ON in Fee Settings, a "Late Fee" line is added for every month whose monthly fee is still due after the due day. Each month gets it once; it can be waived like any line. It is applied when an account is shown, in the reports, and inside every save.
+- [x] Public **Pay Fee** page reads the monthly fee from the current session's Fee Structure (falls back to the old JSON list until a structure is saved).
 
 ### Phase 2: Advanced
 - [ ] Fee card on the panel dashboard (today's collection, total due).

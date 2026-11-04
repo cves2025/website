@@ -10,6 +10,7 @@ import type {
   FeeAllocation,
   FeeHead,
   FeeLine,
+  FeeSettings,
   FeeStructure,
   FeeTotals,
   FeeTransport,
@@ -76,6 +77,7 @@ const newLine = (
   waived: false,
   discountReason: "",
   waiveReason: "",
+  carriedTo: "",
 });
 
 /**
@@ -105,19 +107,25 @@ export function buildFeeLines(
   return sortFeeLines(lines);
 }
 
-/** What is still to be paid on a line (0 when waived). */
+/**
+ * True when nothing more is collected on the line: it was waived, or its
+ * unpaid part was carried forward to the next session.
+ */
+export const isLineClosed = (line: FeeLine): boolean => line.waived || Boolean(line.carriedTo);
+
+/** What is still to be paid on a line (0 when waived or carried forward). */
 export const lineDue = (line: FeeLine): number =>
-  line.waived ? 0 : Math.max(0, line.amount - line.discount - line.paid);
+  isLineClosed(line) ? 0 : Math.max(0, line.amount - line.discount - line.paid);
 
 /**
- * Totals of the lines. A waived line only counts what was paid on it, so
- * `amount - discount - paid = due` always holds.
+ * Totals of the lines. A closed line (waived / carried forward) only counts
+ * what was paid on it, so `amount - discount - paid = due` always holds.
  */
 export function feeTotals(lines: FeeLine[]): FeeTotals {
   return lines.reduce<FeeTotals>(
     (totals, line) => ({
-      amount: totals.amount + (line.waived ? line.paid : line.amount),
-      discount: totals.discount + (line.waived ? 0 : line.discount),
+      amount: totals.amount + (isLineClosed(line) ? line.paid : line.amount),
+      discount: totals.discount + (isLineClosed(line) ? 0 : line.discount),
       paid: totals.paid + line.paid,
       due: totals.due + lineDue(line),
     }),
@@ -401,4 +409,72 @@ export function revertAllocations(lines: FeeLine[], allocations: FeeAllocation[]
       ? { ...line, paid: Math.max(0, line.paid - (byLine.get(line.id) ?? 0)) }
       : line
   );
+}
+
+/* ---------------------------------------------- late fee & carry forward -- */
+
+/** "yyyy-MM-dd" by which the monthly fee of `month` is due. */
+export function dueDateOf(session: string, month: number, dueDay: number): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${monthYear(session, month)}-${pad(month)}-${pad(dueDay)}`;
+}
+
+/**
+ * Adds the late fee for every month whose monthly fee is still due after
+ * its due date (when the late fee is ON). A month gets it only once; an
+ * existing late fee line is never changed or removed.
+ *
+ * @param today "yyyy-MM-dd"
+ */
+export function applyLateFees(
+  account: FeeAccount,
+  settings: FeeSettings,
+  today: string
+): FeeAccount {
+  if (!settings.lateFeeEnabled || settings.lateFeeAmount <= 0) return account;
+  const added: FeeLine[] = [];
+  for (const line of account.lines) {
+    if (line.head !== "monthly" || line.month === null || lineDue(line) === 0) continue;
+    const id = `lateFee-${line.month}`;
+    if (account.lines.some((item) => item.id === id)) continue;
+    if (today <= dueDateOf(account.session, line.month, settings.dueDay)) continue;
+    added.push(newLine(id, "lateFee", FEE_HEAD_LABELS.lateFee, line.month, settings.lateFeeAmount));
+  }
+  return added.length ? { ...account, lines: sortFeeLines([...account.lines, ...added]) } : account;
+}
+
+/** Id of the Previous Dues line brought in from `fromSession`. */
+export const previousDuesLineId = (fromSession: string) => `previousDues-${fromSession}`;
+
+/**
+ * Closes everything still due on the account of the old session, marking it
+ * "carried to `toSession`". The amount goes to the new session's account.
+ */
+export function applyCarryOut(account: FeeAccount, toSession: string): FeeChange & { amount: number } {
+  const amount = feeTotals(account.lines).due;
+  return {
+    account: {
+      ...account,
+      lines: account.lines.map((line) => (lineDue(line) > 0 ? { ...line, carriedTo: toSession } : line)),
+    },
+    text: `Dues of ${formatRupees(amount)} carried forward to ${toSession}`,
+    skipped: 0,
+    amount,
+  };
+}
+
+/** Adds the Previous Dues line brought in from `fromSession`. */
+export function applyCarryIn(account: FeeAccount, fromSession: string, amount: number): FeeChange {
+  const line = newLine(
+    previousDuesLineId(fromSession),
+    "previousDues",
+    `${FEE_HEAD_LABELS.previousDues} (${fromSession})`,
+    null,
+    amount
+  );
+  return {
+    account: { ...account, lines: sortFeeLines([...account.lines, line]) },
+    text: `Previous dues of ${formatRupees(amount)} brought in from ${fromSession}`,
+    skipped: 0,
+  };
 }

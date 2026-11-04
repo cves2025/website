@@ -4,6 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { formatRupees } from "../../../utils/feeStructure";
 import {
   feeTotals,
+  isLineClosed,
   lineDue,
   lineMonthLabel,
   maxDiscount as maxDiscountOf,
@@ -24,6 +25,9 @@ const actionClass =
   "rounded-full p-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40";
 
 function lineStatus(line: FeeLine): { label: string; className: string } {
+  if (line.carriedTo) {
+    return { label: `Carried to ${line.carriedTo}`, className: "bg-indigo-100 text-indigo-700" };
+  }
   if (line.waived) return { label: "Waived", className: "bg-gray-100 text-gray-600" };
   const due = lineDue(line);
   if (due === 0) return { label: "Paid", className: "bg-green-100 text-green-700" };
@@ -104,7 +108,7 @@ function FeeAccountTable({
               return (
                 <tr
                   key={line.id}
-                  className={`${checked ? "bg-blue-50/60" : ""} ${line.waived ? "text-gray-400" : ""}`}
+                  className={`${checked ? "bg-blue-50/60" : ""} ${isLineClosed(line) ? "text-gray-400" : ""}`}
                 >
                   <td className="px-3 py-2">
                     <Checkbox
@@ -115,7 +119,7 @@ function FeeAccountTable({
                     />
                   </td>
                   <td className="px-3 py-2">
-                    <p className={`font-medium ${line.waived ? "text-gray-500" : "text-gray-800"}`}>{line.label}</p>
+                    <p className={`font-medium ${isLineClosed(line) ? "text-gray-500" : "text-gray-800"}`}>{line.label}</p>
                     {line.discountReason && !line.waived && (
                       <p className="text-xs text-blue-700">Discount: {line.discountReason}</p>
                     )}
@@ -135,7 +139,7 @@ function FeeAccountTable({
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex justify-end gap-1">
-                      {!line.waived && (
+                      {!isLineClosed(line) && (
                         <button
                           type="button"
                           disabled={disabled || (maxDiscountOf(line) === 0 && line.discount === 0)}
@@ -149,7 +153,7 @@ function FeeAccountTable({
                       )}
                       <button
                         type="button"
-                        disabled={disabled || (!line.waived && due === 0)}
+                        disabled={disabled || Boolean(line.carriedTo) || (!line.waived && due === 0)}
                         onClick={() => onWaive(line, !line.waived)}
                         title={line.waived ? "Undo waive" : "Waive (fee maafi)"}
                         aria-label={`${line.waived ? "Undo waive of" : "Waive"} ${line.label}`}

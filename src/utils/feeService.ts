@@ -33,17 +33,25 @@ import { db } from "../firebase/config";
 import {
   allocatePayment,
   applyAllocations,
+  applyCarryIn,
+  applyCarryOut,
+  applyLateFees,
   buildFeeLines,
   feeAccountId,
   feeTotals,
   formatReceiptNo,
+  previousDuesLineId,
   revertAllocations,
   sortFeeLines,
 } from "./feeAccount";
+import { planCarryForward } from "./feeReport";
+import { previousAcademicYear } from "./generateAcademicYears";
+import { todayKey } from "./holidayCalendar";
 import type { FeeChange } from "./feeAccount";
 import { emptyFeeStructure, formatRupees, toAmount } from "./feeStructure";
 import { loadRollNumbers } from "./rollNumbers";
 import type {
+  CarryForwardItem,
   ClassFee,
   DuesReportRow,
   ExamFeeItem,
@@ -195,6 +203,7 @@ function toFeeLine(value: unknown): FeeLine | null {
     waived: line.waived === true,
     discountReason: toText(line.discountReason),
     waiveReason: toText(line.waiveReason),
+    carriedTo: toText(line.carriedTo),
   };
 }
 
@@ -318,19 +327,27 @@ export async function loadFeeAccount(
   student: FeeStudent
 ): Promise<{ account: FeeAccount; saved: boolean }> {
   const id = feeAccountId(session, student.studentId);
-  const snapshot = await getDoc(doc(db, COLLECTION.FEE_ACCOUNTS, id));
+  const [snapshot, settings] = await Promise.all([
+    getDoc(doc(db, COLLECTION.FEE_ACCOUNTS, id)),
+    loadFeeSettings(),
+  ]);
   if (snapshot.exists()) {
     // Name / class may have been edited since; show the current details.
-    return {
-      account: { ...toFeeAccount(id, snapshot.data()), ...pickStudent(student), session },
-      saved: true,
-    };
+    const account = { ...toFeeAccount(id, snapshot.data()), ...pickStudent(student), session };
+    return { account: applyLateFees(account, settings, todayKey()), saved: true };
   }
   const [{ structure }, chargeAdmission] = await Promise.all([
     fetchFeeStructure(session),
     isNewAdmission(student.studentId, session),
   ]);
-  return { account: unsavedAccount(session, student, structure, chargeAdmission), saved: false };
+  return {
+    account: applyLateFees(
+      unsavedAccount(session, student, structure, chargeAdmission),
+      settings,
+      todayKey()
+    ),
+    saved: false,
+  };
 }
 
 /** An account that only exists on screen (no payment or change saved yet). */
@@ -364,11 +381,13 @@ export async function loadDuesReport(
   if (className) filters.push(where("className", "==", className));
   if (section) filters.push(where("section", "==", section));
 
-  const [enrollmentSnap, accountSnap, { structure }] = await Promise.all([
+  const [enrollmentSnap, accountSnap, { structure }, settings] = await Promise.all([
     getDocs(query(collection(db, COLLECTION.ENROLLMENTS), ...filters)),
     getDocs(query(collection(db, COLLECTION.FEE_ACCOUNTS), where("session", "==", session))),
     fetchFeeStructure(session),
+    loadFeeSettings(),
   ]);
+  const today = todayKey();
 
   const students: FeeStudent[] = enrollmentSnap.docs
     .filter((item) => item.data().isDeleted !== true)
@@ -407,9 +426,14 @@ export async function loadDuesReport(
       return {
         student,
         rollNumber: rollNumbers.get(student.studentId) ?? 0,
-        account: account
-          ? { ...account, ...pickStudent(student), session }
-          : unsavedAccount(session, student, structure, !enrolledBefore.has(student.studentId)),
+        account: applyLateFees(
+          account
+            ? { ...account, ...pickStudent(student), session }
+            : unsavedAccount(session, student, structure, !enrolledBefore.has(student.studentId)),
+          settings,
+          today
+        ),
+        saved: Boolean(account),
       };
     })
     .sort(
@@ -491,18 +515,23 @@ export const FEE_OVERPAID = "FEE_OVERPAID";
 export async function collectFeePayment(
   account: FeeAccount,
   input: FeePaymentInput,
-  receiptPrefix: string,
   collectedBy: FeeActor
 ): Promise<FeePayment> {
   const accountRef = doc(db, COLLECTION.FEE_ACCOUNTS, account.id);
   const counterRef = doc(db, COLLECTION.FEE_COUNTERS, account.session);
+  const settings = await loadFeeSettings();
+  const today = todayKey();
 
   return runTransaction(db, async (transaction) => {
     const accountSnap = await transaction.get(accountRef);
     const counterSnap = await transaction.get(counterRef);
-    const current: FeeAccount = accountSnap.exists()
-      ? { ...toFeeAccount(account.id, accountSnap.data()), ...pickStudent(account) }
-      : account;
+    const current = applyLateFees(
+      accountSnap.exists()
+        ? { ...toFeeAccount(account.id, accountSnap.data()), ...pickStudent(account) }
+        : account,
+      settings,
+      today
+    );
 
     const allocations = allocatePayment(current, input.amount, input.lineIds);
     const allocated = allocations.reduce((sum, item) => sum + item.amount, 0);
@@ -512,7 +541,7 @@ export async function collectFeePayment(
     const lines = applyAllocations(current.lines, allocations);
     const payment: FeePayment = {
       id: `${account.session}_${String(serial).padStart(4, "0")}`,
-      receiptNo: formatReceiptNo(receiptPrefix, account.session, serial),
+      receiptNo: formatReceiptNo(settings.receiptPrefix, account.session, serial),
       serial,
       session: account.session,
       accountId: account.id,
@@ -558,11 +587,17 @@ export async function updateFeeAccount(
   actor: FeeActor
 ): Promise<number> {
   const accountRef = doc(db, COLLECTION.FEE_ACCOUNTS, account.id);
+  const settings = await loadFeeSettings();
+  const today = todayKey();
   return runTransaction(db, async (transaction) => {
     const snapshot = await transaction.get(accountRef);
-    const current: FeeAccount = snapshot.exists()
-      ? { ...toFeeAccount(account.id, snapshot.data()), ...pickStudent(account) }
-      : account;
+    const current = applyLateFees(
+      snapshot.exists()
+        ? { ...toFeeAccount(account.id, snapshot.data()), ...pickStudent(account) }
+        : account,
+      settings,
+      today
+    );
     const result = change(current);
     const entry: FeeLogEntry = { at: new Date().toISOString(), byName: actor.name, text: result.text };
     transaction.set(
@@ -616,5 +651,78 @@ export async function cancelFeePayment(
         false
       )
     );
+  });
+}
+
+/* ---------------------------------------------------------- carry forward -- */
+
+/**
+ * The students of `session` whose dues of the session before can be carried
+ * forward (see planCarryForward).
+ */
+export async function loadCarryForwardPlan(session: string): Promise<CarryForwardItem[]> {
+  const fromSession = previousAcademicYear(session);
+  const [rows, previousRows] = await Promise.all([
+    loadDuesReport(session, "", ""),
+    loadDuesReport(fromSession, "", ""),
+  ]);
+  return planCarryForward(rows, previousRows, fromSession);
+}
+
+/**
+ * Carries one student's dues forward in a single transaction: everything due
+ * on the old session's account is closed ("carried to") and a Previous Dues
+ * line with that amount is added to the new session's account. Both
+ * accounts are re-read first, so a payment made meanwhile is respected and
+ * running it twice never adds the dues twice.
+ *
+ * @returns the amount carried (0 when there was nothing left to carry)
+ */
+export async function carryForwardStudent(item: CarryForwardItem, actor: FeeActor): Promise<number> {
+  const fromRef = doc(db, COLLECTION.FEE_ACCOUNTS, item.fromAccount.id);
+  const toRef = doc(db, COLLECTION.FEE_ACCOUNTS, item.toAccount.id);
+  const settings = await loadFeeSettings();
+  const today = todayKey();
+  const fromSession = item.fromAccount.session;
+
+  return runTransaction(db, async (transaction) => {
+    const fromSnap = await transaction.get(fromRef);
+    const toSnap = await transaction.get(toRef);
+    const from = applyLateFees(
+      fromSnap.exists() ? toFeeAccount(item.fromAccount.id, fromSnap.data()) : item.fromAccount,
+      settings,
+      today
+    );
+    const to = applyLateFees(
+      toSnap.exists()
+        ? { ...toFeeAccount(item.toAccount.id, toSnap.data()), ...pickStudent(item.toAccount) }
+        : item.toAccount,
+      settings,
+      today
+    );
+    if (to.lines.some((line) => line.id === previousDuesLineId(fromSession))) return 0;
+
+    const out = applyCarryOut(from, to.session);
+    if (out.amount <= 0) return 0;
+    const into = applyCarryIn(to, fromSession, out.amount);
+    const at = new Date().toISOString();
+
+    transaction.set(
+      fromRef,
+      accountFields(
+        { ...out.account, log: [...from.log, { at, byName: actor.name, text: out.text }] },
+        actor,
+        !fromSnap.exists()
+      )
+    );
+    transaction.set(
+      toRef,
+      accountFields(
+        { ...into.account, log: [...to.log, { at, byName: actor.name, text: into.text }] },
+        actor,
+        !toSnap.exists()
+      )
+    );
+    return out.amount;
   });
 }

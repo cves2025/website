@@ -1,12 +1,30 @@
 import { useState } from "react";
 import Underline from "../design/Underline";
 import PayFeeQRCode from "./PayFeeQRCode";
-import feeStructureData from "../assets/JSON/feeStructure.json"; // Importing fee structure from JSON file
+import feeStructureData from "../assets/JSON/feeStructure.json"; // Used until a fee structure is saved
 import SEO from "./SEO";
+import Loader from "../custom-components/Loader";
+import { CLASSES } from "../constants";
+import useFeeStructure from "../hooks/useFeeStructure";
+import { generateAcademicYears } from "../utils/generateAcademicYears";
+
+const currentSession = generateAcademicYears()[0]?.value ?? "";
+
+/** Name of a class on this page ("PG" -> "Play Group", "5" -> "Class-5"). */
+const payFeeTitle = (className: string) =>
+  className === "PG" ? "Play Group" : /^\d+$/.test(className) ? `Class-${className}` : className;
 
 function PayFee() {
   const [openQRCode, setOpenQRCode] = useState(false);
   const [titleAndFee, setTitleAndFee] = useState<{ title?: string; fee?: string }>({ title: "", fee: "" })
+  // Monthly fee of every class from Fees > Fee Structure of the current session.
+  const { structure, saved, loading } = useFeeStructure(currentSession);
+  const fees = saved
+    ? CLASSES.filter((className) => structure.classes[className]?.monthly).map((className) => ({
+        title: payFeeTitle(className),
+        fee: String(structure.classes[className].monthly),
+      }))
+    : feeStructureData;
 
   function showQRCodeHandler(title?: string, fee?: string) {
     openQRCode ? setOpenQRCode(false) : setOpenQRCode(true)
@@ -30,8 +48,11 @@ function PayFee() {
           <Underline className="w-2/3 md:w-1/2 lg:w-60 mt-2 self-center" />
         </div>
       </div>
+      {loading ? (
+        <Loader label="Loading fees..." />
+      ) : (
       <div className="flex flex-wrap justify-center gap-2 mt-5 w-full text-2xl">
-        {feeStructureData.map((item, index) => {
+        {fees.map((item, index) => {
           return (
             <div
               key={index}
@@ -43,6 +64,7 @@ function PayFee() {
           );
         })}
       </div>
+      )}
       {openQRCode && <PayFeeQRCode onClose={()=> showQRCodeHandler()} titleAndFee={titleAndFee} />}
     </div>
   );
