@@ -1,8 +1,8 @@
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
-import { Bus, CheckCircle2, PlusCircle, RefreshCw, Tags } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 
 import PageHeader from "../../../custom-components/PageHeader";
 import SelectDropdown from "../../../custom-components/SelectDropdown";
@@ -20,8 +20,8 @@ import {
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import { todayKey } from "../../../utils/holidayCalendar";
-import { formatRupees, monthLabel, toAmount } from "../../../utils/feeStructure";
-import { allocatePayment, feeTotals, lineDue } from "../../../utils/feeAccount";
+import { formatRupees, toAmount } from "../../../utils/feeStructure";
+import { allocatePayment, feeTotals, keepValidSelection, lineDue } from "../../../utils/feeAccount";
 import {
   FEE_OVERPAID,
   cancelFeePayment,
@@ -31,9 +31,14 @@ import useSectionStudents from "../../../hooks/useSectionStudents";
 import useFeeAccount from "../../../hooks/useFeeAccount";
 import useAccountPayments from "../../../hooks/useAccountPayments";
 import useFeeStructure from "../../../hooks/useFeeStructure";
+import useStudentPhoto from "../../../hooks/useStudentPhoto";
+import useIsStuck from "../../../hooks/useIsStuck";
 import type { FeePayment, FeeStudent, PaymentMode } from "../../../utils/type";
 import { inputClass, labelClass } from "../attendance/attendanceShared";
-import FeeAccountTable from "./FeeAccountTable";
+import FeeAccountCards from "./FeeAccountCards";
+import FeeStudentBar from "./FeeStudentBar";
+import StudentSearch from "./StudentSearch";
+import type { StudentBarAction } from "./FeeStudentBar";
 import PaymentHistory from "./PaymentHistory";
 import FeeAdjustDialog from "./FeeAdjustDialog";
 import type { FeeAdjustment } from "./FeeAdjustDialog";
@@ -100,8 +105,10 @@ function CollectFee() {
   const account = feeAccount.account;
   const history = useAccountPayments(feeAccount.saved && account ? account.id : "");
   const { structure } = useFeeStructure(session);
+  const studentPhoto = useStudentPhoto(picked?.studentId ?? "", picked?.photo);
 
   const [selected, setSelected] = useState<string[]>([]);
+  const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
   const [form, setForm] = useState<PaymentForm>(emptyForm);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -111,11 +118,63 @@ function CollectFee() {
   const [cancelReason, setCancelReason] = useState("");
   const [cancelling, setCancelling] = useState(false);
 
+  // The student card sits above the fees; once it scrolls out of view a slim
+  // copy of it slides in at the top, and the side columns stick below that.
+  const showBar = Boolean(student && account && !feeAccount.loading && !feeAccount.error && !studentsError);
+  const studentBarProps = account
+    ? {
+        account,
+        // Live from the enrollment / roll number records, not the copy
+        // saved on the fee account.
+        enrollmentNo: picked?.admissionNo || account.admissionNo,
+        rollNumber: picked?.rollNumber ?? 0,
+        fatherName: picked?.fatherName || account.fatherName,
+        photo: studentPhoto,
+        disabled: saving,
+        onAction: (kind: StudentBarAction) => setAdjustment({ kind }),
+      }
+    : null;
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  // The bar comes in as soon as 40% of the card has scrolled away.
+  const barStuck = useIsStuck(sentinelRef, showBar, 0.4);
+  const [barHeight, setBarHeight] = useState(0);
+  useEffect(() => {
+    const bar = barRef.current;
+    if (!showBar || !bar) {
+      setBarHeight(0);
+      return;
+    }
+    const observer = new ResizeObserver(() => setBarHeight(bar.offsetHeight));
+    observer.observe(bar);
+    return () => observer.disconnect();
+  }, [showBar]);
+  const sideTop = { top: (barStuck ? barHeight : 0) + 12 };
+
   // A new student or session starts with a clean form.
   useEffect(() => {
     setSelected([]);
+    setSelectedMonths([]);
     setForm(emptyForm());
   }, [session, studentId]);
+
+  // After the account changes (discount, waive, cancelled receipt ...) the
+  // picked months and ticks stay, minus what no longer fits the month order
+  // or no longer owes money; the amount follows the ticks.
+  useEffect(() => {
+    if (!account || (selected.length === 0 && selectedMonths.length === 0)) return;
+    const kept = keepValidSelection(account.lines, selectedMonths, selected);
+    setSelectedMonths(kept.months);
+    setSelected(kept.ticked);
+    if (selected.length > 0) {
+      const due = account.lines
+        .filter((line) => kept.ticked.includes(line.id))
+        .reduce((sum, line) => sum + lineDue(line), 0);
+      setForm((prev) => ({ ...prev, amount: due ? String(due) : "" }));
+    }
+    // Runs only when a reloaded account arrives, not on every tick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account]);
 
   const updateParams = (patch: Record<string, string>) =>
     setParams(
@@ -191,6 +250,7 @@ function CollectFee() {
       setConfirmOpen(false);
       setReceipt(payment);
       setSelected([]);
+      setSelectedMonths([]);
       setForm(emptyForm());
       feeAccount.reload();
       history.reload();
@@ -210,9 +270,8 @@ function CollectFee() {
     }
   };
 
+  // The selection is trimmed to what still fits once the account reloads.
   const refreshAccount = () => {
-    setSelected([]);
-    setForm((prev) => ({ ...prev, amount: "" }));
     feeAccount.reload();
     history.reload();
   };
@@ -244,12 +303,14 @@ function CollectFee() {
 
   const studentOptions = students.map((item) => ({
     value: item.studentId,
-    label: `${item.rollNumber ? `${item.rollNumber}. ` : ""}${item.studentName}`,
+    label: `${item.rollNumber ? `${item.rollNumber}. ` : ""}${item.studentName}${
+      item.admissionNo ? ` (${item.admissionNo})` : ""
+    }`,
     keywords: `${item.admissionNo} ${item.fatherName}`,
   }));
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       <PageHeader
         title="Collect Fee"
         titleStyle="text-primaryBlue"
@@ -257,146 +318,211 @@ function CollectFee() {
         descriptionStyle="text-gray-500"
       />
 
-      <div className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div>
-          <label htmlFor="collectSession" className={labelClass}>Session</label>
-          <SelectDropdown
-            id="collectSession"
-            value={session}
-            onValueChange={(value) => updateParams({ session: value, student: "" })}
-            options={sessions}
-          />
+      {/* Slim student bar: takes no space, slides in once the card scrolls away */}
+      {showBar && studentBarProps && (
+        <div className="sticky top-0 z-20 -mt-3 h-0">
+          <div
+            ref={barRef}
+            aria-hidden={!barStuck}
+            // The ::before backdrop also covers <main>'s padding around the
+            // bar, so nothing scrolling underneath shows through the gaps.
+            // Shown with `transform: none` (not translate-y-0): a leftover
+            // transform puts the bar on its own layer and blurs the text.
+            className={`relative isolate pb-2 transition-[opacity,transform,visibility] duration-150 before:absolute before:-inset-x-4 before:-top-4 before:bottom-0 before:-z-10 before:bg-gray-100 before:content-[''] md:before:-inset-x-2 ${
+              barStuck ? "transform-none opacity-100" : "pointer-events-none invisible -translate-y-full opacity-0"
+            }`}
+          >
+            <FeeStudentBar variant="bar" {...studentBarProps} />
+          </div>
         </div>
-        <div>
-          <label htmlFor="collectClass" className={labelClass}>Class</label>
-          <SelectDropdown
-            id="collectClass"
-            value={className}
-            placeholder="Select class"
-            onValueChange={(value) => updateParams({ class: value, student: "" })}
-            options={CLASS_OPTIONS.map((option) => ({ ...option, label: toOrdinalLabel(option.label) }))}
-          />
-        </div>
-        <div>
-          <label htmlFor="collectSection" className={labelClass}>Section</label>
-          <SelectDropdown
-            id="collectSection"
-            value={section}
-            onValueChange={(value) => updateParams({ section: value, student: "" })}
-            options={SECTION_OPTIONS}
-          />
-        </div>
-        <div>
-          <label htmlFor="collectStudent" className={labelClass}>Student</label>
-          <SelectDropdown
-            id="collectStudent"
-            value={studentId}
-            placeholder={
-              !className
-                ? "Select class first"
-                : studentsLoading
-                  ? "Loading..."
-                  : students.length
-                    ? "Search name / admission no."
-                    : "No students"
-            }
-            disabled={!className || studentsLoading || students.length === 0}
-            searchable
-            searchPlaceholder="Name, admission no. or father"
-            onValueChange={(value) => updateParams({ student: value })}
-            options={studentOptions}
-          />
-        </div>
-      </div>
-
-      {studentsError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">{studentsError}</div>
       )}
 
-      {!student ? (
-        <p className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">
-          Select a class, section and student to see the fee account.
-        </p>
-      ) : feeAccount.loading ? (
-        <Loader label="Loading fee account..." />
-      ) : feeAccount.error || !account ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
-          {feeAccount.error ?? "Fee account could not be loaded."}
-        </div>
-      ) : (
-        <>
-          <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_320px]">
+        {/* Left: who is paying; stays in view below the student bar */}
+        <aside className="flex flex-col gap-3 lg:sticky" style={sideTop}>
+          <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4">
             <div>
-              <p className="text-lg font-bold text-gray-800">{account.studentName}</p>
-              <p className="text-sm text-gray-500">
-                Class {toOrdinalLabel(account.className)}-{account.section} · Adm. No.{" "}
-                {account.admissionNo || "-"} · Father: {account.fatherName || "-"} · Session {session}
-              </p>
-              <div className="mt-1 flex flex-wrap gap-2 text-xs font-semibold empty:hidden">
-                {account.specialMonthlyFee !== null && (
-                  <span className="rounded-full bg-purple-100 px-2 py-0.5 text-purple-700">
-                    Special fee {formatRupees(account.specialMonthlyFee)}/month
-                  </span>
-                )}
-                {account.transport && (
-                  <span className="rounded-full bg-sky-100 px-2 py-0.5 text-sky-700">
-                    Transport {formatRupees(account.transport.amount)}/month (
-                    {monthLabel(account.transport.fromMonth)} - {monthLabel(account.transport.toMonth)})
-                  </span>
-                )}
-              </div>
+              <label htmlFor="collectSession" className={labelClass}>Session</label>
+              <SelectDropdown
+                id="collectSession"
+                value={session}
+                onValueChange={(value) => updateParams({ session: value, student: "" })}
+                options={sessions}
+              />
             </div>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { kind: "special" as const, label: "Special Fee", icon: Tags },
-                { kind: "transport" as const, label: "Transport", icon: Bus },
-                { kind: "extra" as const, label: "Extra Charge", icon: PlusCircle },
-                { kind: "refresh" as const, label: "Refresh", icon: RefreshCw },
-              ].map(({ kind, label, icon: Icon }) => (
-                <button
-                  key={kind}
-                  type="button"
-                  disabled={saving}
-                  onClick={() => setAdjustment({ kind })}
-                  title={kind === "refresh" ? "Refresh the fees from the Fee Structure" : undefined}
-                  className="flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                >
-                  <Icon className="h-4 w-4" />
-                  {label}
-                </button>
-              ))}
+            <StudentSearch
+              session={session}
+              onPick={(found) =>
+                updateParams({ class: found.className, section: found.section, student: found.studentId })
+              }
+            />
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+              <span className="h-px flex-1 bg-gray-200" />
+              or pick by class
+              <span className="h-px flex-1 bg-gray-200" />
+            </div>
+            <div>
+              <label htmlFor="collectClass" className={labelClass}>Class</label>
+              <SelectDropdown
+                id="collectClass"
+                value={className}
+                placeholder="Select class"
+                onValueChange={(value) => updateParams({ class: value, student: "" })}
+                options={CLASS_OPTIONS.map((option) => ({ ...option, label: toOrdinalLabel(option.label) }))}
+              />
+            </div>
+            <div>
+              <label htmlFor="collectSection" className={labelClass}>Section</label>
+              <SelectDropdown
+                id="collectSection"
+                value={section}
+                onValueChange={(value) => updateParams({ section: value, student: "" })}
+                options={SECTION_OPTIONS}
+              />
+            </div>
+            <div>
+              <label htmlFor="collectStudent" className={labelClass}>Student</label>
+              <SelectDropdown
+                id="collectStudent"
+                value={studentId}
+                placeholder={
+                  !className
+                    ? "Select class first"
+                    : studentsLoading
+                      ? "Loading..."
+                      : students.length
+                        ? "Search name / admission no."
+                        : "No students"
+                }
+                disabled={!className || studentsLoading || students.length === 0}
+                searchable
+                searchPlaceholder="Name, admission no. or father"
+                onValueChange={(value) => updateParams({ student: value })}
+                options={studentOptions}
+              />
             </div>
           </div>
 
-          {account.lines.length === 0 ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-              No fees found for Class {toOrdinalLabel(account.className)} in {session}. Set the fees on
-              the{" "}
-              <Link to={FEE_STRUCTURE_PATH} className="font-semibold underline">
-                Fee Structure
-              </Link>{" "}
-              page first.
+          {account && !feeAccount.loading && totals && (
+            <div className="grid grid-cols-2 gap-4 rounded-lg border border-gray-200 bg-white p-4">
+              {[
+                { label: "Total Fee", value: totals.amount, className: "text-gray-800" },
+                { label: "Discount", value: totals.discount, className: "text-blue-600" },
+                { label: "Paid", value: totals.paid, className: "text-green-700" },
+                { label: "Due", value: totals.due, className: "text-red-600" },
+              ].map((tile) => (
+                <div key={tile.label} className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                    {tile.label}
+                  </p>
+                  <p className={`text-lg font-bold tabular-nums ${tile.className}`}>
+                    {formatRupees(tile.value)}
+                  </p>
+                </div>
+              ))}
             </div>
-          ) : (
-            <>
-              <FeeAccountTable
-                account={account}
-                selected={selected}
-                onSelectedChange={handleSelectedChange}
-                onDiscount={(line) => setAdjustment({ kind: "discount", line })}
-                onWaive={(line, waived) => setAdjustment({ kind: "waive", lineIds: [line.id], waived })}
-                onRemove={(line) => setAdjustment({ kind: "removeExtra", line })}
-                disabled={saving}
+          )}
+        </aside>
+
+        {studentsError ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700 xl:col-span-2">
+            {studentsError}
+          </div>
+        ) : !student ? (
+          <p className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500 xl:col-span-2">
+            Select a class, section and student to see the fee account.
+          </p>
+        ) : feeAccount.loading ? (
+          <div className="xl:col-span-2">
+            <Loader label="Loading fee account..." />
+          </div>
+        ) : feeAccount.error || !account ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700 xl:col-span-2">
+            {feeAccount.error ?? "Fee account could not be loaded."}
+          </div>
+        ) : (
+          <>
+            {/* Middle: the fee account */}
+            <div
+              className={`flex min-w-0 flex-col gap-3 ${account.lines.length === 0 ? "xl:col-span-2" : ""}`}
+            >
+              <div ref={sentinelRef}>
+                {studentBarProps && <FeeStudentBar variant="card" {...studentBarProps} />}
+              </div>
+              {account.lines.length === 0 ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                  No fees found for Class {toOrdinalLabel(account.className)} in {session}. Set the fees on
+                  the{" "}
+                  <Link to={FEE_STRUCTURE_PATH} className="font-semibold underline">
+                    Fee Structure
+                  </Link>{" "}
+                  page first.
+                </div>
+              ) : (
+                <FeeAccountCards
+                  account={account}
+                  selected={selected}
+                  onSelectedChange={handleSelectedChange}
+                  selectedMonths={selectedMonths}
+                  onSelectedMonthsChange={setSelectedMonths}
+                  onDiscount={(line) => setAdjustment({ kind: "discount", line })}
+                  onWaive={(line, waived) => setAdjustment({ kind: "waive", lineIds: [line.id], waived })}
+                  onRemove={(line) => setAdjustment({ kind: "removeExtra", line })}
+                  disabled={saving}
+                />
+              )}
+
+              <PaymentHistory
+                payments={history.payments}
+                loading={history.loading}
+                error={history.error}
+                onCancel={(payment) => {
+                  setCancelReason("");
+                  setToCancel(payment);
+                }}
               />
 
-              <section className="rounded-lg border border-gray-200 bg-white p-4">
-                <h2 className="mb-1 font-bold text-gray-800">Receive payment</h2>
-                <p className="mb-3 text-sm text-gray-500">
-                  {selected.length
-                    ? `${selected.length} fee(s) ticked - due ${formatRupees(payable)}.`
-                    : `Nothing ticked - the amount is adjusted against the oldest due fees first (total due ${formatRupees(payable)}).`}
+              {account.log.length > 0 && (
+                <details className="rounded-lg border border-gray-200 bg-white">
+                  <summary className="cursor-pointer p-4 font-bold text-gray-800">
+                    Change log ({account.log.length})
+                  </summary>
+                  <ul className="divide-y divide-gray-100 border-t border-gray-100 text-sm">
+                    {[...account.log].reverse().map((entry, index) => (
+                      <li key={`${entry.at}-${index}`} className="px-4 py-2">
+                        <p className="text-gray-800">{entry.text}</p>
+                        <p className="text-xs text-gray-500">
+                          {entry.at ? format(new Date(entry.at), "d MMM yyyy, h:mm a") : "-"} ·{" "}
+                          {entry.byName || "-"}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+
+            {/* Right: take the payment; stays in view while the fees scroll */}
+            {account.lines.length > 0 && (
+              <aside
+                className="rounded-lg border border-gray-200 bg-white p-4 lg:col-start-2 xl:sticky xl:col-start-auto"
+                style={sideTop}
+              >
+                <h2 className="font-bold text-gray-800">Receive payment</h2>
+                <p className="mb-3 mt-1 text-xs text-gray-500">
+                  {selected.length ? (
+                    <>
+                      Selected: {selected.length} fee{selected.length === 1 ? "" : "s"} ·{" "}
+                      <span className="font-semibold text-primaryBlue">{formatRupees(payable)}</span>
+                    </>
+                  ) : (
+                    <>
+                      Nothing ticked: the amount goes to the oldest dues first (total due{" "}
+                      {formatRupees(payable)}).
+                    </>
+                  )}
                 </p>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label htmlFor="payAmount" className={labelClass}>
                       Amount (₹) <span className="ml-0.5 text-red-500">*</span>
@@ -421,7 +547,7 @@ function CollectFee() {
                       onChange={(date) => setForm({ ...form, date })}
                     />
                   </div>
-                  <div>
+                  <div className="col-span-2">
                     <label htmlFor="payMode" className={labelClass}>Payment mode</label>
                     <SelectDropdown
                       id="payMode"
@@ -431,7 +557,7 @@ function CollectFee() {
                     />
                   </div>
                   {needsReference && (
-                    <div>
+                    <div className="col-span-2">
                       <label htmlFor="payReference" className={labelClass}>
                         {form.mode === "Cheque" ? "Cheque no." : "Transaction / UTR no."}{" "}
                         <span className="ml-0.5 text-red-500">*</span>
@@ -444,7 +570,7 @@ function CollectFee() {
                       />
                     </div>
                   )}
-                  <div className="sm:col-span-2 lg:col-span-4">
+                  <div className="col-span-2">
                     <label htmlFor="payNote" className={labelClass}>
                       Note <span className="font-normal text-gray-400">(optional)</span>
                     </label>
@@ -457,67 +583,40 @@ function CollectFee() {
                     />
                   </div>
                 </div>
-                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                <div className="mt-4 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    disabled={saving || !amount || totals?.due === 0}
+                    onClick={handleReview}
+                    // Same school-colour gradient as the scrollbar thumb (index.css).
+                    className="rounded-md bg-[linear-gradient(to_right,#009746,#393186,#e7087e,#e31e25)] py-2.5 text-sm font-semibold text-white shadow-sm transition hover:shadow-md hover:brightness-110 disabled:opacity-50 disabled:hover:brightness-100"
+                  >
+                    Collect {amount ? formatRupees(amount) : "Fee"}
+                  </button>
                   {selected.length > 0 && (
                     <button
                       type="button"
                       disabled={saving}
                       onClick={() => setAdjustment({ kind: "waive", lineIds: selected, waived: true })}
-                      className="rounded-md border border-amber-300 px-5 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                      className="rounded-md border border-amber-300 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-50"
                     >
                       Waive ticked ({selected.length})
                     </button>
                   )}
-                  <button
-                    type="button"
-                    disabled={saving || !amount || totals?.due === 0}
-                    onClick={handleReview}
-                    className="rounded-md bg-green-600 px-6 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
-                  >
-                    Collect {amount ? formatRupees(amount) : "Fee"}
-                  </button>
                 </div>
-              </section>
-            </>
-          )}
+              </aside>
+            )}
 
-          <PaymentHistory
-            payments={history.payments}
-            loading={history.loading}
-            error={history.error}
-            onCancel={(payment) => {
-              setCancelReason("");
-              setToCancel(payment);
-            }}
-          />
-
-          {account.log.length > 0 && (
-            <details className="rounded-lg border border-gray-200 bg-white">
-              <summary className="cursor-pointer p-4 font-bold text-gray-800">
-                Change log ({account.log.length})
-              </summary>
-              <ul className="divide-y divide-gray-100 border-t border-gray-100 text-sm">
-                {[...account.log].reverse().map((entry, index) => (
-                  <li key={`${entry.at}-${index}`} className="px-4 py-2">
-                    <p className="text-gray-800">{entry.text}</p>
-                    <p className="text-xs text-gray-500">
-                      {entry.at ? format(new Date(entry.at), "d MMM yyyy, h:mm a") : "-"} · {entry.byName || "-"}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
-
-          <FeeAdjustDialog
-            adjustment={adjustment}
-            account={account}
-            structure={structure}
-            onClose={() => setAdjustment(null)}
-            onSaved={refreshAccount}
-          />
-        </>
-      )}
+            <FeeAdjustDialog
+              adjustment={adjustment}
+              account={account}
+              structure={structure}
+              onClose={() => setAdjustment(null)}
+              onSaved={refreshAccount}
+            />
+          </>
+        )}
+      </div>
 
       <Modal
         isOpen={toCancel !== null}

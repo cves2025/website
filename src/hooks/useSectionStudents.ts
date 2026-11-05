@@ -13,6 +13,8 @@ export interface SectionStudent {
   fatherName: string;
   /** 0 when roll numbers are not generated yet. */
   rollNumber: number;
+  /** Photo URL when the enrollment carries one ("" = read it from `students`). */
+  photo: string;
 }
 
 /**
@@ -66,6 +68,7 @@ export function useSectionStudents(
               fatherName: String(data.fatherName ?? ""),
               rollNumber:
                 rollNumbers.get(studentId) ?? rollNumbers.get(item.id) ?? 0,
+              photo: typeof data.studentPhoto === "string" ? data.studentPhoto : "",
             };
           });
         rows.sort(

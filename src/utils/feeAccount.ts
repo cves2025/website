@@ -133,6 +133,108 @@ export function feeTotals(lines: FeeLine[]): FeeTotals {
   );
 }
 
+/* ------------------------------------------------- paying in month order -- */
+
+/** Position of a month in the session (April = 0 ... March = 11). */
+export const sessionMonthRank = (month: number): number => SESSION_MONTHS.indexOf(month);
+
+/** The months of the session that have at least one line, April -> March. */
+export const accountMonths = (lines: FeeLine[]): number[] =>
+  SESSION_MONTHS.filter((month) => lines.some((line) => line.month === month));
+
+/** What is still due in a month (all its lines). */
+export const monthDue = (lines: FeeLine[], month: number): number =>
+  lines.filter((line) => line.month === month).reduce((sum, line) => sum + lineDue(line), 0);
+
+/**
+ * The earlier line of the same fee that still blocks `line`: fees are paid
+ * month after month, so May's transport waits for April's transport (it is
+ * cleared, or ticked in the same payment). Lines without a month never wait.
+ */
+export function blockingLine(lines: FeeLine[], line: FeeLine, ticked: ReadonlySet<string>): FeeLine | null {
+  if (line.month === null) return null;
+  const rank = sessionMonthRank(line.month);
+  return (
+    lines.find(
+      (other) =>
+        other.head === line.head &&
+        other.month !== null &&
+        sessionMonthRank(other.month) < rank &&
+        lineDue(other) > 0 &&
+        !ticked.has(other.id)
+    ) ?? null
+  );
+}
+
+/** A line can be ticked when it owes money and nothing earlier blocks it. */
+export const canTickLine = (lines: FeeLine[], line: FeeLine, ticked: ReadonlySet<string>): boolean =>
+  lineDue(line) > 0 && !blockingLine(lines, line, ticked);
+
+/** Unticks a line and, to keep the order, the same fee of every later month. */
+export function untickLine(lines: FeeLine[], line: FeeLine, ticked: ReadonlySet<string>): Set<string> {
+  const next = new Set(ticked);
+  next.delete(line.id);
+  if (line.month === null) return next;
+  const rank = sessionMonthRank(line.month);
+  lines.forEach((other) => {
+    if (other.head === line.head && other.month !== null && sessionMonthRank(other.month) > rank) {
+      next.delete(other.id);
+    }
+  });
+  return next;
+}
+
+/** Ticks every due line of a month that is not blocked by an earlier month. */
+export function tickMonth(lines: FeeLine[], month: number, ticked: ReadonlySet<string>): Set<string> {
+  const next = new Set(ticked);
+  lines
+    .filter((line) => line.month === month)
+    .forEach((line) => {
+      if (canTickLine(lines, line, next)) next.add(line.id);
+    });
+  return next;
+}
+
+/**
+ * The earlier month that must be cleared or picked before `month` can be
+ * picked (null = it can be picked).
+ */
+export function blockingMonth(lines: FeeLine[], month: number, picked: readonly number[]): number | null {
+  const rank = sessionMonthRank(month);
+  return (
+    accountMonths(lines).find(
+      (other) => sessionMonthRank(other) < rank && !picked.includes(other) && monthDue(lines, other) > 0
+    ) ?? null
+  );
+}
+
+/**
+ * What is left of a selection after the account changed (discount, waive,
+ * cancelled receipt ...): picked months and ticked lines that still follow
+ * the month order and still owe money.
+ */
+export function keepValidSelection(
+  lines: FeeLine[],
+  months: readonly number[],
+  ticked: readonly string[]
+): { months: number[]; ticked: string[] } {
+  const keptMonths: number[] = [];
+  [...months]
+    .sort((a, b) => sessionMonthRank(a) - sessionMonthRank(b))
+    .forEach((month) => {
+      if (accountMonths(lines).includes(month) && blockingMonth(lines, month, keptMonths) === null) {
+        keptMonths.push(month);
+      }
+    });
+  const wanted = new Set(ticked);
+  const kept = new Set<string>();
+  lines.forEach((line) => {
+    const visible = line.month === null || keptMonths.includes(line.month);
+    if (wanted.has(line.id) && visible && canTickLine(lines, line, kept)) kept.add(line.id);
+  });
+  return { months: keptMonths, ticked: [...kept] };
+}
+
 /**
  * Splits `amount` over the due lines, in account order (oldest first).
  * Only the lines in `lineIds` are used when it is given. The allocations
