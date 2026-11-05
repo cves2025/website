@@ -623,8 +623,8 @@ function CollectFee() {
                     type="button"
                     disabled={saving || !amount || totals?.due === 0}
                     onClick={handleReview}
-                    // Same school-colour gradient as the scrollbar thumb (index.css).
-                    className="rounded-md bg-[linear-gradient(to_right,#009746,#393186,#e7087e,#e31e25)] py-2.5 text-sm font-semibold text-white shadow-sm transition hover:shadow-md hover:brightness-110 disabled:opacity-50 disabled:hover:brightness-100"
+                    // bg-cves: the school-colour gradient (tailwind.config.js).
+                    className="rounded-md bg-cves py-2.5 text-sm font-semibold text-white shadow-sm transition hover:shadow-md hover:brightness-110 disabled:opacity-50 disabled:hover:brightness-100"
                   >
                     Collect {amount ? formatRupees(amount) : "Fee"}
                   </button>

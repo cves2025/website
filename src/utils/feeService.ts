@@ -11,6 +11,7 @@
 import {
   collection,
   doc,
+  documentId,
   getDoc,
   getDocs,
   query,
@@ -19,7 +20,7 @@ import {
   setDoc,
   where,
 } from "firebase/firestore";
-import type { DocumentData } from "firebase/firestore";
+import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore";
 
 import {
   CLASSES,
@@ -312,6 +313,27 @@ async function studentsEnrolledBefore(
   return earlier;
 }
 
+/**
+ * The saved fee accounts of these students in a session, read by document
+ * id in batches (only accounts that exist are read).
+ */
+async function accountsOfStudents(
+  session: string,
+  studentIds: string[]
+): Promise<QueryDocumentSnapshot<DocumentData>[]> {
+  const ids = [...new Set(studentIds)].map((studentId) => feeAccountId(session, studentId));
+  const batches: string[][] = [];
+  for (let index = 0; index < ids.length; index += IDS_PER_IN_QUERY) {
+    batches.push(ids.slice(index, index + IDS_PER_IN_QUERY));
+  }
+  const snapshots = await Promise.all(
+    batches.map((batch) =>
+      getDocs(query(collection(db, COLLECTION.FEE_ACCOUNTS), where(documentId(), "in", batch)))
+    )
+  );
+  return snapshots.flatMap((snapshot) => snapshot.docs);
+}
+
 /** True when the student was admitted in `session` (owes the admission fee). */
 async function isNewAdmission(studentId: string, session: string): Promise<boolean> {
   return !(await studentsEnrolledBefore([studentId], session)).has(studentId);
@@ -381,9 +403,13 @@ export async function loadDuesReport(
   if (className) filters.push(where("className", "==", className));
   if (section) filters.push(where("section", "==", section));
 
-  const [enrollmentSnap, accountSnap, { structure }, settings] = await Promise.all([
+  // All classes: every account of the session in one query. One class: only
+  // the accounts of its students, read by id once the students are known.
+  const [enrollmentSnap, sessionAccounts, { structure }, settings] = await Promise.all([
     getDocs(query(collection(db, COLLECTION.ENROLLMENTS), ...filters)),
-    getDocs(query(collection(db, COLLECTION.FEE_ACCOUNTS), where("session", "==", session))),
+    className
+      ? null
+      : getDocs(query(collection(db, COLLECTION.FEE_ACCOUNTS), where("session", "==", session))),
     fetchFeeStructure(session),
     loadFeeSettings(),
   ]);
@@ -408,8 +434,14 @@ export async function loadDuesReport(
       };
     });
 
+  const accountDocs = sessionAccounts
+    ? sessionAccounts.docs
+    : await accountsOfStudents(
+        session,
+        students.map((student) => student.studentId)
+      );
   const saved = new Map(
-    accountSnap.docs.map((item) => {
+    accountDocs.map((item) => {
       const account = toFeeAccount(item.id, item.data());
       return [account.studentId, account] as const;
     })

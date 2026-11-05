@@ -7,6 +7,10 @@ export default {
 
   theme: {
   	extend: {
+  		backgroundImage: {
+  			// "cves": the school colours (sidebar stripe, scrollbar). Use as bg-cves.
+  			cves: 'linear-gradient(to right, #009746, #393186, #e7087e, #e31e25)'
+  		},
   		keyframes: {
   			'scroll-left': {
   				'0%': {
