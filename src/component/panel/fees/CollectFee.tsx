@@ -39,6 +39,7 @@ import { inputClass, labelClass } from "../attendance/attendanceShared";
 import FeeAccountCards from "./FeeAccountCards";
 import FeeStudentBar from "./FeeStudentBar";
 import StudentSearch from "./StudentSearch";
+import CollectFeeEmpty from "./CollectFeeEmpty";
 import type { StudentBarAction } from "./FeeStudentBar";
 import PaymentHistory from "./PaymentHistory";
 import FeeAdjustDialog from "./FeeAdjustDialog";
@@ -368,10 +369,14 @@ function CollectFee() {
         {/* Left: who is paying; stays in view below the student bar and
             scrolls inside itself when taller than the space left. */}
         <aside
-          className="flex flex-col gap-3 lg:sticky lg:max-h-[var(--side-max)] lg:overflow-y-auto lg:overscroll-contain"
+          // With no student yet it stretches with the empty card beside it,
+          // so both are the same height.
+          className={`flex flex-col gap-3 lg:sticky lg:max-h-[var(--side-max)] lg:overflow-y-auto lg:overscroll-contain ${
+            student ? "" : "self-stretch"
+          }`}
           style={leftSideStyle}
         >
-          <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4">
+          <div className="flex flex-1 flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4">
             <div>
               <label htmlFor="collectSession" className={labelClass}>Session</label>
               <SelectDropdown
@@ -460,9 +465,8 @@ function CollectFee() {
             {studentsError}
           </div>
         ) : !student ? (
-          <p className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500 xl:col-span-2">
-            Select a class, section and student to see the fee account.
-          </p>
+          // Stretches to the height of the filter column.
+          <CollectFeeEmpty className="self-stretch xl:col-span-2" />
         ) : feeAccount.loading ? (
           <div className="xl:col-span-2">
             <Loader label="Loading fee account..." />
