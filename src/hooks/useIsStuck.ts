@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { RefObject } from "react";
 
 /** The nearest ancestor that scrolls (null = the page itself). */
-function scrollParentOf(element: HTMLElement): HTMLElement | null {
+export function scrollParentOf(element: HTMLElement): HTMLElement | null {
   let parent = element.parentElement;
   while (parent) {
     const { overflowY } = getComputedStyle(parent);

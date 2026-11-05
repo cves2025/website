@@ -1,4 +1,5 @@
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import toast from "react-hot-toast";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
@@ -32,7 +33,7 @@ import useFeeAccount from "../../../hooks/useFeeAccount";
 import useAccountPayments from "../../../hooks/useAccountPayments";
 import useFeeStructure from "../../../hooks/useFeeStructure";
 import useStudentPhoto from "../../../hooks/useStudentPhoto";
-import useIsStuck from "../../../hooks/useIsStuck";
+import useIsStuck, { scrollParentOf } from "../../../hooks/useIsStuck";
 import type { FeePayment, FeeStudent, PaymentMode } from "../../../utils/type";
 import { inputClass, labelClass } from "../attendance/attendanceShared";
 import FeeAccountCards from "./FeeAccountCards";
@@ -149,7 +150,30 @@ function CollectFee() {
     observer.observe(bar);
     return () => observer.disconnect();
   }, [showBar]);
-  const sideTop = { top: (barStuck ? barHeight : 0) + 12 };
+  const sideOffset = (barStuck ? barHeight : 0) + 12;
+  const sideTop = { top: sideOffset };
+
+  // Height of the scroll area, so a side column taller than the space left
+  // below the bar scrolls inside itself instead of sliding away.
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [viewHeight, setViewHeight] = useState(0);
+  useEffect(() => {
+    const scroller = gridRef.current ? scrollParentOf(gridRef.current) : null;
+    const measure = () => setViewHeight(scroller ? scroller.clientHeight : window.innerHeight);
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (scroller) observer.observe(scroller);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
+  // The cap is used only where the column is sticky (lg:max-h below).
+  const leftSideStyle = {
+    top: sideOffset,
+    "--side-max": viewHeight ? `${viewHeight - sideOffset - 12}px` : "none",
+  } as CSSProperties;
 
   // A new student or session starts with a clean form.
   useEffect(() => {
@@ -337,9 +361,16 @@ function CollectFee() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_320px]">
-        {/* Left: who is paying; stays in view below the student bar */}
-        <aside className="flex flex-col gap-3 lg:sticky" style={sideTop}>
+      <div
+        ref={gridRef}
+        className="grid grid-cols-1 items-start gap-3 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_320px]"
+      >
+        {/* Left: who is paying; stays in view below the student bar and
+            scrolls inside itself when taller than the space left. */}
+        <aside
+          className="flex flex-col gap-3 lg:sticky lg:max-h-[var(--side-max)] lg:overflow-y-auto lg:overscroll-contain"
+          style={leftSideStyle}
+        >
           <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4">
             <div>
               <label htmlFor="collectSession" className={labelClass}>Session</label>
