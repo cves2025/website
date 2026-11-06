@@ -23,7 +23,7 @@ import CustomToggle from "../../../custom-components/CustomToggle";
 import SearchableMultiSelect, {
   SearchableOption,
 } from "../../../custom-components/SearchableMultiSelect";
-import { CLASSES, COLLECTION } from "../../../constants";
+import { CLASSES, COLLECTION, CVES_BUTTON } from "../../../constants";
 import { db } from "../../../firebase/config";
 import { isSubjectInUse } from "../../../utils/marksService";
 import PageHeader from "../../../custom-components/PageHeader";
@@ -693,9 +693,9 @@ function Subject() {
         button={
           <Button
             buttonName="+ Add Subject"
-            variant="success"
+            variant="cves"
             size="md"
-            buttonStyle="rounded-full bg-blue-600 hover:bg-blue-700"
+            buttonStyle="rounded-full"
             onClick={openAddModal}
           />
         }
@@ -906,6 +906,7 @@ function Subject() {
         modalClassName="max-w-2xl"
         cancelText="Cancel"
         submitText={editingId ? "Update" : "Add Subject"}
+        submitClassName={CVES_BUTTON}
         loading={saving}
         submitDisabled={
           loading ||
@@ -1049,6 +1050,7 @@ function Subject() {
         }
         cancelText={deleteInUse === true && subjectToDelete?.archived === true ? "Close" : "Cancel"}
         submitText={deleteInUse ? "Archive" : "Delete"}
+        submitClassName={CVES_BUTTON}
         hideSubmit={deleteInUse === true && subjectToDelete?.archived === true}
         submitDisabled={deleteInUse === null}
         loading={deleting}

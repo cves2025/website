@@ -663,9 +663,9 @@ export default function StudentList() {
           canManage ? (
             <Button
               buttonName="+ Add Student"
-              variant="success"
+              variant="cves"
               size="md"
-              buttonStyle="rounded-full bg-blue-600 hover:bg-blue-700"
+              buttonStyle="rounded-full"
               onClick={() => navigate(ADD_STUDENT_PATH)}
             />
           ) : undefined
@@ -939,7 +939,8 @@ export default function StudentList() {
             type="button"
             disabled={!hasNextPage || loading}
             onClick={handleNext}
-            className="rounded border px-4 py-2 disabled:opacity-50"
+            // Blue at rest; the school-colour gradient on hover (not when disabled).
+            className="rounded border border-transparent bg-blue-600 px-4 py-2 font-semibold text-white shadow-sm transition hover:bg-cves hover:shadow-md disabled:opacity-50 disabled:hover:bg-none disabled:hover:shadow-sm"
           >
             Next
           </button>
@@ -956,6 +957,7 @@ export default function StudentList() {
         }
         cancelText="Cancel"
         submitText="Delete"
+        submitClassName="bg-cves shadow-sm transition hover:shadow-md hover:brightness-110"
         loading={deletingId !== null}
         onSubmit={handleDelete}
       />

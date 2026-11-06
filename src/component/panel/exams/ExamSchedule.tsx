@@ -3,7 +3,9 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import toast from "react-hot-toast";
 import { Trash2 } from "lucide-react";
-import { COLLECTION } from "../../../constants";
+import { COLLECTION, CVES_BUTTON } from "../../../constants";
+import { Checkbox } from "@/components/ui/checkbox";
+import Modal from "../../../custom-components/Modal";
 import { db } from "../../../firebase/config";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import { marksSchemeBadge } from "../../../utils/examMarksScheme";
@@ -255,6 +257,9 @@ function ExamSchedule() {
     setRows((prev) => prev.filter((row) => row.id !== id));
   };
 
+  // The paper waiting for the "Remove" confirmation.
+  const [rowToRemove, setRowToRemove] = useState<{ id: string; name: string } | null>(null);
+
   const handleClearSchedule = () => {
     setRows([]);
     setScheduleErrors([]);
@@ -330,9 +335,9 @@ function ExamSchedule() {
         button={
           <Button
             buttonName="+ Add Exam"
-            variant="success"
+            variant="cves"
             size="md"
-            buttonStyle="rounded-full bg-blue-600 hover:bg-blue-700"
+            buttonStyle="rounded-full"
             onClick={() => navigate(`/welcome/exam/list/?add-exam`)}
           />
         }
@@ -523,7 +528,10 @@ function ExamSchedule() {
                           variant="destructive"
                           title="Remove this paper"
                           aria-label="Remove this paper"
-                          onClick={() => handleRemoveRow(row.id)}
+                          // Asks first; the paper goes only on "Remove".
+                          onClick={() =>
+                            setRowToRemove({ id: row.id, name: scheduleRowName(row, index) })
+                          }
                           className="h-8 w-8 shrink-0 bg-red-600 text-white hover:bg-red-700"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -643,17 +651,15 @@ function ExamSchedule() {
                                           : "border-red-300 bg-red-50 text-red-700"
                                       }`}
                                     >
-                                      <input
-                                        type="checkbox"
+                                      <Checkbox
                                         checked={row.classes.includes(className)}
-                                        onChange={(event) =>
+                                        onCheckedChange={(checked) =>
                                           handleToggleRowClass(
                                             row.id,
                                             className,
-                                            event.target.checked
+                                            checked === true
                                           )
                                         }
-                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                       />
                                       {toOrdinalLabel(className)}
                                       {takenBy !== undefined && (
@@ -727,7 +733,7 @@ function ExamSchedule() {
               <button
                 type="button"
                 onClick={handleAddRow}
-                className="rounded-md bg-green-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-green-700"
+                className={`rounded-md px-4 py-2 text-sm font-bold text-white ${CVES_BUTTON}`}
               >
                 + Add Subject Paper
               </button>
@@ -735,7 +741,7 @@ function ExamSchedule() {
                 type="button"
                 onClick={() => void handleSaveSchedule()}
                 disabled={savingSchedule || rows.length === 0}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className={`rounded-md px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:brightness-100 ${CVES_BUTTON}`}
               >
                 {savingSchedule ? "Saving..." : "Save Schedule"}
               </button>
@@ -764,6 +770,24 @@ function ExamSchedule() {
             </div>
         )}
       </section>
+
+      <Modal
+        isOpen={rowToRemove !== null}
+        onClose={() => setRowToRemove(null)}
+        title="Remove Paper"
+        description={
+          rowToRemove
+            ? `Remove ${rowToRemove.name} from this schedule? It is removed for good when you click Save Schedule.`
+            : ""
+        }
+        cancelText="Cancel"
+        submitText="Remove"
+        submitClassName={CVES_BUTTON}
+        onSubmit={() => {
+          if (rowToRemove) handleRemoveRow(rowToRemove.id);
+          setRowToRemove(null);
+        }}
+      />
     </div>
   );
 }

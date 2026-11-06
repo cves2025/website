@@ -10,7 +10,7 @@ import CircleCheckbox from "../../../custom-components/CircleCheckbox";
 import Loader from "../../../custom-components/Loader";
 import Modal from "../../../custom-components/Modal";
 import { myContext } from "../../context/MyContextProvider";
-import { CLASSES } from "../../../constants";
+import { CLASSES, CVES_BUTTON } from "../../../constants";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import useHolidayCalendar from "../../../hooks/useHolidayCalendar";
@@ -335,7 +335,7 @@ function HolidayCalendar() {
                 type="button"
                 disabled={saving}
                 onClick={handleSubmit}
-                className="rounded-md bg-primaryBlue px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                className={`rounded-md px-5 py-2 text-sm font-semibold text-white disabled:opacity-50 disabled:hover:brightness-100 ${CVES_BUTTON}`}
               >
                 {form.id ? "Update Holiday" : "Add Holiday"}
               </button>
@@ -420,6 +420,7 @@ function HolidayCalendar() {
         }
         cancelText="Cancel"
         submitText="Delete"
+        submitClassName={CVES_BUTTON}
         loading={saving}
         onSubmit={() => void handleConfirmDelete()}
       />

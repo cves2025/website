@@ -7,7 +7,7 @@ import { ArrowLeft, Pencil, Printer } from "lucide-react";
 import { AdmissionStudentFormValues } from "../../../utils/type";
 import { studentDocToFormValues } from "../../../utils/admissionFormValues";
 import { allowedClassSections, pairKey } from "../../../utils/studentScope";
-import { ADD_STUDENT_PATH, COLLECTION } from "../../../constants";
+import { ADD_STUDENT_PATH, COLLECTION, CVES_ON_HOVER } from "../../../constants";
 import { db } from "../../../firebase/config";
 import type { PhotoKind } from "../../../firebase/studentPhotos";
 import { NO_SCOPE, PERMISSIONS } from "../../../permissions";
@@ -147,8 +147,11 @@ function StudentView() {
     <div className="flex flex-col gap-4">
       <style>{"@page { size: A4; margin: 0; }"}</style>
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white px-4 py-3 shadow-sm print:hidden">
+      {/* Toolbar: stays at the top while the form scrolls. The band is in the
+          page colour and its ::before covers <main>'s padding around it, so
+          the form never shows through. */}
+      <div className="sticky top-0 z-20 bg-gray-100 pb-1 before:absolute before:-inset-x-4 before:-top-4 before:bottom-0 before:-z-10 before:bg-gray-100 before:content-[''] md:before:-inset-x-2 print:hidden">
+      <div className="relative flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white px-4 py-3 shadow-sm">
         <div className="min-w-0">
           <h1 className="truncate text-lg font-bold text-primaryBlue">
             {studentName || "Admission Form"}
@@ -161,6 +164,7 @@ function StudentView() {
           <CustomButton
             type="button"
             variant="outline"
+            className={CVES_ON_HOVER}
             onClick={() => navigate(STUDENT_LIST_PATH)}
           >
             <ArrowLeft className="h-4 w-4" /> Back
@@ -169,6 +173,7 @@ function StudentView() {
             <CustomButton
               type="button"
               variant="outline"
+              className={CVES_ON_HOVER}
               disabled={state.status !== "ready"}
               onClick={() => navigate(`${ADD_STUDENT_PATH}?edit=${enrollmentId}`)}
             >
@@ -184,6 +189,7 @@ function StudentView() {
             <Printer className="h-4 w-4" /> Print
           </CustomButton>
         </div>
+      </div>
       </div>
 
       {state.status === "loading" && (

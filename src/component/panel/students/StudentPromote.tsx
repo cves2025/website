@@ -657,7 +657,7 @@ function StudentPromote() {
           <div className="flex justify-end">
             <Button
               buttonName="Promote Student"
-              variant="success"
+              variant="cves"
               disabled={!canSubmit}
               onClick={() => setConfirmOpen(true)}
             />
@@ -787,7 +787,7 @@ function StudentPromote() {
           <div className="flex justify-end">
             <Button
               buttonName={`Promote Whole Class (${activeCandidates.length})`}
-              variant="success"
+              variant="cves"
               disabled={!canSubmit}
               onClick={() => setConfirmOpen(true)}
             />

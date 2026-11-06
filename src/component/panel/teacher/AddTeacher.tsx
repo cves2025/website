@@ -23,6 +23,7 @@ import {
   CLASSES,
   CLASS_OPTIONS,
   COLLECTION,
+  CVES_BUTTON,
   EMAIL_PATTERN,
   GENDER_OPTIONS,
   TEACHER_DESIGNATIONS,
@@ -1069,7 +1070,7 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
         </div>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <CustomButton type="submit" disabled={!isFormDirty || isSubmitting}>
+          <CustomButton type="submit" variant="cves" disabled={!isFormDirty || isSubmitting}>
             {isSubmitting
               ? "Saving..."
               : initialEditId
@@ -1143,7 +1144,7 @@ function AddTeacher() {
         titleStyle="text-primaryBlue"
         description={`${teachers.length} teacher(s) added. Click the Add Teacher button to create a new record.`}
         descriptionStyle="text-gray-500"
-        button={<Button buttonName="+ Add Teacher" onClick={openAddModal} />}
+        button={<Button buttonName="+ Add Teacher" variant="cves" onClick={openAddModal} />}
       />
 
       {loading ? (
@@ -1275,6 +1276,7 @@ function AddTeacher() {
         }
         cancelText="Cancel"
         submitText="Delete"
+        submitClassName={CVES_BUTTON}
         loading={deleting}
         onSubmit={() => void handleDelete()}
       />

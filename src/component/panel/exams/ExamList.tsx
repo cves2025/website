@@ -12,7 +12,7 @@ import {
 } from "firebase/firestore";
 import toast from "react-hot-toast";
 import { Archive, ArchiveRestore, Pencil } from "lucide-react";
-import { CLASSES, COLLECTION } from "../../../constants";
+import { CLASSES, COLLECTION, CVES_BUTTON } from "../../../constants";
 import { db } from "../../../firebase/config";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
@@ -139,6 +139,9 @@ function ExamList() {
       (!selectedClass || exam.applicableClasses.includes(selectedClass))
   );
 
+  // The exam waiting for the "Archive" confirmation.
+  const [examToArchive, setExamToArchive] = useState<ExamDoc | null>(null);
+
   const handleToggleStatus = async (exam: ExamDoc) => {
     const nextStatus: ExamStatus =
       exam.status === "active" ? "archived" : "active";
@@ -189,7 +192,7 @@ function ExamList() {
           <UIButton
             type="button"
             onClick={openAddModal}
-            className="bg-primaryGreen font-bold text-white hover:bg-green-700"
+            className={`font-bold text-white ${CVES_BUTTON}`}
           >
             + Add Exam
           </UIButton>
@@ -320,7 +323,10 @@ function ExamList() {
                           title={isUpdating ? "Updating..." : statusAction}
                           aria-label={`${statusAction} ${exam.examName}`}
                           disabled={isUpdating}
-                          onClick={() => void handleToggleStatus(exam)}
+                          // Archiving asks first; activating again does not.
+                          onClick={() =>
+                            isActive ? setExamToArchive(exam) : void handleToggleStatus(exam)
+                          }
                           className={`h-8 w-8 text-white ${
                             isActive
                               ? "bg-amber-500 hover:bg-amber-600"
@@ -344,6 +350,29 @@ function ExamList() {
           </Table>
         </div>
       )}
+
+      {/* Archive confirmation */}
+      <Modal
+        isOpen={examToArchive !== null}
+        onClose={() => {
+          if (!updatingId) setExamToArchive(null);
+        }}
+        title="Archive Exam"
+        description={
+          examToArchive
+            ? `Archive "${examToArchive.examName}"? It is hidden from active use (marks entry, schedules) but kept for existing marks records. You can activate it again later.`
+            : ""
+        }
+        cancelText="Cancel"
+        submitText="Archive"
+        submitClassName={CVES_BUTTON}
+        loading={examToArchive !== null && updatingId === examToArchive.id}
+        onSubmit={async () => {
+          if (!examToArchive) return;
+          await handleToggleStatus(examToArchive);
+          setExamToArchive(null);
+        }}
+      />
 
       {/* Add / Edit exam modal */}
       {modalOpen && (

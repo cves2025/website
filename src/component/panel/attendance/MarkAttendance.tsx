@@ -7,6 +7,7 @@ import PageHeader from "../../../custom-components/PageHeader";
 import SelectDropdown from "../../../custom-components/SelectDropdown";
 import Loader from "../../../custom-components/Loader";
 import { myContext } from "../../context/MyContextProvider";
+import { CVES_BUTTON } from "../../../constants";
 import { NO_SCOPE, PERMISSIONS, isClassTeacherOf } from "../../../permissions";
 import useHolidayCalendar from "../../../hooks/useHolidayCalendar";
 import useSectionStudents from "../../../hooks/useSectionStudents";
@@ -348,7 +349,7 @@ function MarkAttendance() {
                 type="button"
                 onClick={handleSave}
                 disabled={saving || !dirty}
-                className="rounded-md bg-primaryBlue px-6 py-2 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                className={`rounded-md px-6 py-2 font-semibold text-white disabled:opacity-50 disabled:hover:brightness-100 ${CVES_BUTTON}`}
               >
                 {saving ? "Saving..." : saved ? "Update Attendance" : "Save Attendance"}
               </button>

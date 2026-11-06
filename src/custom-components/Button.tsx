@@ -9,6 +9,8 @@ const VARIANTS = {
   success: "bg-green-600 text-white shadow-sm hover:bg-green-700",
   danger: "bg-red-600 text-white shadow-sm hover:bg-red-700",
   warning: "bg-amber-500 text-white shadow-sm hover:bg-amber-600",
+  // School-colour gradient (bg-cves in tailwind.config.js).
+  cves: "bg-cves text-white shadow-sm hover:shadow-md hover:brightness-110",
   outline:
     "border border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
   ghost: "bg-transparent text-blue-600 hover:bg-blue-50",

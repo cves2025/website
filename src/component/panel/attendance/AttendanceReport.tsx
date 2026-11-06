@@ -1,6 +1,7 @@
 import { useContext, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import * as XLSX from "xlsx";
+import { FileSpreadsheet, Printer } from "lucide-react";
 
 import PageHeader from "../../../custom-components/PageHeader";
 import SelectDropdown from "../../../custom-components/SelectDropdown";
@@ -203,17 +204,21 @@ function AttendanceReport() {
                 type="button"
                 onClick={exportExcel}
                 disabled={loading || report.rows.length === 0}
-                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                title="Download Excel"
+                aria-label="Download the attendance report as Excel"
+                className="grid h-[38px] w-[38px] place-items-center rounded-md border border-gray-300 bg-white text-green-700 hover:bg-gray-50 disabled:opacity-50"
               >
-                Excel
+                <FileSpreadsheet className="h-5 w-5" />
               </button>
               <button
                 type="button"
                 onClick={() => window.print()}
                 disabled={loading || report.rows.length === 0}
-                className="rounded-md bg-primaryBlue px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                title="Print"
+                aria-label="Print the attendance report"
+                className="grid h-[38px] w-[38px] place-items-center rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               >
-                Print
+                <Printer className="h-5 w-5" />
               </button>
             </div>
           }

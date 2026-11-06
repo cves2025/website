@@ -190,6 +190,16 @@ export const DEFAULT_FEE_SETTINGS: FeeSettings = {
   receiptPrefix: "CVES",
 };
 
+/** Classes for a button in the school-colour gradient (e.g. a Modal's submitClassName). */
+export const CVES_BUTTON = "bg-cves shadow-sm transition hover:shadow-md hover:brightness-110";
+
+/**
+ * Extra classes for a button that turns to the school-colour gradient
+ * (bg-cves) on hover, with white text and no border (not when disabled).
+ */
+export const CVES_ON_HOVER =
+  "hover:border-transparent hover:bg-cves hover:text-white hover:shadow-md disabled:hover:bg-none";
+
 /** Number input for a rupee amount inside a table cell (fee pages). */
 export const AMOUNT_INPUT_CLASS =
   "w-full max-w-[140px] rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50";

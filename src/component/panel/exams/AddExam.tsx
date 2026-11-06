@@ -1092,6 +1092,7 @@ function AddExam({ initialEditId, onClose }: AddExamProps) {
           <div className="mt-6 flex flex-wrap gap-3">
             <CustomButton
               type="submit"
+              variant="cves"
               loading={isSubmitting}
               disabled={isSubmitting || checkingSequence}
             >
