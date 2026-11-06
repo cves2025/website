@@ -254,7 +254,7 @@ function FeeStructure() {
               <button
                 type="button"
                 onClick={addExamFee}
-                className="flex items-center justify-center gap-2 rounded-md bg-primaryBlue px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+                className="flex items-center justify-center gap-2 rounded-md bg-cves px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:shadow-md hover:brightness-110"
               >
                 <Plus className="h-4 w-4" />
                 Add Exam Fee
@@ -297,7 +297,7 @@ function FeeStructure() {
           type="button"
           disabled={!dirty || saving || loading}
           onClick={() => void handleSave()}
-          className="rounded-md bg-primaryBlue px-6 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+          className="rounded-md bg-cves px-6 py-2 text-sm font-semibold text-white shadow-sm transition hover:shadow-md hover:brightness-110 disabled:opacity-50 disabled:hover:brightness-100"
         >
           {saving ? "Saving..." : "Save Fee Structure"}
         </button>
@@ -333,6 +333,7 @@ function FeeStructure() {
         description={`Remove "${examToDelete?.name || "this exam fee"}"? It is removed for good when you click Save.`}
         cancelText="Cancel"
         submitText="Remove"
+        submitClassName="bg-cves shadow-sm transition hover:shadow-md hover:brightness-110"
         onSubmit={() => {
           const target = examToDelete;
           if (target) {

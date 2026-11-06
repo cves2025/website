@@ -311,7 +311,12 @@ function DuesReport() {
           className="flex-1"
         />
       ) : loading ? (
-        <Loader label="Loading dues..." />
+        // In the report area, not over the page: the filters stay usable.
+        <Loader
+          fullScreen={false}
+          label="Loading dues..."
+          className="flex-1 rounded-lg border border-gray-200 bg-white"
+        />
       ) : error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
           {error}

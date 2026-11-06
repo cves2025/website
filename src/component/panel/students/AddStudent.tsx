@@ -926,8 +926,11 @@ function AddStudent() {
         </div>
       )}
 
-      {/* Form tabs */}
-      <div className="mb-6 inline-flex max-w-full flex-wrap overflow-hidden rounded-lg border border-gray-300 bg-white">
+      {/* Form tabs: stick to the top while the form scrolls. The band is in
+          the page colour and its ::before covers <main>'s padding around it,
+          so the form never shows through. */}
+      <div className="sticky top-0 z-20 mb-6 bg-gray-100 pb-2 before:absolute before:-inset-x-4 before:-top-4 before:bottom-0 before:-z-10 before:bg-gray-100 before:content-[''] md:before:-inset-x-2">
+      <div className="relative inline-flex max-w-full flex-wrap overflow-hidden rounded-lg border border-gray-300 bg-white">
         <button
           type="button"
           onClick={() => setActiveTab("info")}
@@ -962,6 +965,7 @@ function AddStudent() {
           Bulk Import (Excel / CSV)
         </button>
       </div>
+      </div>
 
       {activeTab === "bulk" ? (
         <BulkStudentImport />
@@ -979,14 +983,14 @@ function AddStudent() {
           />
 
           <div className="mt-8 flex flex-wrap items-center justify-end gap-3">
-            <CustomButton type="button" onClick={handleNext}>
+            <CustomButton type="button" variant="cves" onClick={handleNext}>
               Next
             </CustomButton>
 
             {editingStudentId && (
               <CustomButton
                 type="button"
-                variant="outline"
+                variant="cves"
                 loading={loadingNextStudent}
                 onClick={() => void handleNextStudent()}
               >
@@ -1013,7 +1017,7 @@ function AddStudent() {
             </CustomButton>
             <CustomButton
               type="submit"
-              variant="success"
+              variant="cves"
               loading={isSubmitting}
             >
               {isSubmitting
@@ -1026,7 +1030,7 @@ function AddStudent() {
             {editingStudentId && (
               <CustomButton
                 type="button"
-                variant="outline"
+                variant="cves"
                 loading={loadingNextStudent}
                 onClick={() => void handleNextStudent()}
               >
