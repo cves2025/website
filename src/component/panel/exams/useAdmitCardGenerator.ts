@@ -64,8 +64,8 @@ interface UseAdmitCardGeneratorOptions {
  * saved schedule of the picked exam, the live student list of the picked class
  * and the derived values used by the step UI and the printed cards.
  *
- * Used by the "Generate Admit Card" modal (AdmitCard hub) and by the
- * generated-admit-cards page, which restores the same selection from the URL.
+ * Used by the Admit Card page (filters and cards on one page) and by the
+ * generated-admit-cards page; both restore the selection from the URL.
  */
 export function useAdmitCardGenerator(
   options: UseAdmitCardGeneratorOptions = {},
@@ -432,8 +432,8 @@ export function useAdmitCardGenerator(
 
       setCards(selectedStudents);
 
-      /* The modal only needs a valid selection before navigating away, so it
-         skips the per-student reads; the generated page loads them. */
+      /* A caller that only checks the selection can skip the per-student
+         reads (loadDetails = false); the pages that show cards load them. */
       if (!loadDetails) return true;
 
       // Extra details (mother's / father's name) live on the students document.
