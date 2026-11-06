@@ -1,4 +1,5 @@
 import React, { useContext, useMemo, useState } from "react";
+import { Printer } from "lucide-react";
 import { CLASSES, SECTIONS } from "../../../../constants";
 import { toOrdinalLabel } from "../../../../utils/toOrdinalLabel";
 import { academicYears } from "../examScheduleShared";
@@ -160,9 +161,11 @@ const DeskSlip: React.FC = () => {
           <button
             type="button"
             onClick={() => window.print()}
-            className="rounded-full bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            title={`Print ${students.length} desk slip${students.length > 1 ? "s" : ""}`}
+            aria-label={`Print ${students.length} desk slip${students.length > 1 ? "s" : ""}`}
+            className="grid h-[38px] w-[38px] place-items-center rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
           >
-            Print Desk Slips
+            <Printer className="h-5 w-5" />
           </button>
         </div>
       )}

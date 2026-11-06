@@ -1,7 +1,7 @@
 import { useContext, useEffect, useMemo, useState } from "react";
 import { NavLink, useSearchParams } from "react-router-dom";
 import { collection, getDocs, query, where } from "firebase/firestore";
-import { FaPrint } from "react-icons/fa";
+import { Printer } from "lucide-react";
 import PageHeader from "../../../custom-components/PageHeader";
 import { useExamRules } from "../../../hooks/useExamRules";
 import { useResultCardData } from "../../../hooks/useResultCardData";
@@ -286,10 +286,11 @@ function GeneratedResultCards() {
       type="button"
       onClick={() => window.print()}
       disabled={busy || results.length === 0}
-      className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+      title={`Print all ${results.length} result card(s)`}
+      aria-label={`Print all ${results.length} result card(s)`}
+      className="grid h-[38px] w-[38px] place-items-center rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
     >
-      <FaPrint />
-      Print{results.length > 0 ? ` all ${results.length}` : ""}
+      <Printer className="h-5 w-5" />
     </button>
   );
 

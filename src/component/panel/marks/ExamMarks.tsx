@@ -19,7 +19,7 @@ import {
 
 import toast from "react-hot-toast";
 
-import { CLASSES, COLLECTION, SECTIONS } from "../../../constants";
+import { CLASSES, COLLECTION, CVES_ON_HOVER, SECTIONS } from "../../../constants";
 
 import { db } from "../../../firebase/config";
 
@@ -1150,14 +1150,14 @@ function ExamMarks() {
                   buttonName="Fill from Daily Attendance"
                   variant="outline"
                   size="md"
-                  buttonStyle="rounded-full"
+                  buttonStyle={`rounded-full ${CVES_ON_HOVER}`}
                   disabled={attendanceLoading}
                   onClick={() => setAttendanceFillOpen(true)}
                 />
               )}
               <Button
                 buttonName="Upload Excel"
-                variant="success"
+                variant="cves"
                 size="md"
                 buttonStyle="rounded-full"
                 onClick={() => setUploadOpen(true)}

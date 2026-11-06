@@ -1,4 +1,5 @@
 import { useContext, useEffect, useMemo, useState } from "react";
+import { Printer, RefreshCw } from "lucide-react";
 import {
   collection,
   getDocs,
@@ -930,17 +931,18 @@ function CrossList() {
           descriptionStyle="text-gray-500"
           button={
             <div className="flex items-center gap-2">
-              <Button
-                buttonName="Refresh"
-                variant="outline"
-                size="sm"
+              <button
+                type="button"
                 disabled={!readyToLoad}
                 onClick={handleRefresh}
-              />
-              <Button
-                buttonName="Print"
-                variant="primary"
-                size="sm"
+                title="Refresh"
+                aria-label="Refresh the cross list"
+                className="grid h-[38px] w-[38px] place-items-center rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RefreshCw className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
                 disabled={
                   !readyToLoad ||
                   blocks.length === 0 ||
@@ -948,7 +950,12 @@ function CrossList() {
                   Boolean(rulesError)
                 }
                 onClick={() => window.print()}
-              />
+                title="Print"
+                aria-label="Print the cross list"
+                className="grid h-[38px] w-[38px] place-items-center rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Printer className="h-5 w-5" />
+              </button>
             </div>
           }
         />

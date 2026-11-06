@@ -3,7 +3,7 @@ import { deleteField, doc, setDoc, type FieldValue } from "firebase/firestore";
 import toast from "react-hot-toast";
 import { db } from "../../../../../firebase/config";
 // TODO: set the correct import path for these constants
-import { COLLECTION, PRE_DEFINED_DOC_ID } from "../../../../../constants";
+import { COLLECTION, CVES_BUTTON, PRE_DEFINED_DOC_ID } from "../../../../../constants";
 import Button from "../../../../../custom-components/Button";
 import DatePicker from "../../../../../custom-components/DatePicker";
 import Modal from "../../../../../custom-components/Modal";
@@ -556,7 +556,7 @@ function ResultCardSettings() {
                 )}
                 <Button
                   buttonName={saving ? "Saving..." : hasSavedForSelection ? "Update" : "Save"}
-                  variant="success"
+                  variant="cves"
                   size="md"
                   buttonStyle="rounded-md"
                   onClick={handleSave}
@@ -581,7 +581,7 @@ function ResultCardSettings() {
             : "selected exam"
         }? This cannot be undone.`}
         submitText="Delete"
-        submitClassName="bg-red-600 hover:bg-red-700"
+        submitClassName={CVES_BUTTON}
         loading={saving}
         onSubmit={() => void handleClearSaved()}
       />
@@ -603,7 +603,7 @@ function ResultCardSettings() {
             : "Remove this empty range from the form?"
         }
         submitText="Remove"
-        submitClassName="bg-red-600 hover:bg-red-700"
+        submitClassName={CVES_BUTTON}
         onSubmit={() => {
           if (rowToRemove) removeRow(rowToRemove.id);
           setRowToRemove(null);

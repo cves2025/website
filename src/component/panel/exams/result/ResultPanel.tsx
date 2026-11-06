@@ -165,9 +165,9 @@ function ResultPanel() {
                 ? `Generate ${studentCount} Result Cards`
                 : "Generate Result Card"
             }
-            variant="success"
+            variant="cves"
             size="md"
-            buttonStyle="rounded-full bg-amber-600 hover:bg-amber-700"
+            buttonStyle="rounded-full"
             disabled={!canGenerate}
             onClick={handleSubmit}
           />
