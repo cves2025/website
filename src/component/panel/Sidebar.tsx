@@ -135,6 +135,13 @@ const hoverTimer = useRef<number | null>(null);
 
   useEffect(() => clearHoverTimer, []);
 
+  // The group of the open page is always shown expanded: after moving to
+  // another page, and each time the sidebar opens (hover or the chevron).
+  const currentGroup = groupOfPath(menu, location.pathname);
+  useEffect(() => {
+    if (currentGroup) setExpanded(currentGroup);
+  }, [currentGroup, hovering, collapsed]);
+
   // Mini sidebar ("account menu") shown when the user name at the bottom is
   // clicked. It hosts the My Profile, Settings, Permissions, Home Banner, News, Gallery and
   // Downloads entries.
@@ -186,7 +193,7 @@ const hoverTimer = useRef<number | null>(null);
     setCollapsed((prev) => !prev);
     clearHoverTimer();
     setHovering(false);
-    setExpanded("");
+    setExpanded(currentGroup);
   };
 
   const handleLogout = async () => {
