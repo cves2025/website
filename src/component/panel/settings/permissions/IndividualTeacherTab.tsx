@@ -21,6 +21,7 @@ import PermissionSwitchList, {
   TAG_DEFAULT,
 } from "./PermissionSwitchList";
 import { useTeacherRoleDefaults } from "./useTeacherRoleDefaults";
+import Loader from "../../../../custom-components/Loader";
 
 interface Overrides {
   grant: Permission[];
@@ -181,7 +182,7 @@ function IndividualTeacherTab() {
           {loadError} Saving is disabled. Please reload the page.
         </div>
       ) : !profile || defaultsLoading ? (
-        <p className="py-4 text-sm text-gray-500">Loading permissions...</p>
+        <Loader fullScreen={false} size="sm" label="Loading permissions..." />
       ) : (
         <>
           <p className="text-sm text-gray-500">

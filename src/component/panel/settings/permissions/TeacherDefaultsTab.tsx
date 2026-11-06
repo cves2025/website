@@ -13,6 +13,7 @@ import { saveTeacherRoleDefaults } from "../../../../utils/permissionSettingsSer
 import { myContext } from "../../../context/MyContextProvider";
 import PermissionSwitchList from "./PermissionSwitchList";
 import { useTeacherRoleDefaults } from "./useTeacherRoleDefaults";
+import Loader from "../../../../custom-components/Loader";
 
 const BUILT_IN_DEFAULTS: TeacherRoleDefaults = {
   teacher: ROLE_PERMISSIONS.teacher.filter((p) => !isTeacherBlocked(p)),
@@ -66,7 +67,7 @@ function TeacherDefaultsTab() {
   };
 
   if (loading) {
-    return <p className="py-4 text-sm text-gray-500">Loading permissions...</p>;
+    return <Loader fullScreen={false} size="sm" label="Loading permissions..." />;
   }
 
   if (error) {

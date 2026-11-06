@@ -11,7 +11,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import toast from "react-hot-toast";
-import { Archive, ArchiveRestore, Loader2, Pencil } from "lucide-react";
+import { Archive, ArchiveRestore, Pencil } from "lucide-react";
 import { CLASSES, COLLECTION } from "../../../constants";
 import { db } from "../../../firebase/config";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
@@ -36,6 +36,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Spinner } from "../../../custom-components/Loader";
 
 type ExamStatus = "active" | "archived";
 
@@ -327,7 +328,7 @@ function ExamList() {
                           }`}
                         >
                           {isUpdating ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <Spinner size="xs" tone="white" label="" />
                           ) : isActive ? (
                             <Archive className="h-4 w-4" />
                           ) : (

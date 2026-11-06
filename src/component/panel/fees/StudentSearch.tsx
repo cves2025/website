@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Search, X } from "lucide-react";
+import { Search, X } from "lucide-react";
 
 import {
   Popover,
   PopoverAnchor,
   PopoverContent,
 } from "@/components/ui/popover";
+import { Spinner } from "../../../custom-components/Loader";
 import useStudentSearch from "../../../hooks/useStudentSearch";
 import type { StudentSearchResult } from "../../../hooks/useStudentSearch";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
@@ -83,7 +84,10 @@ function StudentSearch({ session, onPick }: StudentSearchProps) {
               onKeyDown={onKeyDown}
             />
             {loading ? (
-              <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-gray-400" />
+              // The wrapper places it; the spinner's own transform turns it.
+              <span className="absolute right-3 top-1/2 flex -translate-y-1/2">
+                <Spinner size="xs" label="Searching" />
+              </span>
             ) : (
               term && (
                 <button

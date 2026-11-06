@@ -38,6 +38,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import Loader from "../../../custom-components/Loader";
 
 type SubjectType =
   | "Written"
@@ -764,7 +765,7 @@ function Subject() {
         </div>
         {loading ? (
           <div className="px-4 py-10 text-center">
-            <p className="text-gray-500 font-semibold">Loading subjects...</p>
+            <Loader fullScreen={false} label="Loading subjects..." />
           </div>
         ) : shownSubjects.length === 0 ? (
           <div className="rounded-md border border-dashed border-gray-300 p-10 text-center">

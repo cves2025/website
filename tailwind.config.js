@@ -9,7 +9,9 @@ export default {
   	extend: {
   		backgroundImage: {
   			// "cves": the school colours (sidebar stripe, scrollbar). Use as bg-cves.
-  			cves: 'linear-gradient(to right, #009746, #393186, #e7087e, #e31e25)'
+  			cves: 'linear-gradient(to right, #009746, #393186, #e7087e, #e31e25)',
+  			// The same colours around a circle, fading in (loader ring).
+  			'cves-ring': 'conic-gradient(from 0deg, transparent 0 8%, #009746 30%, #393186 55%, #e7087e 78%, #e31e25)'
   		},
   		keyframes: {
   			'scroll-left': {

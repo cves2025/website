@@ -3,7 +3,6 @@ import {
   ChevronDown,
   ChevronUp,
   ListOrdered,
-  Loader2,
   Trash2,
 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -36,6 +35,7 @@ import type {
   ClassStudentCount,
   ClassStudentsDeleteMode,
 } from "../../../utils/type";
+import { Spinner } from "../../../custom-components/Loader";
 
 const academicYears = generateAcademicYears();
 
@@ -230,7 +230,7 @@ function AllClassLists() {
             className="bg-blue-600 font-semibold text-white hover:bg-blue-700"
           >
             {generatingAll ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Spinner size="xs" tone="white" label="" />
             ) : (
               <ListOrdered className="h-4 w-4" />
             )}
@@ -343,7 +343,7 @@ function AllClassLists() {
                               className="h-8 w-8 bg-blue-600 text-white hover:bg-blue-700"
                             >
                               {generatingClass === item.className ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <Spinner size="xs" tone="white" label="" />
                               ) : (
                                 <ListOrdered className="h-4 w-4" />
                               )}

@@ -9,6 +9,7 @@ import {
   subscribeDownloads,
   type DownloadFile,
 } from "../utils/downloadsService";
+import Loader from "../custom-components/Loader";
 
 const CURRENT_YEAR = generateAcademicYears()[0]?.value ?? "";
 
@@ -52,7 +53,7 @@ function Downloads() {
         <p className='text-xl md:text-3xl font-bold'><span className='text-pink-500'>Downloads</span> Sections</p>
         <Underline />
       {files === null ? (
-        <p className="mt-8 text-center text-gray-500">Loading...</p>
+        <Loader fullScreen={false} className="mt-8" />
       ) : accordians.length === 0 ? (
         <p className="mt-8 text-center text-gray-500">
           Downloads for {CURRENT_YEAR} will be available soon.

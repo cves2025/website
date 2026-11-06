@@ -19,6 +19,7 @@ import {
   sectionValue,
   type SectionOption,
 } from "./attendanceShared";
+import Loader from "../../../custom-components/Loader";
 
 const MARK_PATH = "/welcome/attendance/mark";
 
@@ -60,7 +61,7 @@ function TodayList({ rows, showTeacher }: { rows: TodayRow[]; showTeacher: boole
   const marked = useMarkedToday(today);
 
   if (loading || marked === null) {
-    return <p className="text-sm text-gray-500">Loading...</p>;
+    return <Loader fullScreen={false} size="sm" />;
   }
 
   const working = rows.filter(
@@ -129,7 +130,7 @@ function AdminRows() {
       ),
     [teachers]
   );
-  if (loading) return <p className="text-sm text-gray-500">Loading...</p>;
+  if (loading) return <Loader fullScreen={false} size="sm" />;
   if (rows.length === 0) {
     return (
       <p className="text-sm text-gray-600">

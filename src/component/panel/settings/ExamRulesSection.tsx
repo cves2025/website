@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import Loader from "../../../custom-components/Loader";
 
 /** Warning shown before the rules are saved (applies to past exams too). */
 const SAVE_WARNING =
@@ -186,7 +187,7 @@ function ExamRulesSection() {
       </p>
 
       {loading ? (
-        <p className="py-4 text-sm text-gray-500">Loading exam rules...</p>
+        <Loader fullScreen={false} size="sm" label="Loading exam rules..." />
       ) : error ? (
         <div
           className="mt-2 flex items-center justify-between gap-3 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"

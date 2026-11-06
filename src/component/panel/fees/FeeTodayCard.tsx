@@ -16,6 +16,7 @@ import { formatRupees, monthLabel } from "../../../utils/feeStructure";
 import { currentSessionMonth, duesUpTo, summarizeCollection } from "../../../utils/feeReport";
 import useCollectionReport from "../../../hooks/useCollectionReport";
 import useDuesReport from "../../../hooks/useDuesReport";
+import Loader from "../../../custom-components/Loader";
 
 const session = generateAcademicYears()[0]?.value ?? "";
 
@@ -39,7 +40,7 @@ function DuesSummary() {
       </button>
     );
   }
-  if (loading) return <p className="p-3 text-sm text-gray-500">Loading dues...</p>;
+  if (loading) return <Loader fullScreen={false} size="sm" label="Loading dues..." />;
   if (error) return <p className="p-3 text-sm text-red-600">{error}</p>;
 
   const dues = rows.map((row) => duesUpTo(row.account, month).due).filter((due) => due > 0);
@@ -87,7 +88,7 @@ function FeeSummary() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-gray-500">Loading...</p>
+        <Loader fullScreen={false} size="sm" />
       ) : error ? (
         <p className="text-sm text-red-600">{error}</p>
       ) : (

@@ -26,6 +26,7 @@ import type {
   SavedRange,
 } from "../../../../../utils/type";
 import { useAdmitCardGenerator } from "../../useAdmitCardGenerator";
+import Loader from "../../../../../custom-components/Loader";
 
 const newRow = (): RemarkRow => ({
   id: crypto.randomUUID(),
@@ -422,7 +423,7 @@ function ResultCardSettings() {
           />
 
           {loading && validExamIds.length > 0 && (
-            <p className="text-sm text-gray-500">Loading...</p>
+            <Loader fullScreen={false} size="sm" />
           )}
 
           {!loading && validExamIds.length > 0 && (

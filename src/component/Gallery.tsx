@@ -7,6 +7,7 @@ import {
   type GalleryPhoto,
 } from "../utils/galleryService";
 import { LEGACY_GALLERY_PHOTOS } from "../utils/legacyGallery";
+import Loader from "../custom-components/Loader";
 
 interface GalleryImage {
   key: string;
@@ -87,7 +88,7 @@ function Gallery() {
         {/* Gallery Grid */}
         <div className="mt-4 m-auto">
           {loading && (
-            <p className="py-10 text-center text-gray-500">Loading photos...</p>
+            <Loader fullScreen={false} label="Loading photos..." className="py-10" />
           )}
           {!loading && images.length === 0 && (
             <p className="py-10 text-center text-gray-500">
