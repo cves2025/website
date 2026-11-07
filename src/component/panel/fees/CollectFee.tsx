@@ -13,6 +13,7 @@ import Modal from "../../../custom-components/Modal";
 import { myContext } from "../../context/MyContextProvider";
 import {
   CLASS_OPTIONS,
+  CVES_BUTTON,
   FEE_RECEIPT_PATH,
   FEE_STRUCTURE_PATH,
   PAYMENT_MODE_OPTIONS,
@@ -335,7 +336,8 @@ function CollectFee() {
   }));
 
   return (
-    <div className="flex flex-col gap-3">
+    // On phones, room at the bottom for the fixed Collect bar.
+    <div className={`flex flex-col gap-3 ${showBar && account?.lines.length ? "max-md:pb-24" : ""}`}>
       <PageHeader
         title="Collect Fee"
         titleStyle="text-primaryBlue"
@@ -477,9 +479,10 @@ function CollectFee() {
           </div>
         ) : (
           <>
-            {/* Middle: the fee account */}
+            {/* Middle: the fee account. Below lg it is display: contents, so its
+                parts join the one-column grid and the history can go last. */}
             <div
-              className={`flex min-w-0 flex-col gap-3 ${account.lines.length === 0 ? "xl:col-span-2" : ""}`}
+              className={`contents lg:flex lg:min-w-0 lg:flex-col lg:gap-3 ${account.lines.length === 0 ? "xl:col-span-2" : ""}`}
             >
               <div ref={sentinelRef}>
                 {studentBarProps && <FeeStudentBar variant="card" {...studentBarProps} />}
@@ -507,6 +510,8 @@ function CollectFee() {
                 />
               )}
 
+              {/* History and change log: last of all on one-column screens */}
+              <div className="flex min-w-0 flex-col gap-3 max-lg:order-last">
               <PaymentHistory
                 payments={history.payments}
                 loading={history.loading}
@@ -535,6 +540,7 @@ function CollectFee() {
                   </ul>
                 </details>
               )}
+              </div>
             </div>
 
             {/* Right: take the payment; stays in view while the fees scroll */}
@@ -618,13 +624,14 @@ function CollectFee() {
                     />
                   </div>
                 </div>
-                <div className="mt-4 flex flex-col gap-2">
+                {/* On phones the actions sit in a bar fixed to the bottom of the screen. */}
+                <div className="mt-4 flex flex-col gap-2 max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:mt-0 max-md:flex-row-reverse max-md:border-t max-md:border-gray-200 max-md:bg-white max-md:px-4 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:pt-3 max-md:shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
                   <button
                     type="button"
                     disabled={saving || !amount || totals?.due === 0}
                     onClick={handleReview}
                     // bg-cves: the school-colour gradient (tailwind.config.js).
-                    className="rounded-md bg-cves py-2.5 text-sm font-semibold text-white shadow-sm transition hover:shadow-md hover:brightness-110 disabled:opacity-50 disabled:hover:brightness-100"
+                    className="rounded-md bg-cves py-2.5 text-sm font-semibold text-white shadow-sm transition hover:shadow-md hover:brightness-110 disabled:opacity-50 disabled:hover:brightness-100 max-md:flex-1"
                   >
                     Collect {amount ? formatRupees(amount) : "Fee"}
                   </button>
@@ -633,7 +640,7 @@ function CollectFee() {
                       type="button"
                       disabled={saving}
                       onClick={() => setAdjustment({ kind: "waive", lineIds: selected, waived: true })}
-                      className="rounded-md border border-amber-300 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                      className="rounded-md border border-amber-300 bg-white py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-50 max-md:flex-1"
                     >
                       Waive ticked ({selected.length})
                     </button>
@@ -666,7 +673,7 @@ function CollectFee() {
         }
         cancelText="Back"
         submitText="Cancel Receipt"
-        submitClassName="bg-red-600 hover:bg-red-700"
+        submitClassName={CVES_BUTTON}
         loading={cancelling}
         onSubmit={() => void handleCancelReceipt()}
       >
@@ -694,6 +701,7 @@ function CollectFee() {
         description={`${formatRupees(amount)} by ${form.mode} from ${account?.studentName ?? ""}. It is adjusted as below.`}
         cancelText="Back"
         submitText="Save & Get Receipt"
+        submitClassName={CVES_BUTTON}
         loading={saving}
         onSubmit={() => void handleCollect()}
       >
@@ -713,6 +721,7 @@ function CollectFee() {
         title="Payment Saved"
         cancelText="Close"
         submitText="Print Receipt"
+        submitClassName={CVES_BUTTON}
         onSubmit={() => {
           if (receipt) navigate(`${FEE_RECEIPT_PATH}?id=${encodeURIComponent(receipt.id)}`);
         }}

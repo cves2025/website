@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Bus, PlusCircle, RefreshCw, Tags } from "lucide-react";
 
+import { CVES_ON_HOVER } from "../../../constants";
 import { formatRupees, monthLabel } from "../../../utils/feeStructure";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import type { FeeAccount } from "../../../utils/type";
@@ -133,7 +134,8 @@ function FeeStudentBar({
       disabled={disabled}
       onClick={() => onAction(kind)}
       title={kind === "refresh" ? "Refresh the fees from the Fee Structure" : undefined}
-      className={`flex items-center justify-center gap-1.5 rounded-md border border-gray-300 bg-white font-semibold text-gray-700 hover:border-primaryBlue/40 hover:bg-indigo-50 disabled:opacity-50 ${
+      // White at rest, the school-colour gradient on hover.
+      className={`flex items-center justify-center gap-1.5 rounded-md border border-gray-300 bg-white font-semibold text-gray-700 transition disabled:opacity-50 ${CVES_ON_HOVER} ${
         isBar ? "px-2.5 py-1 text-xs" : "px-3 py-1.5 text-sm"
       }`}
     >

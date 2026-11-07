@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import Loader from "../../../custom-components/Loader";
 import schoolLogo from "../../../assets/image/schoolLogo.jpg";
-import { FEE_COLLECT_PATH, SCHOOL_CONTACT, SCHOOL_NAME } from "../../../constants";
+import { CVES_ON_HOVER, FEE_COLLECT_PATH, SCHOOL_CONTACT, SCHOOL_NAME } from "../../../constants";
 import { amountInWords } from "../../../utils/amountInWords";
 import { formatRupees } from "../../../utils/feeStructure";
 import { fromDateKey } from "../../../utils/holidayCalendar";
@@ -51,7 +51,7 @@ function FeeReceipt() {
         <button
           type="button"
           onClick={backToStudent}
-          className="flex items-center gap-2 rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          className={`flex items-center gap-2 rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition ${CVES_ON_HOVER}`}
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Collect Fee
@@ -60,10 +60,11 @@ function FeeReceipt() {
           type="button"
           disabled={!payment}
           onClick={() => window.print()}
-          className="flex items-center gap-2 rounded-md bg-primaryBlue px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+          title="Print receipt"
+          aria-label="Print receipt"
+          className="grid h-[38px] w-[38px] place-items-center rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <Printer className="h-4 w-4" />
-          Print Receipt
+          <Printer className="h-5 w-5" />
         </button>
       </div>
 

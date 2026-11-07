@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 import Modal from "../../../custom-components/Modal";
 import SelectDropdown from "../../../custom-components/SelectDropdown";
 import { myContext } from "../../context/MyContextProvider";
-import { SESSION_MONTHS, SESSION_MONTH_OPTIONS } from "../../../constants";
+import { CVES_BUTTON, SESSION_MONTHS, SESSION_MONTH_OPTIONS } from "../../../constants";
 import { formatRupees, toAmount } from "../../../utils/feeStructure";
 import {
   applyDiscount,
@@ -253,6 +253,7 @@ function FeeAdjustDialog({ adjustment, account, structure, onClose, onSaved }: F
                 : "Undo Waive"
               : "Save"
       }
+      submitClassName={CVES_BUTTON}
       loading={saving}
       onSubmit={handleSubmit}
       secondaryText={canRemove ? "Remove" : undefined}
@@ -288,7 +289,8 @@ function FeeAdjustDialog({ adjustment, account, structure, onClose, onSaved }: F
           </div>
         )}
         {showAmount && (
-          <div>
+          // The discount amount is the only field, so it takes the full row.
+          <div className={adjustment.kind === "discount" ? "sm:col-span-2" : ""}>
             <label htmlFor="adjustAmount" className={labelClass}>
               {adjustment.kind === "special" || adjustment.kind === "transport"
                 ? "Amount per month (₹)"
