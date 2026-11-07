@@ -2,11 +2,13 @@
   "firestore": [
     {
       "database": "(default)",
-      "rules": "firestore.rules"
+      "rules": "firestore.rules",
+      "indexes": "firestore.indexes.dev.json"
     },
     {
       "database": "prod",
-      "rules": "firestore.rules"
+      "rules": "firestore.rules",
+      "indexes": "firestore.indexes.prod.json"
     }
   ],
   "hosting": {
