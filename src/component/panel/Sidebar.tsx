@@ -178,6 +178,21 @@ const hoverTimer = useRef<number | null>(null);
 
   const onSettingsPage = location.pathname.startsWith(SETTINGS_PATH);
 
+  // On a page of the account menu (all under /welcome/settings) the menu is
+  // shown open each time the sidebar opens, so it is clear where you are.
+  const sidebarShown = isDesktop ? !isCollapsed : open;
+  useEffect(() => {
+    if (onSettingsPage && sidebarShown) setAccountMenuOpen(true);
+  }, [onSettingsPage, sidebarShown]);
+
+  /** The account menu item of the open page: the longest path that matches. */
+  const isActiveAccountPath = (path: string, allPaths: string[]) => {
+    const matches = (candidate: string) =>
+      location.pathname === candidate || location.pathname.startsWith(`${candidate}/`);
+    if (!matches(path)) return false;
+    return !allPaths.some((other) => other.length > path.length && matches(other));
+  };
+
   // When isCollapsed, clicking a group icon navigates straight to its first sub-link
   // instead of expanding (since there's no room to show sub-links while isCollapsed).
   const handleGroupClick = (item: Extract<MenuItem, { subLinks: unknown[] }>) => {
@@ -475,26 +490,40 @@ const hoverTimer = useRef<number | null>(null);
                 },
               ]
                 .filter((item) => item.show)
-                .map((item) => (
-                  <button
-                    key={item.path}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => openFromAccountMenu(item.path)}
-                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900"
-                  >
-                    <span
-                      className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-base"
-                      style={{
-                        backgroundColor: `${item.color}1A`,
-                        color: item.color,
-                      }}
+                .map((item, _index, shown) => {
+                  // The open page is marked like the active links of the main menu.
+                  const active = isActiveAccountPath(
+                    item.path,
+                    shown.map((entry) => entry.path)
+                  );
+                  return (
+                    <button
+                      key={item.path}
+                      type="button"
+                      role="menuitem"
+                      aria-current={active ? "page" : undefined}
+                      onClick={() => openFromAccountMenu(item.path)}
+                      className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
+                        active
+                          ? "font-bold text-gray-900"
+                          : "font-semibold text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                      }`}
+                      style={active ? { backgroundColor: `${item.color}1A` } : undefined}
                     >
-                      {item.icon}
-                    </span>
-                    {item.label}
-                  </button>
-                ))}
+                      <span
+                        className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-base"
+                        style={
+                          active
+                            ? { backgroundColor: item.color, color: "#fff" }
+                            : { backgroundColor: `${item.color}1A`, color: item.color }
+                        }
+                      >
+                        {item.icon}
+                      </span>
+                      {item.label}
+                    </button>
+                  );
+                })}
             </div>}
 
             {/* Clicking the name (or the avatar while isCollapsed) opens the menu */}
