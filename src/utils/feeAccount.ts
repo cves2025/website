@@ -453,7 +453,7 @@ export function applyDiscount(
   };
 }
 
-/** Waives (fee maafi) or un-waives lines; the reason is kept on each line. */
+/** Waives (fee exemption) or un-waives lines; the reason is kept on each line. */
 export function applyWaive(
   account: FeeAccount,
   lineIds: string[],

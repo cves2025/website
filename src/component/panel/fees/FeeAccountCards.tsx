@@ -86,7 +86,7 @@ function LineActions({
         type="button"
         disabled={disabled || Boolean(line.carriedTo) || (!line.waived && due === 0)}
         onClick={() => onWaive(line, !line.waived)}
-        title={line.waived ? "Undo waive" : "Waive (fee maafi)"}
+        title={line.waived ? "Undo waive" : "Waive (fee exemption)"}
         aria-label={`${line.waived ? "Undo waive of" : "Waive"} ${fullName}`}
         className={`${actionClass} ${line.waived ? "text-green-600 hover:bg-green-50" : "text-amber-600 hover:bg-amber-50"}`}
       >

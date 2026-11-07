@@ -24,7 +24,7 @@ interface FeeStudentBarProps {
 }
 
 const ACTIONS = [
-  { kind: "special" as const, label: "Special Fee", icon: Tags },
+  { kind: "special" as const, label: "Concession Fee", icon: Tags },
   { kind: "transport" as const, label: "Transport", icon: Bus },
   { kind: "extra" as const, label: "Extra Charge", icon: PlusCircle },
   { kind: "refresh" as const, label: "Refresh", icon: RefreshCw },
