@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import toast from "react-hot-toast";
 
-import { COLLECTION } from "../../../../constants";
+import { COLLECTION, CVES_ON_HOVER } from "../../../../constants";
 import { db } from "../../../../firebase/config";
 import Button from "../../../../custom-components/Button";
 import SelectDropdown from "../../../../custom-components/SelectDropdown";
@@ -209,6 +209,7 @@ function IndividualTeacherTab() {
               buttonName="Reset to default"
               variant="outline"
               size="sm"
+              buttonStyle={CVES_ON_HOVER}
               disabled={saving || customCount === 0}
               onClick={() => setDraft({ grant: [], revoke: [] })}
             />
@@ -221,7 +222,7 @@ function IndividualTeacherTab() {
             />
             <Button
               buttonName={saving ? "Saving..." : "Save"}
-              variant="success"
+              variant="cves"
               size="sm"
               disabled={!dirty || saving}
               onClick={handleSave}

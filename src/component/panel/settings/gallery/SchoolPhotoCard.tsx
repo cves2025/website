@@ -11,6 +11,7 @@ import {
   subscribeSchoolPhoto,
 } from "../../../../utils/siteImagesService";
 import { myContext } from "../../../context/MyContextProvider";
+import { CVES_ON_HOVER } from "../../../../constants";
 
 /** The school photo of the Home and About pages: replace or reset it. */
 function SchoolPhotoCard() {
@@ -96,7 +97,7 @@ function SchoolPhotoCard() {
         <div className="flex flex-wrap gap-2">
           <Button
             buttonName={saving ? "Saving..." : "Change photo"}
-            variant="primary"
+            variant="cves"
             size="sm"
             disabled={saving || photoUrl === null}
             onClick={() => fileInputRef.current?.click()}
@@ -106,6 +107,7 @@ function SchoolPhotoCard() {
               buttonName="Use default photo"
               variant="outline"
               size="sm"
+              buttonStyle={CVES_ON_HOVER}
               disabled={saving}
               onClick={() => setConfirmReset(true)}
             />

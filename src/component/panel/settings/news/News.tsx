@@ -16,6 +16,7 @@ import {
   type NewsItem,
 } from "../../../../utils/newsService";
 import NewsFormModal from "./NewsFormModal";
+import { CVES_BUTTON } from "../../../../constants";
 
 function formatDate(value: string): string {
   const date = new Date(value);
@@ -106,9 +107,9 @@ function News() {
         button={
           <Button
             buttonName="+ Add News"
-            variant="success"
+            variant="cves"
             size="md"
-            buttonStyle="rounded-full bg-blue-600 hover:bg-blue-700"
+            buttonStyle="rounded-full"
             onClick={() => openForm(null)}
           />
         }
@@ -229,7 +230,7 @@ function News() {
             : ""
         }
         submitText="Delete"
-        submitClassName="bg-red-600 hover:bg-red-700"
+        submitClassName={CVES_BUTTON}
         loading={deleting}
         onSubmit={handleDelete}
       />

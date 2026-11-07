@@ -14,6 +14,7 @@ import { myContext } from "../../../context/MyContextProvider";
 import PermissionSwitchList from "./PermissionSwitchList";
 import { useTeacherRoleDefaults } from "./useTeacherRoleDefaults";
 import Loader from "../../../../custom-components/Loader";
+import { CVES_ON_HOVER } from "../../../../constants";
 
 const BUILT_IN_DEFAULTS: TeacherRoleDefaults = {
   teacher: ROLE_PERMISSIONS.teacher.filter((p) => !isTeacherBlocked(p)),
@@ -135,6 +136,7 @@ function TeacherDefaultsTab() {
           buttonName="Restore built-in defaults"
           variant="outline"
           size="sm"
+          buttonStyle={CVES_ON_HOVER}
           disabled={saving}
           onClick={() => setDraft(BUILT_IN_DEFAULTS)}
         />
@@ -147,7 +149,7 @@ function TeacherDefaultsTab() {
         />
         <Button
           buttonName={saving ? "Saving..." : "Save"}
-          variant="success"
+          variant="cves"
           size="sm"
           disabled={!dirty || saving}
           onClick={handleSave}

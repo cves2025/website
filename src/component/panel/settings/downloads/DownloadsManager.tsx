@@ -28,6 +28,7 @@ import {
   type DownloadFile,
 } from "../../../../utils/downloadsService";
 import { myContext } from "../../../context/MyContextProvider";
+import { CVES_BUTTON } from "../../../../constants";
 
 const academicYears = generateAcademicYears();
 const CURRENT_YEAR = academicYears[0]?.value ?? "";
@@ -332,7 +333,7 @@ function DownloadsManager() {
                       size="sm"
                       onClick={() => openPicker(className)}
                       disabled={uploadingClass !== null}
-                      className="h-8 gap-1.5 bg-blue-600 text-white hover:bg-blue-700"
+                      className={`h-8 gap-1.5 text-white ${CVES_BUTTON}`}
                     >
                       <Upload className="h-4 w-4" />
                       {file ? "Replace" : "Upload"}
@@ -369,7 +370,7 @@ function DownloadsManager() {
             : ""
         }
         submitText="Delete"
-        submitClassName="bg-red-600 hover:bg-red-700"
+        submitClassName={CVES_BUTTON}
         loading={deleting}
         onSubmit={handleDelete}
       />

@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import Loader from "../../../custom-components/Loader";
+import { CVES_BUTTON } from "../../../constants";
 
 /** Warning shown before the rules are saved (applies to past exams too). */
 const SAVE_WARNING =
@@ -247,7 +248,7 @@ function ExamRulesSection() {
               buttonName={
                 saving ? "Saving..." : justSaved ? "Saved" : "Save rules"
               }
-              variant={justSaved ? "success" : "primary"}
+              variant={justSaved ? "success" : "cves"}
               disabled={!formValid || !isDirty || saving}
               title={
                 formValid && !isDirty
@@ -270,6 +271,7 @@ function ExamRulesSection() {
         title="Save exam rules?"
         cancelText="Cancel"
         submitText="Save"
+        submitClassName={CVES_BUTTON}
         loading={saving}
         submitDisabled={!formValid}
         onSubmit={() => void handleSave()}

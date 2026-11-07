@@ -29,6 +29,7 @@ import {
   type HomeBanner,
 } from "../../../../utils/homeBannerService";
 import { myContext } from "../../../context/MyContextProvider";
+import { CVES_BUTTON, CVES_ON_HOVER } from "../../../../constants";
 
 const FIT_OPTIONS: { value: BannerFit; label: string }[] = [
   { value: "cover", label: "Fill screen" },
@@ -411,9 +412,13 @@ function HomeBannerManager() {
                 </span>
                 <label
                   htmlFor={inputId}
-                  className={`absolute bottom-2 right-2 flex cursor-pointer items-center gap-1.5 rounded-md bg-white/90 px-2.5 py-1.5 text-xs font-bold text-gray-800 hover:bg-white ${
-                    busy ? "pointer-events-none opacity-60" : ""
-                  }`}
+                  // "Add photo" is always in the school colours; "Change photo"
+                  // is white and turns to them on hover.
+                  className={`absolute bottom-2 right-2 flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-bold transition ${
+                    photo
+                      ? `bg-white/90 text-gray-800 ${CVES_ON_HOVER}`
+                      : `text-white ${CVES_BUTTON}`
+                  } ${busy ? "pointer-events-none opacity-60" : ""}`}
                 >
                   <ImagePlus className="h-4 w-4" />
                   {photo ? "Change photo" : "Add photo"}
@@ -549,10 +554,24 @@ function HomeBannerManager() {
           type="button"
           onClick={addSlide}
           disabled={busy}
-          className="flex min-h-48 flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-300 bg-white text-sm font-bold text-gray-500 transition-colors hover:border-blue-400 hover:text-blue-600 disabled:opacity-60"
+          className="group relative flex min-h-48 flex-col items-center justify-center gap-3 overflow-hidden rounded-xl border-2 border-dashed border-indigo-200 bg-gradient-to-br from-emerald-50 via-indigo-50 to-pink-50 p-6 text-center transition hover:-translate-y-0.5 hover:border-primaryBlue/50 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primaryBlue disabled:pointer-events-none disabled:opacity-60"
         >
-          <ImagePlus className="h-8 w-8" />
-          + Add Slide
+          {/* Soft school-colour glow behind the icon */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-pink-200/50 blur-2xl"
+          />
+          <span
+            aria-hidden
+            className="pointer-events-none absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-emerald-200/50 blur-2xl"
+          />
+          <span className="relative grid h-14 w-14 place-items-center rounded-full bg-cves text-white shadow-md ring-4 ring-white transition group-hover:scale-110">
+            <ImagePlus className="h-7 w-7" />
+          </span>
+          <span className="relative text-base font-bold text-gray-800">Add Slide</span>
+          <span className="relative max-w-[16rem] text-xs text-gray-500">
+            A photo with a title and a line of text for the Home page banner.
+          </span>
         </button>
       </div>
 
@@ -571,7 +590,7 @@ function HomeBannerManager() {
         />
         <Button
           buttonName={saving ? "Saving..." : "Save"}
-          variant="success"
+          variant="cves"
           size="sm"
           disabled={!dirty || busy || missingPhoto}
           onClick={() => void handleSave()}

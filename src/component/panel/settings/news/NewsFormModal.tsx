@@ -16,6 +16,7 @@ import {
   type NewsItem,
 } from "../../../../utils/newsService";
 import { myContext } from "../../../context/MyContextProvider";
+import { CVES_BUTTON } from "../../../../constants";
 
 /** Today as "YYYY-MM-DD" in local time (the value of a date input). */
 function today(): string {
@@ -102,6 +103,7 @@ function NewsFormModal({ isOpen, news, onClose }: NewsFormModalProps) {
       onClose={onClose}
       title={news ? "Edit News" : "Add News"}
       submitText={news ? "Update" : "Add"}
+      submitClassName={CVES_BUTTON}
       loading={saving}
       onSubmit={() => void handleSubmit(save)()}
       modalClassName="max-w-2xl"

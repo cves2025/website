@@ -22,6 +22,7 @@ import {
 import { LEGACY_GALLERY_PHOTOS } from "../../../../utils/legacyGallery";
 import { myContext } from "../../../context/MyContextProvider";
 import SchoolPhotoCard from "./SchoolPhotoCard";
+import { CVES_BUTTON } from "../../../../constants";
 
 interface Progress {
   label: string;
@@ -178,9 +179,9 @@ function GalleryManager() {
         button={
           <Button
             buttonName="+ Upload Photos"
-            variant="success"
+            variant="cves"
             size="md"
-            buttonStyle="rounded-full bg-blue-600 hover:bg-blue-700"
+            buttonStyle="rounded-full"
             disabled={busy}
             onClick={() => fileInputRef.current?.click()}
           />
@@ -323,6 +324,7 @@ function GalleryManager() {
         title="Photo Caption"
         description="Shown under the photo when it is opened on the Gallery page. Leave empty for no caption."
         submitText="Save"
+        submitClassName={CVES_BUTTON}
         loading={savingCaption}
         submitDisabled={captionDraft.trim() === (captionPhoto?.caption ?? "")}
         onSubmit={handleSaveCaption}
@@ -351,7 +353,7 @@ function GalleryManager() {
         title="Delete Photo"
         description="Delete this photo from the gallery? This cannot be undone."
         submitText="Delete"
-        submitClassName="bg-red-600 hover:bg-red-700"
+        submitClassName={CVES_BUTTON}
         loading={deleting}
         onSubmit={handleDelete}
       >

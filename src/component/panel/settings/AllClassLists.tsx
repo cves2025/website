@@ -36,6 +36,7 @@ import type {
   ClassStudentsDeleteMode,
 } from "../../../utils/type";
 import { Spinner } from "../../../custom-components/Loader";
+import { CVES_BUTTON } from "../../../constants";
 
 const academicYears = generateAcademicYears();
 
@@ -227,7 +228,7 @@ function AllClassLists() {
             type="button"
             onClick={() => void handleGenerateAll()}
             disabled={generationInProgress || !selectedYear}
-            className="bg-blue-600 font-semibold text-white hover:bg-blue-700"
+            className={`font-semibold text-white ${CVES_BUTTON}`}
           >
             {generatingAll ? (
               <Spinner size="xs" tone="white" label="" />
@@ -390,7 +391,7 @@ function AllClassLists() {
         }
         cancelText="Cancel"
         submitText={passwordVerified ? "Permanent Delete" : "Delete"}
-        submitClassName="bg-red-600 hover:bg-red-700"
+        submitClassName={CVES_BUTTON}
         loading={
           passwordVerified ? pendingAction === "permanent" : verifyingPassword
         }
