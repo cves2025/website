@@ -15,22 +15,28 @@ import { inputClass, labelClass } from "../attendance/attendanceShared";
 interface StudentSearchProps {
   session: string;
   onPick: (student: StudentSearchResult) => void;
+  /** Each new value puts the cursor in the search box (the header's ₹ button). */
+  focusKey?: number;
 }
 
 /**
  * Finds a student of the session by enrollment number or name; picking one
  * fills the class, section and student of the filter.
  */
-function StudentSearch({ session, onPick }: StudentSearchProps) {
+function StudentSearch({ session, onPick, focusKey }: StudentSearchProps) {
   const [term, setTerm] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const boxRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const { results, loading, error, ready } = useStudentSearch(session, term);
 
   // A new session starts a new search.
   useEffect(() => setTerm(""), [session]);
   useEffect(() => setActive(0), [results]);
+  useEffect(() => {
+    if (focusKey) inputRef.current?.focus();
+  }, [focusKey]);
 
   const pick = (student: StudentSearchResult) => {
     onPick(student);
@@ -67,13 +73,15 @@ function StudentSearch({ session, onPick }: StudentSearchProps) {
           <div ref={boxRef} className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
+              ref={inputRef}
               id="collectSearch"
               type="search"
               autoComplete="off"
               role="combobox"
               aria-expanded={showList}
               aria-controls="collectSearchList"
-              className={`${inputClass} pl-9 pr-8`}
+              // Hides the browser's own clear cross; the one below is used.
+              className={`${inputClass} pl-9 pr-8 [&::-webkit-search-cancel-button]:appearance-none`}
               placeholder="Enrollment no. or name"
               value={term}
               onChange={(event) => {

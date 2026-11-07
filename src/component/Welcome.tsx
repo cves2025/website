@@ -7,10 +7,12 @@ import { BsList } from "react-icons/bs";
 import { FaGlobe } from "react-icons/fa";
 import WhatsNewModal from "../features/whats-new/WhatsNewModal";
 import { useWhatsNew } from "../features/whats-new/useWhatsNew";
-import { DASHBOARD_GRADIENT } from "../constants";
+import { IndianRupee } from "lucide-react";
+import { DASHBOARD_GRADIENT, FEE_COLLECT_PATH } from "../constants";
+import { PERMISSIONS } from "../permissions";
 
 function Welcome() {
-  const { user, authReady } = useContext(myContext);
+  const { user, authReady, can } = useContext(myContext);
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -87,11 +89,36 @@ function Welcome() {
               Welcome{user?.fullName ? `, ${user.fullName}` : ""}!
             </h1>
           )}
+          {can(PERMISSIONS.FEE_MANAGE) && (
+            // Collect Fee from any page, with the cursor in the student search.
+            // On that page already, the picked student stays.
+            <button
+              type="button"
+              title="Collect Fee"
+              aria-label="Collect Fee"
+              onClick={() =>
+                navigate(
+                  {
+                    pathname: FEE_COLLECT_PATH,
+                    search: location.pathname === FEE_COLLECT_PATH ? location.search : "",
+                  },
+                  { state: { focusSearch: Date.now() } }
+                )
+              }
+              className={`ml-auto grid shrink-0 place-items-center rounded-full text-white shadow-sm transition-colors ${
+                onDashboard
+                  ? "h-7 w-7 bg-white/15 ring-1 ring-inset ring-white/40 hover:bg-white/25"
+                  : "h-9 w-9 bg-blue-600 hover:bg-blue-700"
+              }`}
+            >
+              <IndianRupee className="h-4 w-4" strokeWidth={2.5} />
+            </button>
+          )}
           {user.role === "admin" && (
             <Link
               to="/"
               title="Go to Website"
-              className={`ml-auto flex shrink-0 items-center gap-2 rounded-full px-3 text-sm font-bold text-white shadow-sm transition-colors sm:px-4 ${
+              className={`${can(PERMISSIONS.FEE_MANAGE) ? "" : "ml-auto "}flex shrink-0 items-center gap-2 rounded-full px-3 text-sm font-bold text-white shadow-sm transition-colors sm:px-4 ${
                 onDashboard
                   ? "bg-white/15 py-1 ring-1 ring-inset ring-white/40 hover:bg-white/25"
                   : "bg-blue-600 py-2 hover:bg-blue-700"

@@ -1,7 +1,7 @@
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import toast from "react-hot-toast";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import { CheckCircle2 } from "lucide-react";
 
@@ -76,6 +76,8 @@ const emptyForm = (): PaymentForm => ({
 function CollectFee() {
   const { user } = useContext(myContext);
   const navigate = useNavigate();
+  // Set by the header's ₹ button: put the cursor in the student search.
+  const focusSearch = (useLocation().state as { focusSearch?: number } | null)?.focusSearch;
   // The selection lives in the URL, so it survives a trip to the receipt.
   const [params, setParams] = useSearchParams();
   const session = params.get("session") || sessions[0]?.value || "";
@@ -390,6 +392,7 @@ function CollectFee() {
             </div>
             <StudentSearch
               session={session}
+              focusKey={focusSearch}
               onPick={(found) =>
                 updateParams({ class: found.className, section: found.section, student: found.studentId })
               }
