@@ -100,8 +100,25 @@ export async function saveDailyAttendance(
       COLLECTION.DAILY_ATTENDANCE,
       dailyAttendanceDocId(value.session, value.className, value.section, value.date)
     ),
-    { ...value, updatedAt: serverTimestamp() }
+    {
+      ...value,
+      // Totals of the day, so the dashboard can add them up with aggregation
+      // queries (sum) instead of reading every section's document.
+      ...attendanceCounts(value.records),
+      updatedAt: serverTimestamp(),
+    }
   );
+}
+
+/** How many students are present / absent / on leave in a day's records. */
+export function attendanceCounts(records: Record<string, AttendanceStatus>) {
+  const counts = { presentCount: 0, absentCount: 0, leaveCount: 0 };
+  Object.values(records).forEach((status) => {
+    if (status === "P") counts.presentCount += 1;
+    else if (status === "A") counts.absentCount += 1;
+    else if (status === "L") counts.leaveCount += 1;
+  });
+  return counts;
 }
 
 async function rangeSnapshot(

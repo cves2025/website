@@ -13,7 +13,7 @@ import PayFee from './PayFee'
 import Result from './Result'
 import Login from './Login'
 import Welcome from './Welcome'
-import PanelHome from './panel/PanelHome'
+import Dashboard from './admin/Dashboard'
 import AddStudent from './panel/students/AddStudent'
 import StudentList from './panel/students/StudentList'
 import StudentPromote from './panel/students/StudentPromote'
@@ -76,7 +76,7 @@ function Router() {
         <Route element={<RequireAccess />}>
         <Route path="/welcome" element={<Welcome />}>
         <Route element={<RequireRoutePermission />}>
-          <Route index element={<PanelHome />} />
+          <Route index element={<Dashboard />} />
           <Route path="student/add" element={<AddStudent />} />
           <Route path="student/list" element={<StudentList />} />
           <Route path="student/view" element={<StudentView />} />

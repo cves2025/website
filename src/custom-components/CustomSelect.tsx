@@ -14,7 +14,7 @@ function fieldBorder(invalid: boolean): string {
     : "border-gray-300 focus:border-blue-500 focus:ring-blue-500/50";
 }
 
-export type SelectOption = string | { value: string; label: string };
+export type SelectOption = string | { value: string; label: string; disabled?: boolean };
 
 interface CustomSelectProps<T extends FieldValues = FieldValues> {
   control: Control<T>;
@@ -37,6 +37,12 @@ interface CustomSelectProps<T extends FieldValues = FieldValues> {
    * so the form value is already updated when this runs.
    */
   onValueChange?: (value: string) => void;
+  /** Called when the list opens or closes (e.g. to load options on open). */
+  onOpenChange?: (open: boolean) => void;
+  /** Text in the list when there is no option (e.g. "Loading..."). */
+  emptyMessage?: string;
+  /** Extra classes for the opened list. */
+  contentClassName?: string;
 }
 
 /**
@@ -61,13 +67,20 @@ function CustomSelect<T extends FieldValues = FieldValues>({
   searchable = false,
   searchPlaceholder,
   onValueChange,
+  onOpenChange,
+  emptyMessage,
+  contentClassName,
 }: CustomSelectProps<T>) {
   const isRequired = required || Boolean(rules.required);
 
   const normalizedOptions = options.map((option) => {
     if (typeof option === "object" && option !== null) {
-      const obj = option as Record<string, string>;
-      return { value: obj[optionValue], label: obj[optionLabel] };
+      const obj = option as Record<string, unknown>;
+      return {
+        value: String(obj[optionValue] ?? ""),
+        label: String(obj[optionLabel] ?? ""),
+        disabled: obj.disabled === true,
+      };
     }
     return { value: option, label: option };
   });
@@ -101,8 +114,11 @@ function CustomSelect<T extends FieldValues = FieldValues>({
               }}
               onOpenChange={(open) => {
                 if (!open) field.onBlur();
+                onOpenChange?.(open);
               }}
               options={normalizedOptions}
+              emptyMessage={emptyMessage}
+              contentClassName={contentClassName}
               placeholder={placeholder ?? ""}
               disabled={disabled}
               searchable={searchable}

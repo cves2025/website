@@ -1,129 +1,257 @@
-import { useContext, useState } from "react";
+import { useContext, useMemo } from "react";
 import { NavLink } from "react-router-dom";
-import { startOfMonth } from "date-fns";
-import { FaRupeeSign } from "react-icons/fa";
+import { ArrowRight } from "lucide-react";
+import { startOfMonth, startOfWeek, subDays } from "date-fns";
+
+import { useForm } from "react-hook-form";
+import CustomSelect from "../../../custom-components/CustomSelect";
+import {
+  FEE_DUES_REPORT_PATH,
+  FEE_PERIOD_OPTIONS,
+  type FeePeriod,
+} from "../../../constants";
 
 import { myContext } from "../../context/MyContextProvider";
 import { PERMISSIONS } from "../../../permissions";
-import {
-  FEE_COLLECT_PATH,
-  FEE_COLLECTION_REPORT_PATH,
-  FEE_DUES_REPORT_PATH,
-} from "../../../constants";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
-import { toDateKey, todayKey } from "../../../utils/holidayCalendar";
-import { formatRupees, monthLabel } from "../../../utils/feeStructure";
-import { currentSessionMonth, duesUpTo, summarizeCollection } from "../../../utils/feeReport";
-import useCollectionReport from "../../../hooks/useCollectionReport";
-import useDuesReport from "../../../hooks/useDuesReport";
-import Loader from "../../../custom-components/Loader";
+import { toDateKey } from "../../../utils/holidayCalendar";
+import { formatRupees } from "../../../utils/feeStructure";
+import { feeTargetOfMonth } from "../../../utils/feeTarget";
+import {
+  useCollectionTotal,
+  useTransportPerMonth,
+} from "../../../hooks/useDashboardStats";
+import useFeeStructure from "../../../hooks/useFeeStructure";
+import { useAllClassesLengthOfStudents } from "../../../hooks/useAllClassesLengthOfStudents";
+import { Spinner } from "../../../custom-components/Loader";
 
 const session = generateAcademicYears()[0]?.value ?? "";
 
-/**
- * Dues of the whole school. Loaded only on request: it reads every student
- * and fee account of the session.
- */
-function DuesSummary() {
-  const [show, setShow] = useState(false);
-  const { rows, loading, error } = useDuesReport(session, "", "", show);
-  const month = currentSessionMonth(session);
-
-  if (!show) {
+/** Ring showing how much of the target is collected. */
+function ProgressRing({
+  percent,
+  loading = false,
+}: {
+  percent: number | null;
+  loading?: boolean;
+}) {
+  const radius = 40;
+  const circumference = 2 * Math.PI * radius;
+  const filled =
+    percent === null || loading
+      ? 0
+      : (Math.min(percent, 100) / 100) * circumference;
+  if (loading) {
+    // The empty ring with a spinner in the middle while the numbers load.
     return (
-      <button
-        type="button"
-        onClick={() => setShow(true)}
-        className="w-full rounded-lg border border-dashed border-gray-300 p-3 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-      >
-        Show dues till {monthLabel(month)}
-      </button>
+      <div className="relative grid h-32 w-32 shrink-0 place-items-center">
+        <svg
+          viewBox="0 0 100 100"
+          className="absolute inset-0 h-full w-full"
+          aria-hidden
+        >
+          <circle
+            cx="50"
+            cy="50"
+            r={radius}
+            fill="none"
+            stroke="#f2dfe8"
+            strokeWidth="14"
+          />
+        </svg>
+        <Spinner size="sm" label="Loading collection" />
+      </div>
     );
   }
-  if (loading) return <Loader fullScreen={false} size="sm" label="Loading dues..." />;
-  if (error) return <p className="p-3 text-sm text-red-600">{error}</p>;
-
-  const dues = rows.map((row) => duesUpTo(row.account, month).due).filter((due) => due > 0);
-  const total = dues.reduce((sum, due) => sum + due, 0);
   return (
-    <NavLink
-      to={FEE_DUES_REPORT_PATH}
-      className="block rounded-lg bg-red-50 p-3 hover:bg-red-100"
+    <svg
+      viewBox="0 0 100 100"
+      className="h-32 w-32 shrink-0"
+      role="img"
+      aria-label="Collected of target"
     >
-      <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
-        Due till {monthLabel(month)}
-      </p>
-      <p className="text-xl font-bold text-red-700">{formatRupees(total)}</p>
-      <p className="text-xs text-red-700">
-        {dues.length} of {rows.length} students · View report →
-      </p>
-    </NavLink>
+      <circle
+        cx="50"
+        cy="50"
+        r={radius}
+        fill="none"
+        stroke="#f2dfe8"
+        strokeWidth="14"
+      />
+      <circle
+        cx="50"
+        cy="50"
+        r={radius}
+        fill="none"
+        stroke="#ad1a6f"
+        strokeWidth="14"
+        strokeDasharray={`${filled} ${circumference - filled}`}
+        transform="rotate(-90 50 50)"
+      />
+      <text
+        x="50"
+        y="50"
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontSize="17"
+        fontWeight="600"
+        fill="#1f2937"
+      >
+        {percent === null ? "—" : `${percent}%`}
+      </text>
+    </svg>
   );
 }
 
-/** Today's and this month's collection, and the dues. */
-function FeeSummary() {
-  const today = todayKey();
-  const { payments, loading, error } = useCollectionReport(
-    toDateKey(startOfMonth(new Date())),
-    today
-  );
+/** First and last day ("yyyy-MM-dd") of each period, as of today. */
+function periodRanges(
+  now: Date,
+): Record<FeePeriod, { from: string; to: string }> {
+  const today = toDateKey(now);
+  const yesterday = toDateKey(subDays(now, 1));
+  return {
+    today: { from: today, to: today },
+    yesterday: { from: yesterday, to: yesterday },
+    week: { from: toDateKey(startOfWeek(now, { weekStartsOn: 1 })), to: today },
+    month: { from: toDateKey(startOfMonth(now)), to: today },
+  };
+}
 
-  const month = summarizeCollection(payments);
-  const day = summarizeCollection(payments.filter((payment) => payment.date === today));
-  const dayModes = Object.entries(day.byMode).filter(([, amount]) => amount > 0);
+/**
+ * The chosen period's collection (today by default; aggregation: sum + count
+ * of the receipts), and in the ring how much of this month's target - worked
+ * out from the fee structure and the student counts - is collected so far.
+ */
+function FeeSummary({ className }: { className: string }) {
+  // The period dropdown (Today by default, also after a reload).
+  const { control, watch } = useForm<{ period: FeePeriod }>({ defaultValues: { period: "today" } });
+  const period = watch("period");
+  const ranges = useMemo(() => periodRanges(new Date()), []);
+  const range = ranges[period];
+  const collected = useCollectionTotal(range.from, range.to);
+  // The ring always shows this month; the same number when the period is the month.
+  const monthCollected = useCollectionTotal(ranges.month.from, ranges.month.to, period !== "month");
+  const monthTotal = period === "month" ? collected : monthCollected;
+
+  // Inputs of the target, read once: structure, settings, student counts
+  // (count aggregation per class) and transport (sum aggregation).
+  const { structure, loading: structureLoading } = useFeeStructure(session);
+  const { classes, loading: countsLoading } = useAllClassesLengthOfStudents({
+    academicYear: session,
+  });
+  const { transportMonthly, loading: transportLoading } =
+    useTransportPerMonth(session);
+  const targetLoading =
+    structureLoading || countsLoading || transportLoading;
+
+  const target = useMemo(() => {
+    if (targetLoading) return null;
+    const studentsByClass = Object.fromEntries(
+      classes.map((item) => [item.className, item.totalStudents]),
+    );
+    return feeTargetOfMonth(
+      { structure, studentsByClass, transportMonthly },
+      new Date().getMonth() + 1,
+    );
+  }, [targetLoading, classes, structure, transportMonthly]);
+
+  const percent = target ? Math.round((monthTotal.total / target) * 100) : null;
+  const periodLabel =
+    FEE_PERIOD_OPTIONS.find((option) => option.value === period)?.label ?? "";
 
   return (
-    <div className="mb-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100 text-green-700">
-            <FaRupeeSign className="h-5 w-5" />
-          </div>
-          <h3 className="text-lg font-bold text-gray-800">Fee Collection</h3>
+    <section
+      className={`flex flex-col rounded-3xl bg-white p-6 shadow-[0_20px_50px_-24px_rgba(17,24,39,0.22)] md:p-7 ${className}`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-lg font-bold text-gray-900">Fee Collection</h3>
+        <div className="w-36">
+          <CustomSelect
+            control={control}
+            name="period"
+            placeholder={null}
+            options={[...FEE_PERIOD_OPTIONS]}
+            className="py-1.5"
+          />
         </div>
-        <NavLink to={FEE_COLLECT_PATH} className="text-sm font-semibold text-primaryBlue hover:underline">
-          Collect Fee →
-        </NavLink>
       </div>
 
-      {loading ? (
-        <Loader fullScreen={false} size="sm" />
-      ) : error ? (
-        <p className="text-sm text-red-600">{error}</p>
-      ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <NavLink
-            to={FEE_COLLECTION_REPORT_PATH}
-            className="rounded-lg bg-green-50 p-3 hover:bg-green-100"
-          >
-            <p className="text-xs font-semibold uppercase tracking-wide text-green-700">Today</p>
-            <p className="text-xl font-bold text-green-700">{formatRupees(day.total)}</p>
-            <p className="text-xs text-green-700">
-              {day.receipts} receipt(s)
-              {dayModes.length > 0 &&
-                ` · ${dayModes.map(([mode, amount]) => `${mode} ${formatRupees(amount)}`).join(", ")}`}
+      {/* Always laid out; each number shows a spinner until it arrives. */}
+      <>
+        <div className="mt-4 flex flex-col items-center gap-6 sm:flex-row">
+          <ProgressRing
+            percent={percent}
+            loading={monthTotal.loading || target === null}
+          />
+          <div className="min-w-0 text-center sm:text-left">
+            <p className="text-sm text-gray-600">
+              Collected {periodLabel.toLowerCase()}
             </p>
-          </NavLink>
-          <NavLink
-            to={FEE_COLLECTION_REPORT_PATH}
-            className="rounded-lg bg-blue-50 p-3 hover:bg-blue-100"
-          >
-            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">This month</p>
-            <p className="text-xl font-bold text-blue-700">{formatRupees(month.total)}</p>
-            <p className="text-xs text-blue-700">{month.receipts} receipt(s)</p>
-          </NavLink>
-          <DuesSummary />
+            <div className="flex h-11 items-center justify-center text-4xl font-extrabold leading-tight tracking-tight text-gray-900 tabular-nums sm:justify-start">
+              {collected.loading ? (
+                <Spinner size="md" label="Loading collection" />
+              ) : collected.error ? (
+                <span className="text-base font-semibold text-red-600">
+                  {collected.error}
+                </span>
+              ) : (
+                formatRupees(collected.total)
+              )}
+            </div>
+            <p className="flex min-h-5 items-center justify-center gap-2 text-sm text-gray-600 sm:justify-start">
+              {target === null ? (
+                <>
+                  Target <Spinner size="xs" label="Loading target" />
+                </>
+              ) : target === 0 ? (
+                "No monthly target: add the fees on the Fee Structure page"
+              ) : (
+                // This month: collected so far of what the month should bring in.
+                `${formatRupees(monthTotal.total)} of ${formatRupees(target)} this month`
+              )}
+            </p>
+          </div>
         </div>
-      )}
-    </div>
+
+        <div className="mt-auto grid grid-cols-1 gap-3 pt-5 sm:grid-cols-2">
+          <div className="rounded-xl bg-[#f7e8ee] px-4 py-2.5">
+            <div className="flex h-8 items-center text-2xl font-bold text-gray-900 tabular-nums">
+              {collected.loading ? (
+                <Spinner size="sm" label="" />
+              ) : (
+                collected.receipts
+              )}
+            </div>
+            <p className="text-sm text-gray-600">
+              Receipts {periodLabel.toLowerCase()}
+            </p>
+          </div>
+          <NavLink
+            to={FEE_DUES_REPORT_PATH}
+            className="group flex items-center justify-between gap-2 rounded-xl bg-[#fce7e7] px-4 py-2.5 transition hover:bg-[#f9dada]"
+          >
+            <span>
+              <span className="block text-2xl font-bold text-gray-900">
+                Dues
+              </span>
+              <span className="block text-sm text-gray-600">
+                Open the Dues Report
+              </span>
+            </span>
+            <ArrowRight className="h-5 w-5 shrink-0 text-gray-700 transition group-hover:translate-x-0.5" />
+          </NavLink>
+        </div>
+      </>
+    </section>
   );
 }
 
 /** Dashboard card, only for users who manage fees (nothing is read otherwise). */
-function FeeTodayCard() {
+function FeeTodayCard({ className = "" }: { className?: string }) {
   const { can } = useContext(myContext);
-  return can(PERMISSIONS.FEE_MANAGE) ? <FeeSummary /> : null;
+  return can(PERMISSIONS.FEE_MANAGE) ? (
+    <FeeSummary className={className} />
+  ) : null;
 }
 
 export default FeeTodayCard;

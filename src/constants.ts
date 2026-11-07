@@ -190,6 +190,20 @@ export const DEFAULT_FEE_SETTINGS: FeeSettings = {
   receiptPrefix: "CVES",
 };
 
+/** Periods of the dashboard's Fee Collection card (the week runs Monday to Sunday). */
+export const FEE_PERIOD_OPTIONS = [
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "week", label: "This week" },
+  { value: "month", label: "This month" },
+] as const;
+
+export type FeePeriod = (typeof FEE_PERIOD_OPTIONS)[number]["value"];
+
+/** Background of the dashboard banner and of the top bar on the dashboard. */
+export const DASHBOARD_GRADIENT =
+  "bg-[linear-gradient(100deg,#a8196f_0%,#b52a3f_50%,#c2410c_100%)]";
+
 /** Classes for a button in the school-colour gradient (e.g. a Modal's submitClassName). */
 export const CVES_BUTTON = "bg-cves shadow-sm transition hover:shadow-md hover:brightness-110";
 

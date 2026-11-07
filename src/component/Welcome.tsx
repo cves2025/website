@@ -7,6 +7,7 @@ import { BsList } from "react-icons/bs";
 import { FaGlobe } from "react-icons/fa";
 import WhatsNewModal from "../features/whats-new/WhatsNewModal";
 import { useWhatsNew } from "../features/whats-new/useWhatsNew";
+import { DASHBOARD_GRADIENT } from "../constants";
 
 function Welcome() {
   const { user, authReady } = useContext(myContext);
@@ -14,6 +15,7 @@ function Welcome() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const whatsNew = useWhatsNew();
+  const onDashboard = location.pathname.replace(/\/+$/, "") === "/welcome";
 
   // Only redirect once Firebase has restored the session, and remember where
   // the user was so they land back on the same page after logging in.
@@ -47,11 +49,16 @@ function Welcome() {
       )}
 
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
-        {/* Top bar */}
-        <header className="sticky top-0 z-20 bg-white shadow-sm flex items-center gap-3 px-4 py-3 print:hidden">
+        {/* Top bar. On the dashboard it is part of the greeting banner: the
+            same gradient (DASHBOARD_GRADIENT) with white text. */}
+        <header
+          className={`sticky top-0 z-20 flex items-center gap-3 px-4 print:hidden ${
+            onDashboard ? `${DASHBOARD_GRADIENT} pb-0 pt-3 text-white md:px-12` : "bg-white py-3 shadow-sm"
+          }`}
+        >
           <button
             onClick={() => setSidebarOpen(true)}
-            className="md:hidden text-gray-700 hover:text-gray-900"
+            className={`md:hidden ${onDashboard ? "text-white/90 hover:text-white" : "text-gray-700 hover:text-gray-900"}`}
             aria-label="Open menu"
           >
             <BsList className="w-7 h-7" />
@@ -59,7 +66,15 @@ function Welcome() {
           {user.role === "admin" ? (
             // Admins see the school name, styled like the AddStudent /
             // result card letterhead.
-            <h1 className="min-w-0 truncate text-base font-bold text-gray-800 md:text-xl">
+            // On the dashboard the coloured name sits on a white box, so it
+            // stays readable on the gradient.
+            <h1
+              className={`min-w-0 truncate font-bold text-gray-800 ${
+                onDashboard
+                  ? "rounded-md bg-white px-2 py-0.5 text-xs shadow-sm md:text-sm"
+                  : "text-base md:text-xl"
+              }`}
+            >
               <span className="font-cancun font-extrabold tracking-tight">
                 <span className="text-green-700">CHILDREN&apos;S </span>
                 <span className="text-indigo-800">VALLEY </span>
@@ -68,7 +83,7 @@ function Welcome() {
               </span>
             </h1>
           ) : (
-            <h1 className="text-lg md:text-xl font-bold text-gray-800 truncate">
+            <h1 className={`text-lg md:text-xl font-bold truncate ${onDashboard ? "text-white" : "text-gray-800"}`}>
               Welcome{user?.fullName ? `, ${user.fullName}` : ""}!
             </h1>
           )}
@@ -76,7 +91,11 @@ function Welcome() {
             <Link
               to="/"
               title="Go to Website"
-              className="ml-auto flex shrink-0 items-center gap-2 rounded-full bg-blue-600 px-3 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700 sm:px-4"
+              className={`ml-auto flex shrink-0 items-center gap-2 rounded-full px-3 text-sm font-bold text-white shadow-sm transition-colors sm:px-4 ${
+                onDashboard
+                  ? "bg-white/15 py-1 ring-1 ring-inset ring-white/40 hover:bg-white/25"
+                  : "bg-blue-600 py-2 hover:bg-blue-700"
+              }`}
             >
               <FaGlobe className="h-4 w-4" />
               {/* Icon only on small phones, so the school name keeps its room. */}
