@@ -4,6 +4,7 @@
  * - `feeStructures/{session}` - class-wise admission / monthly fee and the
  *   exam fee plan of a session.
  * - `feeSettings/general` - due day, late fee and receipt prefix.
+ * - `feeSettings/receiptPrint` - how receipts are printed (paper, copies).
  * - `feeAccounts/{session}_{studentId}` - a student's fee lines of a session.
  * - `feePayments/{session}_{serial}` - one document per receipt.
  * - `feeCounters/{session}` - the last receipt serial of the session.
@@ -26,6 +27,10 @@ import {
   CLASSES,
   COLLECTION,
   DEFAULT_FEE_SETTINGS,
+  DEFAULT_RECEIPT_PRINT,
+  RECEIPT_COPIES_OPTIONS,
+  RECEIPT_PAPER_OPTIONS,
+  RECEIPT_PRINT_DOC,
   FEE_SETTINGS_DOC,
   PAYMENT_MODES,
   SESSION_MONTHS,
@@ -66,6 +71,7 @@ import type {
   FeeStructure,
   FeeStudent,
   FeeTransport,
+  ReceiptPrintSettings,
 } from "./type";
 
 const toAmountMap = (value: unknown): Record<string, number> => {
@@ -159,6 +165,30 @@ export async function saveFeeSettings(
   updatedBy: string
 ): Promise<void> {
   await setDoc(doc(db, COLLECTION.FEE_SETTINGS, FEE_SETTINGS_DOC), {
+    ...settings,
+    updatedAt: serverTimestamp(),
+    updatedBy,
+  });
+}
+
+/** How receipts are printed; the default until an admin picks one. */
+export async function loadReceiptPrintSettings(): Promise<ReceiptPrintSettings> {
+  const snapshot = await getDoc(doc(db, COLLECTION.FEE_SETTINGS, RECEIPT_PRINT_DOC));
+  if (!snapshot.exists()) return { ...DEFAULT_RECEIPT_PRINT };
+  const data = snapshot.data();
+  const paper = RECEIPT_PAPER_OPTIONS.find((option) => option.value === data.paper);
+  const copies = RECEIPT_COPIES_OPTIONS.find((option) => option.value === data.copies);
+  return {
+    paper: paper?.value ?? DEFAULT_RECEIPT_PRINT.paper,
+    copies: copies?.value ?? DEFAULT_RECEIPT_PRINT.copies,
+  };
+}
+
+export async function saveReceiptPrintSettings(
+  settings: ReceiptPrintSettings,
+  updatedBy: string
+): Promise<void> {
+  await setDoc(doc(db, COLLECTION.FEE_SETTINGS, RECEIPT_PRINT_DOC), {
     ...settings,
     updatedAt: serverTimestamp(),
     updatedBy,

@@ -1,4 +1,12 @@
-import type { ClassFee, FeeHead, FeeSettings, PaymentMode } from "./utils/type";
+import type {
+  ClassFee,
+  FeeHead,
+  FeeSettings,
+  PaymentMode,
+  ReceiptCopies,
+  ReceiptPaper,
+  ReceiptPrintSettings,
+} from "./utils/type";
 
 export const COLLECTION = {
   STUDENTS: "students",
@@ -56,6 +64,23 @@ export const ADMIT_CARD_SETTINGS_DOC = "admitCard";
 export const HOME_BANNER_SETTINGS_DOC = "homeBanner";
 /** Document id inside COLLECTION.FEE_SETTINGS (due day, late fee, receipt prefix). */
 export const FEE_SETTINGS_DOC = "general";
+
+/** Document id inside COLLECTION.FEE_SETTINGS with the receipt print layout. */
+export const RECEIPT_PRINT_DOC = "receiptPrint";
+
+/** Until the admin changes it: both copies on one A4 page. */
+export const DEFAULT_RECEIPT_PRINT: ReceiptPrintSettings = { paper: "a4", copies: "both" };
+
+export const RECEIPT_PAPER_OPTIONS: { value: ReceiptPaper; label: string; hint: string }[] = [
+  { value: "a4", label: "Full A4 page", hint: "Copies one above the other, cut line in the middle" },
+  { value: "half", label: "Half A4 sheets", hint: "Each copy on its own half sheet (A4 cut in the middle)" },
+];
+
+export const RECEIPT_COPIES_OPTIONS: { value: ReceiptCopies; label: string }[] = [
+  { value: "both", label: "Both copies" },
+  { value: "student", label: "Student copy only" },
+  { value: "office", label: "Office copy only" },
+];
 
 /** Field names of the "stampSign"/"principle" document. */
 export const STAMP_SIGN_FIELDS = {

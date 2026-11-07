@@ -447,6 +447,17 @@ export interface FeeStructure {
   examFees: ExamFeeItem[];
 }
 
+/** Paper a receipt is printed on: a full A4 sheet, or an A4 sheet cut in half. */
+export type ReceiptPaper = "a4" | "half";
+/** Which copies of a receipt are printed. */
+export type ReceiptCopies = "both" | "student" | "office";
+
+/** The `feeSettings/receiptPrint` document: how receipts are printed. */
+export interface ReceiptPrintSettings {
+  paper: ReceiptPaper;
+  copies: ReceiptCopies;
+}
+
 /** The `feeSettings/general` document. */
 export interface FeeSettings {
   /** Day of the month by which the monthly fee is due (1-28). */
@@ -478,7 +489,7 @@ export interface FeeLine {
   amount: number;
   discount: number;
   paid: number;
-  /** Waived (fee maafi): whatever is still due on the line is let go. */
+  /** Waived (fee exemption): whatever is still due on the line is let go. */
   waived: boolean;
   discountReason: string;
   waiveReason: string;
