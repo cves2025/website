@@ -75,17 +75,15 @@ function FeeReceipt() {
   const { paper, copies } = print.settings;
   const labels =
     copies === "both" ? [STUDENT_COPY, OFFICE_COPY] : [copies === "student" ? STUDENT_COPY : OFFICE_COPY];
-  // A4: one page, the copies in its top and bottom halves. Half: a page each.
+  // Always A4 pages. Full A4: one page, the copies in its top and bottom
+  // halves. Half sheets: an A4 page per copy, printed in its top half only,
+  // so it lands on an A4 sheet cut in half that is fed into the printer.
   const sheets = paper === "a4" ? [labels] : labels.map((label) => [label]);
 
   return (
     <div className="flex flex-col gap-3 print:block">
       {/* Page size of the print; margin 0, the sheets carry their own. */}
-      <style>
-        {paper === "a4"
-          ? "@page { size: A4 portrait; margin: 0; }"
-          : "@page { size: 210mm 148.5mm; margin: 0; }"}
-      </style>
+      <style>{"@page { size: A4 portrait; margin: 0; }"}</style>
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white px-4 py-3 shadow-sm print:hidden">
         <button
@@ -134,15 +132,11 @@ function FeeReceipt() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 print:hidden">
                   {paper === "a4"
                     ? "A4 page"
-                    : `Half sheet ${index + 1} of ${sheets.length} · ${sheet[0]}`}
+                    : `A4 page ${index + 1} of ${sheets.length} · ${sheet[0]} on the top half`}
                 </p>
-                {/* A hair under the paper size, so rounding never adds a blank page. */}
-                <div
-                  className={`flex w-[210mm] shrink-0 flex-col bg-white shadow-lg print:shadow-none ${
-                    paper === "a4" ? "h-[296mm]" : "h-[148mm]"
-                  }`}
-                >
-                  {(paper === "a4" ? [sheet[0], sheet[1]] : sheet).map((label, slot) => (
+                {/* A hair under the A4 height, so rounding never adds a blank page. */}
+                <div className="flex h-[296mm] w-[210mm] shrink-0 flex-col bg-white shadow-lg print:shadow-none">
+                  {[sheet[0], sheet[1]].map((label, slot) => (
                     <div
                       key={slot}
                       className={`relative min-h-0 flex-1 p-[7mm] ${
@@ -153,6 +147,12 @@ function FeeReceipt() {
                         <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-white px-2 text-[10px] text-gray-500">
                           ✂ cut here
                         </span>
+                      )}
+                      {!label && paper === "half" && slot === 1 && (
+                        // Preview only: where the cut half sheet ends.
+                        <div className="grid h-full place-items-center rounded border-2 border-dashed border-gray-300 bg-[repeating-linear-gradient(45deg,#f9fafb_0,#f9fafb_10px,#f3f4f6_10px,#f3f4f6_20px)] text-center text-xs text-gray-500 print:hidden">
+                          The half sheet ends here; nothing prints below.
+                        </div>
                       )}
                       {label && (
                         <FitBox>

@@ -73,7 +73,7 @@ export const DEFAULT_RECEIPT_PRINT: ReceiptPrintSettings = { paper: "a4", copies
 
 export const RECEIPT_PAPER_OPTIONS: { value: ReceiptPaper; label: string; hint: string }[] = [
   { value: "a4", label: "Full A4 page", hint: "Copies one above the other, cut line in the middle" },
-  { value: "half", label: "Half A4 sheets", hint: "Each copy on its own half sheet (A4 cut in the middle)" },
+  { value: "half", label: "Half A4 sheets", hint: "Each copy on the top half of its own A4 page, for A4 sheets cut in half" },
 ];
 
 export const RECEIPT_COPIES_OPTIONS: { value: ReceiptCopies; label: string }[] = [

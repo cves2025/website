@@ -111,8 +111,9 @@ function ReceiptPrintPanel({ settings, onChange, loading, saveState }: ReceiptPr
         <p className="flex gap-2 rounded-lg bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
           <Info className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
-            In the print dialog pick paper size <b>A5</b>, <b>Landscape</b>, margins <b>None</b>, and
-            put the half sheets in the manual tray. Try one test print first.
+            Each copy prints on the top half of its own A4 page. Keep paper size <b>A4</b> and
+            margins <b>None</b> in the print dialog, and put the half sheets in the tray one by one,
+            the same way as a full A4 sheet. Try one test print first.
           </span>
         </p>
       )}
