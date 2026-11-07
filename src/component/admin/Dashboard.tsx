@@ -10,9 +10,9 @@ const greeting = (hour: number) =>
   hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
 /**
- * Panel home: a full-width greeting banner with today's attendance and the
- * fee collection on top of it. Each card is shown (and read) only for users
- * allowed to use it.
+ * Panel home: a full-width greeting banner with today's attendance on top of
+ * it. The fee collection stays hidden behind an icon on the right edge until
+ * opened. Each card is shown (and read) only for users allowed to use it.
  */
 function Dashboard() {
   const { user } = useContext(myContext);

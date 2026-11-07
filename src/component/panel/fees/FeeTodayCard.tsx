@@ -1,12 +1,14 @@
-import { useContext, useMemo } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, IndianRupee, X } from "lucide-react";
 import { startOfMonth, startOfWeek, subDays } from "date-fns";
 
 import { useForm } from "react-hook-form";
 import CustomSelect from "../../../custom-components/CustomSelect";
 import {
+  FEE_COLLECTION_REPORT_PATH,
   FEE_DUES_REPORT_PATH,
+  FEE_PANEL_MS,
   FEE_PERIOD_OPTIONS,
   type FeePeriod,
 } from "../../../constants";
@@ -122,7 +124,13 @@ function periodRanges(
  * of the receipts), and in the ring how much of this month's target - worked
  * out from the fee structure and the student counts - is collected so far.
  */
-function FeeSummary({ className }: { className: string }) {
+function FeeSummary({
+  className,
+  onClose,
+}: {
+  className: string;
+  onClose?: () => void;
+}) {
   // The period dropdown (Today by default, also after a reload).
   const { control, watch } = useForm<{ period: FeePeriod }>({ defaultValues: { period: "today" } });
   const period = watch("period");
@@ -164,7 +172,7 @@ function FeeSummary({ className }: { className: string }) {
       className={`flex flex-col rounded-3xl bg-white p-6 shadow-[0_20px_50px_-24px_rgba(17,24,39,0.22)] md:p-7 ${className}`}
     >
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-lg font-bold text-gray-900">Fee Collection</h3>
+        <h3 className="mr-auto text-lg font-bold text-gray-900">Fee Collection</h3>
         <div className="w-36">
           <CustomSelect
             control={control}
@@ -174,6 +182,16 @@ function FeeSummary({ className }: { className: string }) {
             className="py-1.5"
           />
         </div>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close fee collection"
+            className="-mr-2 ml-auto grid h-9 w-9 shrink-0 place-items-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-900"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       {/* Always laid out; each number shows a spinner until it arrives. */}
@@ -226,32 +244,119 @@ function FeeSummary({ className }: { className: string }) {
               Receipts {periodLabel.toLowerCase()}
             </p>
           </div>
-          <NavLink
-            to={FEE_DUES_REPORT_PATH}
-            className="group flex items-center justify-between gap-2 rounded-xl bg-[#fce7e7] px-4 py-2.5 transition hover:bg-[#f9dada]"
-          >
-            <span>
-              <span className="block text-2xl font-bold text-gray-900">
-                Dues
-              </span>
-              <span className="block text-sm text-gray-600">
-                Open the Dues Report
-              </span>
-            </span>
-            <ArrowRight className="h-5 w-5 shrink-0 text-gray-700 transition group-hover:translate-x-0.5" />
-          </NavLink>
+          {/* One card with both report links. */}
+          <div className="flex flex-col justify-center divide-y divide-[#f3cfd6] rounded-xl bg-[#fce7e7] px-4 py-1">
+            {[
+              { to: FEE_DUES_REPORT_PATH, label: "View Dues Report" },
+              { to: FEE_COLLECTION_REPORT_PATH, label: "View Collection Report" },
+            ].map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                className="group flex items-center justify-between gap-2 py-1.5 text-sm font-semibold text-gray-800 transition hover:text-[#ad1a6f]"
+              >
+                {link.label}
+                <ArrowRight className="h-4 w-4 shrink-0 transition group-hover:translate-x-0.5" />
+              </NavLink>
+            ))}
+          </div>
         </div>
       </>
     </section>
   );
 }
 
-/** Dashboard card, only for users who manage fees (nothing is read otherwise). */
-function FeeTodayCard({ className = "" }: { className?: string }) {
+/**
+ * Dashboard: a fee icon stuck to the right edge of the screen, so the
+ * collection is not on view for anyone looking at the screen. Clicking it
+ * slides the card in; the cross (or Esc) hides it again. Only for users who
+ * manage fees, and nothing is read until the card is opened.
+ */
+function FeeTodayCard() {
   const { can } = useContext(myContext);
-  return can(PERMISSIONS.FEE_MANAGE) ? (
-    <FeeSummary className={className} />
-  ) : null;
+  // `mounted`: the card is in the page (its data is read only then);
+  // `shown`: it has grown out of the icon. Closing shrinks it back into the
+  // icon first and removes it once the animation is over.
+  const [mounted, setMounted] = useState(false);
+  const [shown, setShown] = useState(false);
+
+  const open = () => setMounted(true);
+  const close = () => setShown(false);
+
+  useEffect(() => {
+    if (mounted && !shown) {
+      // Opening: one frame at the icon's size, then grow.
+      const frame = requestAnimationFrame(() =>
+        requestAnimationFrame(() => setShown(true)),
+      );
+      return () => cancelAnimationFrame(frame);
+    }
+  }, [mounted]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!mounted || shown) return;
+    // Closing: remove the card after it has shrunk back.
+    const timer = window.setTimeout(() => setMounted(false), FEE_PANEL_MS);
+    return () => window.clearTimeout(timer);
+  }, [shown]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!shown) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [shown]);
+
+  if (!can(PERMISSIONS.FEE_MANAGE)) return null;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={open}
+        aria-label="Show fee collection"
+        title="Fee collection"
+        tabIndex={mounted ? -1 : 0}
+        className={`fixed right-0 top-1/2 z-30 grid h-12 w-11 -translate-y-1/2 place-items-center rounded-l-xl bg-cves text-white shadow-lg transition-all duration-300 hover:w-14 hover:brightness-110 print:hidden ${
+          mounted ? "pointer-events-none scale-75 opacity-0" : "opacity-100"
+        }`}
+      >
+        <IndianRupee className="h-5 w-5" strokeWidth={2.5} />
+      </button>
+      {mounted && (
+        // A click anywhere outside the card hides it. (A click that only
+        // closes the period dropdown does not reach it.)
+        <div
+          aria-hidden
+          onClick={close}
+          style={{ transitionDuration: `${FEE_PANEL_MS}ms` }}
+          className={`fixed inset-0 z-40 bg-black/20 transition-opacity print:hidden ${
+            shown ? "opacity-100" : "pointer-events-none opacity-0"
+          }`}
+        />
+      )}
+      {mounted && (
+        // Grows out of the icon (right edge, middle) and shrinks back into it.
+        <div
+          // The space around the card counts as outside too.
+          onClick={(event) => event.target === event.currentTarget && close()}
+          style={{ transitionDuration: `${FEE_PANEL_MS}ms` }}
+          className={`fixed inset-y-0 right-0 z-40 flex w-full max-w-md origin-right items-center p-3 transition-[transform,opacity] ease-[cubic-bezier(0.22,1,0.36,1)] print:hidden ${
+            shown
+              ? "translate-x-0 scale-100 opacity-100"
+              : "pointer-events-none translate-x-[40%] scale-[0.15] opacity-0"
+          }`}
+        >
+          <FeeSummary
+            className="max-h-full w-full overflow-y-auto shadow-[0_20px_60px_-12px_rgba(17,24,39,0.45)]"
+            onClose={close}
+          />
+        </div>
+      )}
+    </>
+  );
 }
 
 export default FeeTodayCard;

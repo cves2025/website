@@ -200,6 +200,9 @@ export const FEE_PERIOD_OPTIONS = [
 
 export type FeePeriod = (typeof FEE_PERIOD_OPTIONS)[number]["value"];
 
+/** How long the dashboard fee card takes to grow out of (and back into) its icon. */
+export const FEE_PANEL_MS = 350;
+
 /** Background of the dashboard banner and of the top bar on the dashboard. */
 export const DASHBOARD_GRADIENT =
   "bg-[linear-gradient(100deg,#a8196f_0%,#b52a3f_50%,#c2410c_100%)]";
