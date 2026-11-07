@@ -29,6 +29,7 @@ import {
   DEFAULT_FEE_SETTINGS,
   DEFAULT_RECEIPT_PRINT,
   RECEIPT_COPIES_OPTIONS,
+  RECEIPT_DESIGN_OPTIONS,
   RECEIPT_PAPER_OPTIONS,
   RECEIPT_PRINT_DOC,
   FEE_SETTINGS_DOC,
@@ -71,6 +72,7 @@ import type {
   FeeStructure,
   FeeStudent,
   FeeTransport,
+  ReceiptBalance,
   ReceiptPrintSettings,
 } from "./type";
 
@@ -178,7 +180,9 @@ export async function loadReceiptPrintSettings(): Promise<ReceiptPrintSettings> 
   const data = snapshot.data();
   const paper = RECEIPT_PAPER_OPTIONS.find((option) => option.value === data.paper);
   const copies = RECEIPT_COPIES_OPTIONS.find((option) => option.value === data.copies);
+  const design = RECEIPT_DESIGN_OPTIONS.find((option) => option.value === data.design);
   return {
+    design: design?.value ?? DEFAULT_RECEIPT_PRINT.design,
     paper: paper?.value ?? DEFAULT_RECEIPT_PRINT.paper,
     copies: copies?.value ?? DEFAULT_RECEIPT_PRINT.copies,
   };
@@ -538,6 +542,28 @@ export async function loadAccountPayments(accountId: string): Promise<FeePayment
 export async function loadFeePayment(id: string): Promise<FeePayment | null> {
   const snapshot = await getDoc(doc(db, COLLECTION.FEE_PAYMENTS, id));
   return snapshot.exists() ? toFeePayment(snapshot.id, snapshot.data()) : null;
+}
+
+/**
+ * The account around a receipt: paid before it, and still due right after
+ * it (what is due now plus the receipts saved after this one). Reads the
+ * account and its receipts; only the "Balance" receipt design needs it.
+ */
+export async function loadReceiptBalance(payment: FeePayment): Promise<ReceiptBalance> {
+  const [{ account }, payments] = await Promise.all([
+    loadFeeAccount(payment.session, pickStudent(payment)),
+    loadAccountPayments(payment.accountId),
+  ]);
+  const active = payments.filter((item) => item.status === "active" && item.id !== payment.id);
+  const sum = (items: FeePayment[]) => items.reduce((total, item) => total + item.amount, 0);
+  const paidEarlier = sum(active.filter((item) => item.serial < payment.serial));
+  const balance = feeTotals(account.lines).due + sum(active.filter((item) => item.serial > payment.serial));
+  return {
+    total: paidEarlier + payment.amount + balance,
+    paidEarlier,
+    thisReceipt: payment.amount,
+    balance,
+  };
 }
 
 /** Most recent change-log entries kept on an account. */

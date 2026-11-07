@@ -452,10 +452,25 @@ export type ReceiptPaper = "a4" | "half";
 /** Which copies of a receipt are printed. */
 export type ReceiptCopies = "both" | "student" | "office";
 
+/** Look of the printed receipt (H, I, J, K of the client's design sheet). */
+export type ReceiptDesign = "classic" | "minimal" | "balance" | "band";
+
 /** The `feeSettings/receiptPrint` document: how receipts are printed. */
 export interface ReceiptPrintSettings {
+  design: ReceiptDesign;
   paper: ReceiptPaper;
   copies: ReceiptCopies;
+}
+
+/** Account position around one receipt (the "Balance" design shows it). */
+export interface ReceiptBalance {
+  /** Paid earlier + this receipt + balance due. */
+  total: number;
+  /** Active receipts of the account before this one. */
+  paidEarlier: number;
+  thisReceipt: number;
+  /** Still due right after this receipt. */
+  balance: number;
 }
 
 /** The `feeSettings/general` document. */

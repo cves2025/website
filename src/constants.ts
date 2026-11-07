@@ -4,6 +4,7 @@ import type {
   FeeSettings,
   PaymentMode,
   ReceiptCopies,
+  ReceiptDesign,
   ReceiptPaper,
   ReceiptPrintSettings,
 } from "./utils/type";
@@ -68,8 +69,19 @@ export const FEE_SETTINGS_DOC = "general";
 /** Document id inside COLLECTION.FEE_SETTINGS with the receipt print layout. */
 export const RECEIPT_PRINT_DOC = "receiptPrint";
 
-/** Until the admin changes it: both copies on one A4 page. */
-export const DEFAULT_RECEIPT_PRINT: ReceiptPrintSettings = { paper: "a4", copies: "both" };
+/** Until the admin changes it: the classic design, both copies on one A4 page. */
+export const DEFAULT_RECEIPT_PRINT: ReceiptPrintSettings = {
+  design: "classic",
+  paper: "a4",
+  copies: "both",
+};
+
+export const RECEIPT_DESIGN_OPTIONS: { value: ReceiptDesign; label: string; hint: string }[] = [
+  { value: "classic", label: "Classic", hint: "Bordered, serif letterhead" },
+  { value: "minimal", label: "Minimal", hint: "Clean lines, big total" },
+  { value: "balance", label: "Balance", hint: "Shows paid earlier and balance due" },
+  { value: "band", label: "Band + Stamp", hint: "Dark band and a PAID stamp" },
+];
 
 export const RECEIPT_PAPER_OPTIONS: { value: ReceiptPaper; label: string; hint: string }[] = [
   { value: "a4", label: "Full A4 page", hint: "Copies one above the other, cut line in the middle" },

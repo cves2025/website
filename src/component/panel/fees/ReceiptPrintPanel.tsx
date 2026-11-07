@@ -1,6 +1,10 @@
 import { CheckCircle2, Info } from "lucide-react";
 
-import { RECEIPT_COPIES_OPTIONS, RECEIPT_PAPER_OPTIONS } from "../../../constants";
+import {
+  RECEIPT_COPIES_OPTIONS,
+  RECEIPT_DESIGN_OPTIONS,
+  RECEIPT_PAPER_OPTIONS,
+} from "../../../constants";
 import { Spinner } from "../../../custom-components/Loader";
 import type { ReceiptPaper, ReceiptPrintSettings } from "../../../utils/type";
 
@@ -41,8 +45,9 @@ const choiceClass = (active: boolean) =>
   }`;
 
 /**
- * Print settings of the receipt page: the paper (full A4 or half sheets)
- * and the copies. Saved for the whole school; the preview follows them.
+ * Print settings of the receipt page: the design, the paper (full A4 or
+ * half sheets) and the copies. Saved for the whole school; the preview
+ * follows them.
  */
 function ReceiptPrintPanel({ settings, onChange, loading, saveState }: ReceiptPrintPanelProps) {
   return (
@@ -65,6 +70,26 @@ function ReceiptPrintPanel({ settings, onChange, loading, saveState }: ReceiptPr
           ) : null}
         </span>
       </div>
+
+      <fieldset disabled={loading}>
+        <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Design</legend>
+        <div className="grid grid-cols-2 gap-2">
+          {RECEIPT_DESIGN_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={settings.design === option.value}
+              onClick={() => onChange({ ...settings, design: option.value })}
+              className={`${choiceClass(settings.design === option.value)} !items-start`}
+            >
+              <span className="min-w-0">
+                <span className="block font-semibold">{option.label}</span>
+                <span className="block text-xs leading-snug text-gray-500">{option.hint}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </fieldset>
 
       <fieldset disabled={loading} className="flex flex-col gap-2">
         <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Paper</legend>

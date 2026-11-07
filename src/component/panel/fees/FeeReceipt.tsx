@@ -1,23 +1,19 @@
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { format } from "date-fns";
 import { ArrowLeft, Printer } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 
 import Loader from "../../../custom-components/Loader";
-import schoolLogo from "../../../assets/image/schoolLogo.jpg";
-import { CVES_ON_HOVER, FEE_COLLECT_PATH, SCHOOL_CONTACT, SCHOOL_NAME } from "../../../constants";
+import { CVES_ON_HOVER, FEE_COLLECT_PATH } from "../../../constants";
 import { myContext } from "../../context/MyContextProvider";
-import { amountInWords } from "../../../utils/amountInWords";
-import { formatRupees } from "../../../utils/feeStructure";
 import { saveReceiptPrintSettings } from "../../../utils/feeService";
-import { fromDateKey } from "../../../utils/holidayCalendar";
-import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import useFeePayment from "../../../hooks/useFeePayment";
 import useReceiptPrintSettings from "../../../hooks/useReceiptPrintSettings";
-import type { FeePayment, ReceiptPrintSettings } from "../../../utils/type";
+import useReceiptBalance from "../../../hooks/useReceiptBalance";
+import type { ReceiptPrintSettings } from "../../../utils/type";
 import ReceiptPrintPanel, { type SaveState } from "./ReceiptPrintPanel";
+import ReceiptDesignCopy from "./ReceiptDesigns";
 
 const STUDENT_COPY = "Student Copy";
 const OFFICE_COPY = "Office Copy";
@@ -25,9 +21,9 @@ const OFFICE_COPY = "Office Copy";
 /**
  * Printable fee receipt (`?id=` = payment id), for the student and for the
  * office. The print settings beside it (saved for the whole school) choose
- * the paper - both halves of one A4 page with a cut line between them, or
- * one half-A4 sheet per copy - and the copies; the preview shows the pages
- * as they will print.
+ * the design, the paper - both halves of one A4 page with a cut line between
+ * them, or one A4 page per copy for half sheets - and the copies; the
+ * preview shows the pages as they will print.
  */
 function FeeReceipt() {
   const navigate = useNavigate();
@@ -36,6 +32,8 @@ function FeeReceipt() {
   const { payment, loading, error } = useFeePayment(params.get("id") ?? "");
   const print = useReceiptPrintSettings();
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  // Paid earlier / balance due: read only for the Balance design.
+  const balance = useReceiptBalance(payment, print.settings.design === "balance");
 
   // The print dialog suggests the page title as the PDF file name.
   useEffect(() => {
@@ -72,7 +70,7 @@ function FeeReceipt() {
     }
   };
 
-  const { paper, copies } = print.settings;
+  const { design, paper, copies } = print.settings;
   const labels =
     copies === "both" ? [STUDENT_COPY, OFFICE_COPY] : [copies === "student" ? STUDENT_COPY : OFFICE_COPY];
   // Always A4 pages. Full A4: one page, the copies in its top and bottom
@@ -96,7 +94,7 @@ function FeeReceipt() {
         </button>
         <button
           type="button"
-          disabled={!payment || print.loading}
+          disabled={!payment || print.loading || balance.loading}
           onClick={() => window.print()}
           title="Print receipt"
           aria-label="Print receipt"
@@ -139,7 +137,8 @@ function FeeReceipt() {
                   {[sheet[0], sheet[1]].map((label, slot) => (
                     <div
                       key={slot}
-                      className={`relative min-h-0 flex-1 p-[7mm] ${
+                      // The design sheet's spacing: 22px round the page, 10px each side of the cut.
+                      className={`relative min-h-0 flex-1 px-[22px] ${slot === 0 ? "pb-[11px] pt-[22px]" : "pb-[22px] pt-[11px]"} ${
                         slot === 1 && label ? "border-t-2 border-dashed border-gray-400" : ""
                       }`}
                     >
@@ -156,7 +155,12 @@ function FeeReceipt() {
                       )}
                       {label && (
                         <FitBox>
-                          <ReceiptCopy payment={payment} copyLabel={label} />
+                          <ReceiptDesignCopy
+                            design={design}
+                            payment={payment}
+                            copyLabel={label}
+                            balance={balance.balance}
+                          />
                         </FitBox>
                       )}
                     </div>
@@ -201,108 +205,6 @@ function FitBox({ children }: { children: ReactNode }) {
         style={scale < 1 ? { transform: `scale(${scale})` } : undefined}
       >
         {children}
-      </div>
-    </div>
-  );
-}
-
-function ReceiptCopy({ payment, copyLabel }: { payment: FeePayment; copyLabel: string }) {
-  const details: [string, string][] = [
-    ["Student", payment.studentName],
-    ["Father's Name", payment.fatherName || "-"],
-    ["Class", `${toOrdinalLabel(payment.className)} - ${payment.section}`],
-    ["Admission No.", payment.admissionNo || "-"],
-  ];
-
-  return (
-    <div className="relative flex flex-1 flex-col overflow-hidden border-2 border-blue-900 p-4 text-[13px] text-black">
-      {payment.status === "cancelled" && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <span className="-rotate-12 rounded border-4 border-red-500 px-6 py-1 text-5xl font-extrabold tracking-widest text-red-500/60">
-            CANCELLED
-          </span>
-        </div>
-      )}
-
-      {/* Letterhead */}
-      <div className="flex items-center gap-3 border-b-2 border-blue-900 pb-2">
-        <img src={schoolLogo} alt="School logo" className="h-14 w-14 shrink-0 object-contain" />
-        <div className="min-w-0 flex-1 text-center">
-          <p className="text-lg font-extrabold leading-tight tracking-tight text-blue-900">{SCHOOL_NAME}</p>
-          <p className="text-[11px]">
-            {SCHOOL_CONTACT.ADDRESS} · Ph. {SCHOOL_CONTACT.PHONE}
-          </p>
-          <p className="mt-1 inline-block rounded bg-blue-900 px-4 py-0.5 text-xs font-bold tracking-wider text-white">
-            FEE RECEIPT
-          </p>
-        </div>
-        <span className="w-14 shrink-0 self-start text-right text-[10px] font-semibold uppercase text-gray-600">
-          {copyLabel}
-        </span>
-      </div>
-
-      {/* Receipt no. / date / session */}
-      <div className="mt-2 flex flex-wrap justify-between gap-x-4 font-semibold">
-        <span>Receipt No.: {payment.receiptNo}</span>
-        <span>Date: {format(fromDateKey(payment.date), "dd/MM/yyyy")}</span>
-        <span>Session: {payment.session}</span>
-      </div>
-
-      <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5">
-        {details.map(([label, value]) => (
-          <p key={label} className="truncate">
-            <span className="text-gray-600">{label}:</span> <span className="font-semibold">{value}</span>
-          </p>
-        ))}
-      </div>
-
-      {/* Fees paid */}
-      <table className="mt-2 w-full border-collapse">
-        <thead>
-          <tr className="bg-blue-50">
-            <th className="w-10 border border-gray-400 px-2 py-1 text-left">S.No.</th>
-            <th className="border border-gray-400 px-2 py-1 text-left">Particulars</th>
-            <th className="w-28 border border-gray-400 px-2 py-1 text-right">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {payment.allocations.map((item, index) => (
-            <tr key={item.lineId}>
-              <td className="border border-gray-400 px-2 py-0.5">{index + 1}</td>
-              <td className="border border-gray-400 px-2 py-0.5">{item.label}</td>
-              <td className="border border-gray-400 px-2 py-0.5 text-right">{formatRupees(item.amount)}</td>
-            </tr>
-          ))}
-          <tr className="font-bold">
-            <td className="border border-gray-400 px-2 py-1" colSpan={2}>
-              Total
-            </td>
-            <td className="border border-gray-400 px-2 py-1 text-right">{formatRupees(payment.amount)}</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <p className="mt-1.5">
-        <span className="text-gray-600">In words:</span>{" "}
-        <span className="font-semibold">{amountInWords(payment.amount)}</span>
-      </p>
-      <p>
-        <span className="text-gray-600">Payment mode:</span>{" "}
-        <span className="font-semibold">
-          {payment.mode}
-          {payment.reference ? ` (Ref. ${payment.reference})` : ""}
-        </span>
-        {payment.note && (
-          <>
-            {" "}
-            · <span className="text-gray-600">Note:</span> {payment.note}
-          </>
-        )}
-      </p>
-
-      <div className="mt-auto flex items-end justify-between pt-6 text-xs">
-        <span className="text-gray-600">Received by: {payment.collectedByName || "-"}</span>
-        <span className="border-t border-black px-6 pt-0.5 font-semibold">Authorised Signatory</span>
       </div>
     </div>
   );
