@@ -236,6 +236,8 @@ export interface TeacherFormValues {
   dateOfBirth: Date | null;
   employeeId: string;
   designation: string;
+  /** The work the person does (Teacher, Accountant, Driver ...), on the ID card. */
+  jobRole: string;
   status: string;
   email: string;
   phone: string;

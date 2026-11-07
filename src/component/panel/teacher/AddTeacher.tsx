@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  addDoc,
+  collection,
   doc,
   DocumentData,
   getDoc,
@@ -24,9 +26,14 @@ import {
   CLASS_OPTIONS,
   COLLECTION,
   CVES_BUTTON,
+  DEFAULT_TEACHER_JOB_ROLE,
   EMAIL_PATTERN,
   GENDER_OPTIONS,
+  PERSON_TYPE_OPTIONS,
+  STAFF_JOB_ROLES,
+  STAFF_ROLE,
   TEACHER_DESIGNATIONS,
+  TEACHER_JOB_ROLES,
   TEACHER_STATUS,
 } from "../../../constants";
 import Button from "../../../custom-components/Button";
@@ -99,6 +106,7 @@ const EMPTY_TEACHER: TeacherFormValues = {
   dateOfBirth: null,
   employeeId: "",
   designation: "",
+  jobRole: DEFAULT_TEACHER_JOB_ROLE,
   status: "Active",
   email: "",
   phone: "",
@@ -128,6 +136,10 @@ function teacherDocToForm(
     dateOfBirth: toDateOrNull(data.dateOfBirth),
     employeeId: stringField("employeeId"),
     designation: stringField("designation"),
+    // Saved before Job Roles existed: a teacher is a "Teacher".
+    jobRole:
+      stringField("jobRole") ||
+      (stringField("role") === STAFF_ROLE ? "" : DEFAULT_TEACHER_JOB_ROLE),
     status: stringField("status") || "Active",
     email: stringField("email"),
     phone: toMobileDigits(stringField("phone")),
@@ -505,10 +517,23 @@ function firestoreErrorMessage(error: unknown): string {
 
 interface TeacherFormProps {
   initialEditId: string | null;
+  /** Teacher or staff (STAFF_ROLE) for a new record; an edit keeps its own. */
+  personType: string;
   onClose: () => void;
 }
 
-function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
+/** The empty form of a new teacher / staff member. */
+const emptyPerson = (personType: string): TeacherFormValues =>
+  personType === STAFF_ROLE
+    ? { ...EMPTY_TEACHER, role: STAFF_ROLE, jobRole: "" }
+    : EMPTY_TEACHER;
+
+/**
+ * Add / edit a teacher or a staff member. Staff (accountant, driver ...)
+ * have no login, so they are saved straight to `users` with role "staff",
+ * without a password, designation or class / subject assignments.
+ */
+function TeacherForm({ initialEditId, personType, onClose }: TeacherFormProps) {
   const {
     control,
     handleSubmit,
@@ -519,7 +544,7 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
     setError,
     getValues,
   } = useForm<TeacherFormValues>({
-    defaultValues: EMPTY_TEACHER,
+    defaultValues: emptyPerson(personType),
     // Duplicate employee ID / email are checked as soon as a field is left.
     mode: "onTouched",
   });
@@ -558,6 +583,8 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
   const [identities, setIdentities] = useState<UserIdentity[] | null>(null);
   const isFormDirty = isDirty || photoFile !== null || photoRemoved;
   const canBeClassTeacher = watch("designation") !== SUBJECT_TEACHER;
+  const isStaff = watch("role") === STAFF_ROLE;
+  const noun = isStaff ? "Staff" : "Teacher";
   const owners = useMemo(
     () => assignmentOwners(identities ?? [], initialEditId),
     [identities, initialEditId]
@@ -667,7 +694,7 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
 
   const handleReset = () => {
     reset({
-      ...EMPTY_TEACHER,
+      ...emptyPerson(getValues("role")),
       employeeId: identities ? nextEmployeeId(identities) : "",
     });
     setSectionAssignments(createEmptySectionAssignments());
@@ -680,8 +707,12 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
 
   const onSubmit: SubmitHandler<TeacherFormValues> = async (data) => {
     setSubmitError("");
+    const staff = data.role === STAFF_ROLE;
 
-    const sectionPayload = pruneSectionAssignments(toSectionTabs(sectionAssignments));
+    // Staff are not teachers: no class teacher or subjects.
+    const sectionPayload = staff
+      ? []
+      : pruneSectionAssignments(toSectionTabs(sectionAssignments));
     const incompleteSection = sectionPayload.find(
       (item) => item.isClassTeacher && item.classTeacherOf === ""
     );
@@ -693,7 +724,7 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
       return;
     }
     const classTeacherSection = sectionPayload.find((item) => item.isClassTeacher);
-    if (data.designation === SUBJECT_TEACHER && classTeacherSection) {
+    if (!staff && data.designation === SUBJECT_TEACHER && classTeacherSection) {
       setActiveSection(classTeacherSection.section);
       setSubmitError(
         `A Subject Teacher cannot be a class teacher. Turn off "Class Teacher of Section ${classTeacherSection.section}" or change the designation to Class Teacher.`
@@ -747,7 +778,8 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
         gender: data.gender,
         dateOfBirth: toDateInputValue(data.dateOfBirth),
         employeeId: normalizeEmployeeId(data.employeeId),
-        designation: data.designation,
+        designation: staff ? "" : data.designation,
+        jobRole: data.jobRole,
         status: data.status || "Active",
         email: initialEditId ? data.email.trim() : normalizeEmail(data.email),
         phone: toMobileDigits(data.phone),
@@ -759,7 +791,7 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
         assignedClasses: legacyFields.assignedClasses,
         isClassTeacher: legacyFields.isClassTeacher,
         classTeacherOf: legacyFields.classTeacherOf,
-        role: data.role || "teacher",
+        role: staff ? STAFF_ROLE : data.role || "teacher",
       };
 
       if (initialEditId) {
@@ -767,7 +799,16 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
           ...teacherFields,
           updatedAt: serverTimestamp(),
         });
-        toast.success("Teacher updated successfully.");
+        toast.success(`${staff ? "Staff" : "Teacher"} updated successfully.`);
+      } else if (staff) {
+        // No login account for staff: saved straight to users.
+        await addDoc(collection(db, COLLECTION.USERS), {
+          ...teacherFields,
+          isDeleted: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: serverTimestamp(),
+        });
+        toast.success("Staff added successfully.");
       } else {
         const response = await fetch(`${API_BASE_URL}/api/add-teacher`, {
           method: "POST",
@@ -781,13 +822,21 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
             result?.error || "Failed to add teacher. Please try again."
           );
         }
+        // A server deployed before Job Roles existed does not save it.
+        if (typeof result?.id === "string" && result.id) {
+          await updateDoc(doc(db, COLLECTION.USERS, result.id), {
+            jobRole: data.jobRole,
+          }).catch((jobRoleError) =>
+            console.error("Failed to save the job role:", jobRoleError)
+          );
+        }
         toast.success(result?.message || "Teacher added successfully.");
       }
 
       handleReset();
       onClose();
     } catch (error) {
-      console.error("Failed to save teacher:", error);
+      console.error(`Failed to save ${staff ? "staff" : "teacher"}:`, error);
       setSubmitError(firestoreErrorMessage(error));
     }
   };
@@ -805,6 +854,30 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <CustomSelect
+            control={control}
+            name="role"
+            label="Type"
+            required
+            placeholder={null}
+            options={PERSON_TYPE_OPTIONS}
+            // A teacher has a login account and staff do not, so the type is fixed once saved.
+            disabled={Boolean(initialEditId)}
+            onValueChange={(value) =>
+              setValue("jobRole", value === STAFF_ROLE ? "" : DEFAULT_TEACHER_JOB_ROLE, {
+                shouldDirty: true,
+              })
+            }
+          />
+          <CustomSelect
+            control={control}
+            name="jobRole"
+            label="Job Role"
+            required
+            placeholder="Select job role"
+            options={isStaff ? STAFF_JOB_ROLES : TEACHER_JOB_ROLES}
+            rules={{ required: "Job role is required." }}
+          />
           <CustomInput
             control={control}
             name="firstName"
@@ -847,15 +920,20 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
             options={GENDER_OPTIONS}
             rules={{ required: "Gender is required." }}
           />
-          <CustomSelect
-            control={control}
-            name="designation"
-            label="Designation"
-            required
-            placeholder="Select designation"
-            options={TEACHER_DESIGNATIONS}
-            rules={{ required: "Designation is required." }}
-          />
+          {!isStaff && (
+            <CustomSelect
+              control={control}
+              name="designation"
+              label="Designation"
+              required
+              placeholder="Select designation"
+              options={TEACHER_DESIGNATIONS}
+              rules={{
+                validate: (value) =>
+                  getValues("role") === STAFF_ROLE || Boolean(value) || "Designation is required.",
+              }}
+            />
+          )}
           <CustomSelect
             control={control}
             name="status"
@@ -868,8 +946,8 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
             name="email"
             label="Email"
             type="email"
-            required
-            placeholder="Email address"
+            required={!isStaff}
+            placeholder={isStaff ? "Email address (optional)" : "Email address"}
             // The email is the login ID, so it is fixed after the account is created.
             disabled={Boolean(initialEditId)}
             title={
@@ -878,18 +956,23 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
                 : undefined
             }
             rules={{
-              required: "Email is required.",
+              validate: {
+                required: (value) =>
+                  getValues("role") === STAFF_ROLE ||
+                  String(value).trim() !== "" ||
+                  "Email is required.",
+                unique: (value) =>
+                  initialEditId || !identities
+                    ? true
+                    : emailConflict(identities, String(value), null) || true,
+              },
               pattern: {
                 value: EMAIL_PATTERN,
                 message: "Enter a valid email address.",
               },
-              validate: (value) =>
-                initialEditId || !identities
-                  ? true
-                  : emailConflict(identities, String(value), null) || true,
             }}
           />
-          {!initialEditId && (
+          {!initialEditId && !isStaff && (
             <CustomInput
               control={control}
               name="password"
@@ -898,10 +981,13 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
               required
               placeholder="Minimum 6 characters"
               rules={{
-                required: "Password is required.",
-                minLength: {
-                  value: 6,
-                  message: "Password should be at least 6 characters long.",
+                validate: (value) => {
+                  if (getValues("role") === STAFF_ROLE) return true;
+                  if (!value) return "Password is required.";
+                  return (
+                    String(value).length >= 6 ||
+                    "Password should be at least 6 characters long."
+                  );
                 },
               }}
             />
@@ -977,6 +1063,7 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
             label="Qualification"
             placeholder="e.g. B.Ed, M.A."
           />
+          {!isStaff && (
           <div className="flex flex-col gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 sm:col-span-2">
             <div>
               <h3 className="text-sm font-bold text-gray-800">
@@ -1052,9 +1139,10 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
               onReset={() => handleResetSection(activeSection)}
             />
           </div>
+          )}
           <div className="flex flex-col items-center justify-center sm:col-span-2">
             <PhotoUploadBox
-              label={"TEACHER'S\nPHOTO"}
+              label={isStaff ? "STAFF\nPHOTO" : "TEACHER'S\nPHOTO"}
               photoUrl={photoUrl}
               onFileSelected={handlePhotoSelected}
             />
@@ -1074,8 +1162,8 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
             {isSubmitting
               ? "Saving..."
               : initialEditId
-                ? "Update Teacher"
-                : "Add Teacher"}
+                ? `Update ${noun}`
+                : `Add ${noun}`}
           </CustomButton>
           <CustomButton type="button" variant="outline" onClick={handleReset}>
             Reset
@@ -1086,8 +1174,17 @@ function TeacherForm({ initialEditId, onClose }: TeacherFormProps) {
   );
 }
 
+/**
+ * Add Teacher page: the teachers and the staff, each in its own tab, with
+ * add / edit / delete. The tab decides what "+ Add" creates.
+ */
 function AddTeacher() {
-  const { teachers, loading, error } = useTeachers();
+  const teachersList = useTeachers();
+  const staffList = useTeachers(STAFF_ROLE);
+  const [personType, setPersonType] = useState("teacher");
+  const isStaffTab = personType === STAFF_ROLE;
+  const { teachers, loading, error } = isStaffTab ? staffList : teachersList;
+  const noun = isStaffTab ? "Staff" : "Teacher";
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTeacherId, setEditingTeacherId] = useState<string | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -1130,36 +1227,73 @@ function AddTeacher() {
       setIsDeleteModalOpen(false);
       setTeacherToDelete(null);
     } catch (error) {
-      console.error("Failed to delete teacher:", error);
+      console.error("Failed to delete:", error);
       toast.error(firestoreErrorMessage(error));
     } finally {
       setDeleting(false);
     }
   };
 
+  const tabs = [
+    { value: "teacher", label: "Teachers", count: teachersList.teachers.length },
+    { value: STAFF_ROLE, label: "Staff", count: staffList.teachers.length },
+  ];
+
   return (
     <div className="flex flex-col gap-2">
       <PageHeader
         title="Add Teacher"
         titleStyle="text-primaryBlue"
-        description={`${teachers.length} teacher(s) added. Click the Add Teacher button to create a new record.`}
+        description={`${teachersList.teachers.length} teacher(s) and ${staffList.teachers.length} staff added. Pick a tab and click the Add button to create a new record.`}
         descriptionStyle="text-gray-500"
-        button={<Button buttonName="+ Add Teacher" variant="cves" onClick={openAddModal} />}
+        button={<Button buttonName={`+ Add ${noun}`} variant="cves" onClick={openAddModal} />}
       />
+
+      {/* Teachers / Staff */}
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Teachers or staff">
+        {tabs.map((tab) => {
+          const active = tab.value === personType;
+          return (
+            <button
+              key={tab.value}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setPersonType(tab.value)}
+              className={`flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-bold transition ${
+                active
+                  ? "border-transparent bg-cves text-white shadow-sm"
+                  : "border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
+              }`}
+            >
+              {tab.label}
+              <span
+                className={`rounded px-1.5 py-0.5 text-xs font-bold ${
+                  active ? "bg-white/25 text-white" : "bg-gray-100 text-gray-600"
+                }`}
+              >
+                {tab.count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
       {loading ? (
         <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-6 text-center text-sm font-semibold text-blue-700">
-          Loading teachers...
+          Loading {isStaffTab ? "staff" : "teachers"}...
         </div>
       ) : error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-6 text-center text-sm font-semibold text-red-700">
-          Failed to load teachers: {error}
+          Failed to load {isStaffTab ? "staff" : "teachers"}: {error}
         </div>
       ) : teachers.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-dashed border-gray-300 p-10 text-center">
-          <p className="text-gray-500 font-semibold">No teachers added yet.</p>
+          <p className="text-gray-500 font-semibold">
+            No {isStaffTab ? "staff" : "teachers"} added yet.
+          </p>
           <Button
-            buttonName="Add the first teacher"
+            buttonName={`Add the first ${isStaffTab ? "staff member" : "teacher"}`}
             onClick={openAddModal}
             buttonStyle="mt-2"
           />
@@ -1173,10 +1307,11 @@ function AddTeacher() {
                 <th className="px-4 py-3">Photo</th>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Employee ID</th>
-                <th className="px-4 py-3">Designation</th>
+                <th className="px-4 py-3">Job Role</th>
+                {!isStaffTab && <th className="px-4 py-3">Designation</th>}
                 <th className="px-4 py-3">Gender</th>
                 <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3">Phone</th>                
+                <th className="px-4 py-3">Phone</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-center">Actions</th>
               </tr>
@@ -1187,7 +1322,7 @@ function AddTeacher() {
                   key={teacher.id}
                   className={index % 2 ? "bg-gray-50" : "bg-white"}
                 >
-                  <td className="px-4 py-3">{index+1}</td>
+                  <td className="px-4 py-3">{index + 1}</td>
                   <td className="px-4 py-3">
                     {teacher.photo ? (
                       <img
@@ -1197,7 +1332,7 @@ function AddTeacher() {
                       />
                     ) : (
                       <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-sm font-bold text-gray-600">
-                        {(teacher.firstName[0] || "T").toUpperCase()}
+                        {(teacher.firstName[0] || noun[0]).toUpperCase()}
                       </span>
                     )}
                   </td>
@@ -1205,10 +1340,11 @@ function AddTeacher() {
                     {teacher.firstName} {teacher.lastName}
                   </td>
                   <td className="px-4 py-3">{teacher.employeeId || "-"}</td>
-                  <td className="px-4 py-3">{teacher.designation || "-"}</td>
+                  <td className="px-4 py-3">{teacher.jobRole || "-"}</td>
+                  {!isStaffTab && <td className="px-4 py-3">{teacher.designation || "-"}</td>}
                   <td className="px-4 py-3">{teacher.gender || "-"}</td>
-                  <td className="px-4 py-3">{teacher.email}</td>
-                  <td className="px-4 py-3">{teacher.phone || "-"}</td>                                    
+                  <td className="px-4 py-3">{teacher.email || "-"}</td>
+                  <td className="px-4 py-3">{teacher.phone || "-"}</td>
                   <td className="px-4 py-3">
                     <span
                       className={`rounded px-2 py-1 text-xs font-bold ${
@@ -1254,25 +1390,33 @@ function AddTeacher() {
         <Modal
           isOpen
           onClose={closeModal}
-          title={editingTeacherId ? "Edit Teacher" : "Add Teacher"}
-          description="Fill in the teacher details below. Personal information is common and the class teacher / subjects are saved for every section separately. Fields marked with * are required."
+          title={editingTeacherId ? `Edit ${noun}` : `Add ${noun}`}
+          description={
+            isStaffTab
+              ? "Fill in the staff details below. Staff have no login. Fields marked with * are required."
+              : "Fill in the teacher details below. Personal information is common and the class teacher / subjects are saved for every section separately. Fields marked with * are required."
+          }
           cancelText="Cancel"
           hideSubmit
           onSubmit={() => {}}
           modalClassName="max-w-5xl"
         >
-          <TeacherForm initialEditId={editingTeacherId} onClose={closeModal} />
+          <TeacherForm
+            initialEditId={editingTeacherId}
+            personType={personType}
+            onClose={closeModal}
+          />
         </Modal>
       )}
 
       <Modal
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
-        title="Delete Teacher"
+        title={`Delete ${noun}`}
         description={
           teacherToDelete
-            ? `Are you sure you want to delete ${teacherToDelete.firstName} ${teacherToDelete.lastName}? The teacher will be hidden from the list.`
-            : "Are you sure you want to delete this teacher?"
+            ? `Are you sure you want to delete ${teacherToDelete.firstName} ${teacherToDelete.lastName}? The record will be hidden from the list.`
+            : "Are you sure you want to delete this record?"
         }
         cancelText="Cancel"
         submitText="Delete"

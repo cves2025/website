@@ -8,7 +8,12 @@ import {
   where,
 } from "firebase/firestore";
 
-import { COLLECTION } from "../constants";
+import {
+  COLLECTION,
+  DEFAULT_ADMIN_JOB_ROLE,
+  DEFAULT_TEACHER_JOB_ROLE,
+  STAFF_ROLE,
+} from "../constants";
 import { db } from "../firebase/config";
 import type { TeacherRecord } from "../utils/type";
 import { toDateOrNull } from "../utils/toDateOrNull";
@@ -37,13 +42,20 @@ export function teacherRecordFromData(
   const stringField = (key: string) =>
     typeof data[key] === "string" ? data[key] : "";
 
-  const sectionAssignments = sectionAssignmentsFromDoc(data);
+  const role = stringField("role") || "teacher";
+  // Staff have none; they are not teachers.
+  const sectionAssignments = role === STAFF_ROLE ? [] : sectionAssignmentsFromDoc(data);
   const legacyFields = toLegacyTeacherFields(sectionAssignments);
+  // Records saved before Job Roles existed.
+  const jobRole =
+    stringField("jobRole") ||
+    (role === "admin" ? DEFAULT_ADMIN_JOB_ROLE : role === STAFF_ROLE ? "" : DEFAULT_TEACHER_JOB_ROLE);
 
   return {
     id,
     uid: id,
-    role: stringField("role") || "teacher",
+    role,
+    jobRole,
     firstName: stringField("firstName"),
     lastName: stringField("lastName"),
     gender: stringField("gender"),
@@ -67,7 +79,11 @@ export function teacherRecordFromData(
   };
 }
 
-export function useTeachers(): UseTeachersResult {
+/**
+ * Live list of the users with `role` (teachers by default; also used for
+ * the staff), newest first, deleted ones left out.
+ */
+export function useTeachers(role: string = "teacher"): UseTeachersResult {
   const [teachers, setTeachers] = useState<TeacherRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -75,7 +91,7 @@ export function useTeachers(): UseTeachersResult {
   useEffect(() => {
     const teachersQuery = query(
       collection(db, COLLECTION.USERS),
-      where("role", "==", "teacher")
+      where("role", "==", role)
     );
 
     const unsubscribe = onSnapshot(
@@ -97,7 +113,7 @@ export function useTeachers(): UseTeachersResult {
     );
 
     return unsubscribe;
-  }, []);
+  }, [role]);
 
   return { teachers, loading, error };
 }

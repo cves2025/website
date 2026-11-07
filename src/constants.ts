@@ -139,6 +139,63 @@ export const TEACHER_DESIGNATIONS: string[] = [
 
 export const TEACHER_STATUS: string[] = ["Active", "Inactive"];
 
+/**
+ * `users.role` of a staff member (accountant, driver ...). Staff have no
+ * login account; they are kept for the ID cards and are left out of every
+ * teacher feature (attendance, class teacher, subjects, permissions).
+ */
+export const STAFF_ROLE = "staff";
+
+/** Who a record on the Add Teacher page is. */
+export const PERSON_TYPE_OPTIONS = [
+  { value: "teacher", label: "Teacher" },
+  { value: STAFF_ROLE, label: "Staff" },
+];
+
+/**
+ * Job Role: the work a person does, shown on the ID card. Separate from a
+ * teacher's Designation (Subject / Class Teacher), which drives the class
+ * teacher rules.
+ */
+export const TEACHER_JOB_ROLES: string[] = [
+  "Teacher",
+  "Principal",
+  "Vice Principal",
+  "Coordinator",
+  "Sports Teacher",
+  "Music Teacher",
+  "Computer Teacher",
+];
+
+export const STAFF_JOB_ROLES: string[] = [
+  "Accountant",
+  "Clerk",
+  "Receptionist",
+  "Librarian",
+  "Lab Assistant",
+  "Peon",
+  "Driver",
+  "Conductor",
+  "Security Guard",
+  "Cleaner",
+  "Gardener",
+  "Other",
+];
+
+/** An admin picks theirs on My Profile. */
+export const ADMIN_JOB_ROLES: string[] = [
+  "Admin",
+  "Director",
+  "Manager",
+  "Principal",
+  "Chairman",
+  "Secretary",
+];
+
+/** Job Role of a teacher saved before Job Roles existed. */
+export const DEFAULT_TEACHER_JOB_ROLE = "Teacher";
+export const DEFAULT_ADMIN_JOB_ROLE = "Admin";
+
 export const GENDER_OPTIONS: string[] = ["Male", "Female", "Other"];
 
 /**

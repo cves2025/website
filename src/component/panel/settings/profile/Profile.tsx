@@ -1,8 +1,11 @@
 import { useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
+import { useForm } from "react-hook-form";
+import toast from "react-hot-toast";
 
-import { COLLECTION } from "../../../../constants";
+import { ADMIN_JOB_ROLES, COLLECTION } from "../../../../constants";
+import CustomSelect from "../../../../custom-components/CustomSelect";
 import { db } from "../../../../firebase/config";
 import PageHeader from "../../../../custom-components/PageHeader";
 import { teacherRecordFromData } from "../../../../hooks/useTeachers";
@@ -56,6 +59,50 @@ function InfoItem({
       <dd className="mt-0.5 break-words text-sm font-medium text-gray-800">
         {value.trim() || "-"}
       </dd>
+    </div>
+  );
+}
+
+/**
+ * An admin picks their own Job Role (shown on their ID card); saved at once.
+ * Teachers' and staff Job Roles are set by the admin on Add Teacher.
+ */
+function AdminJobRole({ uid, jobRole }: { uid: string; jobRole: string }) {
+  const { control, reset } = useForm<{ jobRole: string }>({ defaultValues: { jobRole } });
+  const [saving, setSaving] = useState(false);
+  // Follows the live document (e.g. after a save).
+  useEffect(() => reset({ jobRole }), [jobRole, reset]);
+
+  const save = async (value: string) => {
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, COLLECTION.USERS, uid), {
+        jobRole: value,
+        updatedAt: serverTimestamp(),
+      });
+      toast.success("Job role saved.");
+    } catch (saveError) {
+      console.error("Failed to save the job role:", saveError);
+      toast.error("Job role could not be saved. Please try again.");
+      reset({ jobRole });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="min-w-0">
+      <CustomSelect
+        control={control}
+        name="jobRole"
+        label="Job Role"
+        placeholder="Select job role"
+        // A role saved earlier that is no longer in the list stays selectable.
+        options={ADMIN_JOB_ROLES.includes(jobRole) || !jobRole ? ADMIN_JOB_ROLES : [jobRole, ...ADMIN_JOB_ROLES]}
+        disabled={saving}
+        onValueChange={(value) => void save(value)}
+        className="py-1.5"
+      />
     </div>
   );
 }
@@ -218,7 +265,7 @@ function Profile() {
                 {fullName}
               </p>
               <p className="text-sm text-gray-500">
-                {[teacher.designation, capitalize(teacher.role)]
+                {[teacher.jobRole, teacher.designation, capitalize(teacher.role)]
                   .filter((part) => part && part !== "-")
                   .join(" · ")}
               </p>
@@ -259,6 +306,11 @@ function Profile() {
 
             <InfoCard title="Job Details">
               <InfoItem label="Employee ID" value={teacher.employeeId} />
+              {teacher.role === "admin" ? (
+                <AdminJobRole uid={uid} jobRole={teacher.jobRole} />
+              ) : (
+                <InfoItem label="Job Role" value={teacher.jobRole} />
+              )}
               <InfoItem label="Designation" value={teacher.designation} />
               <InfoItem
                 label="Joining Date"
