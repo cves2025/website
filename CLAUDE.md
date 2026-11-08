@@ -15,6 +15,7 @@ part of a file you change (use line ranges / grep), not the whole feature.
 | Collect Fee page (search, fee account, payment) | [docs/features/collect-fee.md](docs/features/collect-fee.md) |
 | Dashboard (attendance + fee cards, aggregation queries) | [docs/features/dashboard.md](docs/features/dashboard.md) |
 | Add Teacher: teachers, staff, Job Role | [docs/features/teacher-staff.md](docs/features/teacher-staff.md) |
+| Add / edit student (admission form, Enrollment No. suggestion) | [docs/features/add-student.md](docs/features/add-student.md) |
 | Fee module business rules (heads, dues, carry forward) | [docs/FEE_MANAGEMENT.md](docs/FEE_MANAGEMENT.md) |
 
 **Keep the maps true:** a commit that changes a mapped feature (new file, moved logic, new
