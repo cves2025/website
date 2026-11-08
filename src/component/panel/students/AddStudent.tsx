@@ -11,6 +11,7 @@ import {
   AUTO_NEXT_STUDENT_AFTER_UPDATE,
   CLASSES,
   COLLECTION,
+  ENROLLMENT_JUMP_WARNING,
 } from "../../../constants";
 import {
   collection,
@@ -354,6 +355,11 @@ function AddStudent() {
   const [loadingNextStudent, setLoadingNextStudent] = useState(false);
   // Bumped after a new student is saved, so the next number is suggested.
   const [enrollmentRefresh, setEnrollmentRefresh] = useState(0);
+  // Highest Enrollment No. in use, and a typed number far after it waiting
+  // for "Is this right?" (a typo like 5000 for 1156).
+  const [highestEnrollment, setHighestEnrollment] = useState(0);
+  const [farEnrollment, setFarEnrollment] = useState<string | null>(null);
+  const farEnrollmentConfirmed = useRef("");
 
   /* Copy-paste photo routing: which photo box receives an image pasted from
      the clipboard. A focused photo box wins, otherwise the last-focused box is
@@ -523,14 +529,15 @@ function AddStudent() {
   }, [editEnrollmentId, reset, setSearchParams]);
 
   // Add mode: suggest the next Enrollment No. (still editable). Never
-  // overwrites a number the admin has already typed.
+  // overwrites a number the admin has already typed. The highest number in
+  // use is kept (edit mode too) for the "far ahead" check on save.
   useEffect(() => {
-    if (editEnrollmentId) return;
-
     let cancelled = false;
     fetchNextEnrollment()
       .then((suggestion) => {
-        if (cancelled || getValues("enrollment").trim()) return;
+        if (cancelled) return;
+        setHighestEnrollment(suggestion.highest);
+        if (editEnrollmentId || getValues("enrollment").trim()) return;
         setValue("enrollment", suggestion.next);
       })
       .catch((error) => {
@@ -651,6 +658,18 @@ function AddStudent() {
         setTimeout(() => {
           void trigger(page1RequiredFields).then(() => scrollToInfoField());
         }, 0);
+        return;
+      }
+
+      // Far after the last number: probably a typo; ask once for this number.
+      const typed = data.enrollment.trim();
+      if (
+        /^\d+$/.test(typed) &&
+        highestEnrollment > 0 &&
+        Number(typed) > highestEnrollment + ENROLLMENT_JUMP_WARNING &&
+        farEnrollmentConfirmed.current !== typed
+      ) {
+        setFarEnrollment(typed);
         return;
       }
 
@@ -1040,6 +1059,24 @@ function AddStudent() {
           </div>
         </form>
       )}
+
+      <Modal
+        isOpen={farEnrollment !== null}
+        onClose={() => {
+          setFarEnrollment(null);
+          setActiveTab("info");
+          scrollToInfoField("#enrollment");
+        }}
+        title="Is this Enrollment No. right?"
+        description={`Enrollment No. ${farEnrollment ?? ""} is far after the last one in use (${highestEnrollment}). The next would be ${highestEnrollment + 1}. Save with ${farEnrollment ?? ""} anyway?`}
+        cancelText="Change it"
+        submitText={`Save with ${farEnrollment ?? ""}`}
+        onSubmit={() => {
+          farEnrollmentConfirmed.current = farEnrollment ?? "";
+          setFarEnrollment(null);
+          void handleSubmit(onSubmit)();
+        }}
+      />
 
       {editingStudentId && (
         <Modal

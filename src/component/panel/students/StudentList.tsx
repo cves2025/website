@@ -22,7 +22,7 @@ import {
 } from "firebase/firestore";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
-import { Eye, Pencil, Trash2 } from "lucide-react";
+import { Eye, Pencil, RotateCcw, Trash2 } from "lucide-react";
 
 import {
   ADD_STUDENT_PATH,
@@ -49,6 +49,7 @@ import {
   scopedClasses,
   scopedSections,
 } from "../../../permissions";
+import { removeWrongEntry } from "../../../utils/studentRemoval";
 import Modal from "../../../custom-components/Modal";
 import { Button as UIButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -137,7 +138,8 @@ async function fetchEnrollments(
   const snapshot = await getDocs(
     query(collection(db, COLLECTION.ENROLLMENTS), ...constraints),
   );
-  return snapshot.docs.map(toStudentRow).filter((row) => !row.isDeleted);
+  // Removed students are kept too: the recycle bin view shows them.
+  return snapshot.docs.map(toStudentRow);
 }
 
 function matchesSearch(student: StudentListRow, searchValue: string): boolean {
@@ -238,6 +240,10 @@ export default function StudentList() {
   );
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  // Recycle bin view: removed students, with Restore / Wrong entry.
+  const [showBin, setShowBin] = useState(false);
+  // Which delete button is working ("left" or "wrong").
+  const [deleteReason, setDeleteReason] = useState<"left" | "wrong" | null>(null);
   const [studentToDelete, setStudentToDelete] = useState<StudentListRow | null>(
     null,
   );
@@ -364,12 +370,13 @@ export default function StudentList() {
   /* Back to the first page whenever the list content changes. */
   useEffect(() => {
     setPage(1);
-  }, [search, selectedClass, selectedSection, selectedYear]);
+  }, [search, selectedClass, selectedSection, selectedYear, showBin]);
 
   const students = useMemo(() => {
     const searchValue = search.trim().toLowerCase();
 
-    let result = rows;
+    // The list or the recycle bin.
+    let result = rows.filter((row) => (showBin ? row.isDeleted : !row.isDeleted));
 
     if (selectedSection) {
       result = result.filter((row) => row.section === selectedSection);
@@ -406,6 +413,7 @@ export default function StudentList() {
     return newest ? [newest, ...rest] : rest;
   }, [
     rows,
+    showBin,
     search,
     selectedClass,
     selectedSection,
@@ -413,6 +421,9 @@ export default function StudentList() {
     sortDirection,
     sortActive,
   ]);
+
+  /** Removed students in the loaded classes (the recycle bin button's count). */
+  const binCount = rows.filter((row) => row.isDeleted).length;
 
   /*
    * -----------------------------------------------------------
@@ -453,41 +464,73 @@ export default function StudentList() {
     setPage(currentPage - 1);
   };
 
-  /* Removes a deleted student from every cached result. */
-  const removeFromCache = (id: string) => {
-    cacheRef.current.forEach((list, key) => {
-      cacheRef.current.set(
-        key,
-        list.filter((row) => row.id !== id),
-      );
-    });
+  /** Changes a row everywhere (cache + list); null removes it. No re-read. */
+  const updateRow = (id: string, patch: Partial<StudentListRow> | null) => {
+    const apply = (list: StudentListRow[]) =>
+      patch === null
+        ? list.filter((row) => row.id !== id)
+        : list.map((row) => (row.id === id ? { ...row, ...patch } : row));
+    cacheRef.current.forEach((list, key) => cacheRef.current.set(key, apply(list)));
+    setRows(apply);
+  };
+
+  /** Recycle bin: brings a student back to the list. */
+  const handleRestore = async (student: StudentListRow) => {
+    if (!canManage) return;
+    setDeletingId(student.id);
+    try {
+      await updateDoc(doc(db, COLLECTION.ENROLLMENTS, student.id), {
+        isDeleted: false,
+        updatedAt: serverTimestamp(),
+      });
+      try {
+        await generateClassRollNumbers(student.className, student.academicYear);
+      } catch (rollNumberError) {
+        console.error("Failed to refresh roll numbers:", rollNumberError);
+      }
+      updateRow(student.id, { isDeleted: false });
+      toast.success(`${student.studentName} is back in the list.`);
+    } catch (error) {
+      console.error("Restore enrollment error:", error);
+      toast.error("The student could not be restored. Please try again.");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   /*
    * -----------------------------------------------------------
-   * Delete enrollment (soft delete)
+   * Delete: the admin says why
    * -----------------------------------------------------------
    *
-   * IMPORTANT:
-   * We do NOT delete the permanent student document or the
-   * enrollment document. We only mark the enrollment as
-   * `isDeleted: true` so it is hidden from the list. The row is
-   * removed from the local list, so no re-read is needed.
+   * - "left": the student left / the admission was cancelled. The
+   *   enrollment goes to the recycle bin (`isDeleted: true`) and the
+   *   student keeps the Enrollment No., as in the admission register.
+   * - "wrong": a wrong entry (typo number, added twice). Removed for
+   *   good (studentRemoval.ts), so the number is free again and the next
+   *   Add Student suggestion follows the last real number. Not allowed
+   *   for a real admission (fee receipts, another session).
+   * The row is removed from the local list, so no re-read is needed.
    */
 
-  const handleDelete = async () => {
+  const handleDelete = async (reason: "left" | "wrong") => {
     if (!studentToDelete || !canManage) {
       return;
     }
 
     const removedStudent = studentToDelete;
     setDeletingId(removedStudent.id);
+    setDeleteReason(reason);
 
     try {
-      await updateDoc(doc(db, COLLECTION.ENROLLMENTS, removedStudent.id), {
-        isDeleted: true,
-        updatedAt: serverTimestamp(),
-      });
+      if (reason === "wrong") {
+        await removeWrongEntry(removedStudent.studentId, removedStudent.id);
+      } else {
+        await updateDoc(doc(db, COLLECTION.ENROLLMENTS, removedStudent.id), {
+          isDeleted: true,
+          updatedAt: serverTimestamp(),
+        });
+      }
 
       // Roll numbers are stored per class, so refresh the class this
       // student belonged to.
@@ -503,12 +546,14 @@ export default function StudentList() {
         );
       }
 
-      toast.success("Student enrollment removed.");
-
-      removeFromCache(removedStudent.id);
-      setRows((current) =>
-        current.filter((row) => row.id !== removedStudent.id),
+      toast.success(
+        reason === "wrong"
+          ? `Wrong entry removed. Enrollment No. ${removedStudent.enrollment} is free again.`
+          : `${removedStudent.studentName} moved to the recycle bin. Enrollment No. ${removedStudent.enrollment} stays with them.`,
       );
+
+      // Left: into the recycle bin. Wrong entry: gone.
+      updateRow(removedStudent.id, reason === "wrong" ? null : { isDeleted: true });
       setIsDeleteModalOpen(false);
       setStudentToDelete(null);
     } catch (error) {
@@ -519,6 +564,7 @@ export default function StudentList() {
       );
     } finally {
       setDeletingId(null);
+      setDeleteReason(null);
     }
   };
 
@@ -661,16 +707,45 @@ export default function StudentList() {
         descriptionStyle="text-gray-500"
         button={
           canManage ? (
-            <Button
-              buttonName="+ Add Student"
-              variant="cves"
-              size="md"
-              buttonStyle="rounded-full"
-              onClick={() => navigate(ADD_STUDENT_PATH)}
-            />
+            <div className="flex items-center gap-2">
+              {/* Recycle bin: removed students, with Restore / Wrong entry. */}
+              <button
+                type="button"
+                aria-pressed={showBin}
+                title={showBin ? "Back to the list" : `Recycle bin (${binCount})`}
+                aria-label={showBin ? "Back to the list" : `Recycle bin, ${binCount} removed`}
+                onClick={() => setShowBin((open) => !open)}
+                className={`relative grid h-10 w-10 place-items-center rounded-full border transition ${
+                  showBin
+                    ? "border-transparent bg-cves text-white shadow-sm"
+                    : "border-gray-300 bg-white text-gray-700 hover:border-transparent hover:bg-cves hover:text-white"
+                }`}
+              >
+                <Trash2 className="h-5 w-5" />
+                {binCount > 0 && !showBin && (
+                  <span className="absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+                    {binCount}
+                  </span>
+                )}
+              </button>
+              <Button
+                buttonName="+ Add Student"
+                variant="cves"
+                size="md"
+                buttonStyle="rounded-full"
+                onClick={() => navigate(ADD_STUDENT_PATH)}
+              />
+            </div>
           ) : undefined
         }
       />
+
+      {canManage && showBin && (
+        <p className="rounded-lg border border-pink-200 bg-pink-50 px-4 py-2 text-sm text-gray-700">
+          <b>Recycle bin:</b> removed students of the chosen year and class. Restore brings one back; Wrong entry
+          removes it for good and frees its Enrollment No.
+        </p>
+      )}
 
       {/* Filters */}
 
@@ -859,7 +934,39 @@ export default function StudentList() {
                           </UIButton>
                         )}
 
-                        {canManage && (
+                        {canManage && showBin && (
+                          <UIButton
+                            type="button"
+                            size="icon"
+                            title="Restore"
+                            aria-label={`Restore ${student.studentName}`}
+                            disabled={deletingId === student.id}
+                            onClick={() => void handleRestore(student)}
+                            className="h-8 w-8 bg-emerald-600 text-white hover:bg-emerald-700"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </UIButton>
+                        )}
+
+                        {canManage && showBin && (
+                          <UIButton
+                            type="button"
+                            size="icon"
+                            variant="destructive"
+                            title="Wrong entry: remove for good"
+                            aria-label={`Remove ${student.studentName} for good`}
+                            disabled={deletingId === student.id}
+                            onClick={() => {
+                              setStudentToDelete(student);
+                              setIsDeleteModalOpen(true);
+                            }}
+                            className="h-8 w-8 bg-red-600 text-white hover:bg-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </UIButton>
+                        )}
+
+                        {canManage && !showBin && (
                           <>
                             <UIButton
                               type="button"
@@ -946,21 +1053,46 @@ export default function StudentList() {
           </button>
         </div>
       </div>
+      {/* Why is the student removed? It decides what happens to the Enrollment No. */}
       <Modal
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
-        title="Delete Student"
-        description={
+        title={
           studentToDelete
-            ? `Are you sure you want to delete ${studentToDelete.studentName}?`
-            : "Are you sure you want to delete this student?"
+            ? `Remove ${studentToDelete.studentName} (Enrollment No. ${studentToDelete.enrollment})`
+            : "Remove student"
         }
+        description="Why is this student removed? It decides what happens to the Enrollment No."
         cancelText="Cancel"
-        submitText="Delete"
+        secondaryText="Wrong entry"
+        onSecondarySubmit={() => void handleDelete("wrong")}
+        secondaryLoading={deleteReason === "wrong"}
+        secondaryClassName="border-red-300 text-red-700 hover:bg-red-50"
+        submitText="Student left"
+        hideSubmit={showBin}
         submitClassName="bg-cves shadow-sm transition hover:shadow-md hover:brightness-110"
-        loading={deletingId !== null}
-        onSubmit={handleDelete}
-      />
+        loading={deleteReason === "left"}
+        submitDisabled={deletingId !== null}
+        onSubmit={() => void handleDelete("left")}
+        modalClassName="max-w-lg"
+      >
+        <div className="mt-4 flex flex-col gap-2 text-sm">
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <p className="font-semibold text-gray-800">Student left</p>
+            <p className="text-gray-600">
+              A real admission: the student left or did not join. The record goes to the recycle bin and keeps
+              this Enrollment No., so it is never given to anyone else (as in the admission register).
+            </p>
+          </div>
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+            <p className="font-semibold text-red-800">Wrong entry</p>
+            <p className="text-red-700">
+              Added by mistake (wrong number, added twice). It is removed for good and the Enrollment No. is
+              free again, so the next student gets the number after the last real one.
+            </p>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

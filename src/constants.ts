@@ -53,6 +53,12 @@ export const COLLECTION = {
   FEE_COUNTERS: "feeCounters",
 };
 
+/**
+ * Add Student asks "Is this right?" when the Enrollment No. is more than this
+ * many numbers after the highest in use (catches a typo like 5000 for 1156).
+ */
+export const ENROLLMENT_JUMP_WARNING = 10;
+
 export const PRE_DEFINED_DOC_ID = {
   SUGGESTED_REMARKS: "suggestedRemarks",
   /** School-wide teacher permission defaults (Permissions page). */
