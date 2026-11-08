@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import PageHeader from "../../../../custom-components/PageHeader";
+
 import IndividualTeacherTab from "./IndividualTeacherTab";
 import TeacherDefaultsTab from "./TeacherDefaultsTab";
 
@@ -22,33 +23,35 @@ function Permissions() {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* The app's page header; the two tabs sit on its right. */}
       <PageHeader
         title="Permissions"
         titleStyle="text-primaryBlue"
         description="Choose what teachers can use. A teacher's own settings win over the All Teachers settings."
         descriptionStyle="text-gray-500"
+        button={
+          <div className="flex gap-1 rounded-xl bg-[#e7eaf2] p-1" role="tablist" aria-label="Whose permissions">
+            {TABS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="tab"
+                aria-selected={tab === option.value}
+                onClick={() => setTab(option.value)}
+                className={`min-h-10 rounded-[9px] px-4 text-sm font-semibold transition-colors ${
+                  tab === option.value
+                    ? "bg-white text-[#1d4fd8] shadow-sm"
+                    : "text-[#3b465c] hover:bg-white/60"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        }
       />
 
-      <div className="inline-flex self-start rounded-lg border border-gray-200 bg-white p-1">
-        {TABS.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => setTab(option.value)}
-            className={`rounded-md px-4 py-2 text-sm font-bold transition-colors ${
-              tab === option.value
-                ? "bg-blue-600 text-white"
-                : "text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        {tab === "all" ? <TeacherDefaultsTab /> : <IndividualTeacherTab />}
-      </div>
+      {tab === "all" ? <TeacherDefaultsTab /> : <IndividualTeacherTab />}
     </div>
   );
 }

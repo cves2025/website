@@ -11,7 +11,7 @@ import {
 } from "../../../../permissions";
 import { saveTeacherRoleDefaults } from "../../../../utils/permissionSettingsService";
 import { myContext } from "../../../context/MyContextProvider";
-import PermissionSwitchList from "./PermissionSwitchList";
+import PermissionMatrix, { Chip, PermissionFooter } from "./PermissionMatrix";
 import { useTeacherRoleDefaults } from "./useTeacherRoleDefaults";
 import Loader from "../../../../custom-components/Loader";
 import { CVES_ON_HOVER } from "../../../../constants";
@@ -30,9 +30,10 @@ const toggled = (list: Permission[], permission: Permission, on: boolean) =>
     : list.filter((p) => p !== permission);
 
 /**
- * "All Teachers" tab: what every teacher gets, and what class teachers get on
- * top. Changes stay a draft until "Save" and apply to every teacher at once
- * (a teacher's own changes on the other tab still win).
+ * "All Teachers" tab: one table with what every teacher gets and what class
+ * teachers get on top (a permission already ON for all teachers shows
+ * "Included" there). Changes stay a draft until "Save" and apply to every
+ * teacher at once (a teacher's own changes on the other tab still win).
  */
 function TeacherDefaultsTab() {
   const { user } = useContext(myContext);
@@ -84,54 +85,42 @@ function TeacherDefaultsTab() {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-base font-bold text-gray-800">All teachers</h2>
-          <p className="text-sm text-gray-500">
-            What every teacher can use. Teachers only see the classes and
-            sections assigned to them.
-          </p>
-        </div>
-        <PermissionSwitchList
-          isOn={(p) => current.teacher.includes(p)}
-          onToggle={(p, on) =>
-            update({ teacher: toggled(current.teacher, p, on) })
-          }
-          disabled={saving}
-        />
-      </section>
+    <div className="flex flex-col gap-4">
+      <PermissionMatrix
+        disabled={saving}
+        columns={[
+          {
+            key: "all",
+            title: "All teachers",
+            subtitle: "Every teacher",
+            countOn: true,
+            isOn: (p) => current.teacher.includes(p),
+            onToggle: (p, on) => update({ teacher: toggled(current.teacher, p, on) }),
+          },
+          {
+            key: "class",
+            title: "Class teachers",
+            subtitle: "Extra, on top of All teachers",
+            countOn: true,
+            isOn: (p) => current.teacher.includes(p) || current.classTeacher.includes(p),
+            onToggle: (p, on) => update({ classTeacher: toggled(current.classTeacher, p, on) }),
+            // Already ON for every teacher: nothing extra to switch.
+            replace: (p) => (current.teacher.includes(p) ? <Chip>Included</Chip> : null),
+          },
+        ]}
+      />
 
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-base font-bold text-gray-800">
-            Class teachers get extra
-          </h2>
-          <p className="text-sm text-gray-500">
-            Given on top of the list above, only to teachers who are the class
-            teacher of a section.
-          </p>
-        </div>
-        <PermissionSwitchList
-          isOn={(p) =>
-            current.teacher.includes(p) || current.classTeacher.includes(p)
-          }
-          onToggle={(p, on) =>
-            update({ classTeacher: toggled(current.classTeacher, p, on) })
-          }
-          lockedReason={(p) =>
-            current.teacher.includes(p) ? "Already ON for all teachers." : null
-          }
-          disabled={saving}
-        />
-      </section>
-
-      <div className="sticky bottom-0 flex flex-wrap items-center justify-end gap-2 border-t border-gray-200 bg-white py-3">
-        {!defaults && !dirty && (
-          <span className="mr-auto text-xs text-gray-500">
-            Using the built-in defaults.
-          </span>
-        )}
+      <PermissionFooter
+        note={
+          dirty ? (
+            <Chip className="bg-amber-100 text-amber-800">Unsaved changes</Chip>
+          ) : !defaults ? (
+            "Using the built-in defaults."
+          ) : (
+            "Teachers only see the classes and sections assigned to them."
+          )
+        }
+      >
         <Button
           buttonName="Restore built-in defaults"
           variant="outline"
@@ -142,7 +131,7 @@ function TeacherDefaultsTab() {
         />
         <Button
           buttonName="Discard"
-          variant="ghost"
+          variant="outline"
           size="sm"
           disabled={!dirty || saving}
           onClick={() => setDraft(null)}
@@ -154,7 +143,7 @@ function TeacherDefaultsTab() {
           disabled={!dirty || saving}
           onClick={handleSave}
         />
-      </div>
+      </PermissionFooter>
     </div>
   );
 }

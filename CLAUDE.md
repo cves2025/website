@@ -17,11 +17,18 @@ part of a file you change (use line ranges / grep), not the whole feature.
 | Add Teacher: teachers, staff, Job Role | [docs/features/teacher-staff.md](docs/features/teacher-staff.md) |
 | Add / edit student (admission form, Enrollment No. rules) | [docs/features/add-student.md](docs/features/add-student.md) |
 | Student List (filters, teacher scope, delete: left / wrong entry, recycle bin) | [docs/features/student-list.md](docs/features/student-list.md) |
+| Permissions (all teachers / class teachers / one teacher) | [docs/features/permissions.md](docs/features/permissions.md) |
 | Fee module business rules (heads, dues, carry forward) | [docs/FEE_MANAGEMENT.md](docs/FEE_MANAGEMENT.md) |
 
 **Keep the maps true:** a commit that changes a mapped feature (new file, moved logic, new
 Firestore field) updates its map in the same commit. A feature with no map gets one when it is
 next worked on.
+
+## Design: colours and components
+
+Read [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) before styling: which colour for which part
+(cves gradient for main actions, **navy instead of blue**), the one Loader, and the custom
+components to use. Never invent a new colour or component when one there fits.
 
 ## Conventions
 

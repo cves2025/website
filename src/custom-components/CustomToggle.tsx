@@ -12,6 +12,9 @@ interface CustomToggleProps<T extends FieldValues = FieldValues> {
   wrapperClassName?: string;
   /** Called with the next value (activeValue/inactiveValue). */
   onChange?: (value: string) => void;
+  disabled?: boolean;
+  /** Name for screen readers when there is no visible label. */
+  ariaLabel?: string;
 }
 
 /**
@@ -31,10 +34,13 @@ function CustomToggle<T extends FieldValues = FieldValues>({
   inactiveLabel = "Archived",
   wrapperClassName = "",
   onChange,
+  disabled = false,
+  ariaLabel,
 }: CustomToggleProps<T>) {
   const { field } = useController<T, FieldPath<T>>({ control, name });
 
   const isActive = String(field.value) === activeValue;
+  const stateLabel = isActive ? activeLabel : inactiveLabel;
 
   return (
     <div className={`flex w-full flex-col gap-1.5 ${wrapperClassName}`}>
@@ -52,17 +58,22 @@ function CustomToggle<T extends FieldValues = FieldValues>({
         <Switch
           id={name}
           checked={isActive}
+          disabled={disabled}
+          aria-label={ariaLabel}
           onCheckedChange={(checked) =>
             onChange?.(checked ? activeValue : inactiveValue)
           }
         />
-        <span
-          className={`text-sm font-semibold ${
-            isActive ? "text-green-700" : "text-gray-600"
-          }`}
-        >
-          {isActive ? activeLabel : inactiveLabel}
-        </span>
+        {/* Empty labels (e.g. in a table) draw nothing, so the switch stays centred. */}
+        {stateLabel && (
+          <span
+            className={`text-sm font-semibold ${
+              isActive ? "text-green-700" : "text-gray-600"
+            }`}
+          >
+            {stateLabel}
+          </span>
+        )}
       </div>
     </div>
   );

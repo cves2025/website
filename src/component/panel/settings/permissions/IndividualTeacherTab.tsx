@@ -15,11 +15,13 @@ import {
   type Permission,
 } from "../../../../permissions";
 import { saveTeacherOverrides } from "../../../../utils/permissionSettingsService";
-import PermissionSwitchList, {
+import PermissionMatrix, {
+  Chip,
+  PermissionFooter,
   TAG_CLASS_TEACHER,
   TAG_CUSTOM,
   TAG_DEFAULT,
-} from "./PermissionSwitchList";
+} from "./PermissionMatrix";
 import { useTeacherRoleDefaults } from "./useTeacherRoleDefaults";
 import Loader from "../../../../custom-components/Loader";
 
@@ -153,8 +155,9 @@ function IndividualTeacherTab() {
   const customCount = current.grant.length + current.revoke.length;
 
   return (
-    <div className="space-y-4">
-      <div className="max-w-xl">
+    <div className="flex flex-col gap-4">
+      <div className="rounded-2xl border border-[#e3e7f0] bg-white p-4">
+        <div className="max-w-xl">
         <Label htmlFor="permission-teacher" className="mb-1 block font-bold">
           Teacher
         </Label>
@@ -168,10 +171,19 @@ function IndividualTeacherTab() {
           searchPlaceholder="Search by name, employee id or email"
           disabled={teachersLoading || teachers.length === 0}
         />
+        </div>
+        {profile && !loadError && (
+          <p className="mt-2 text-sm text-[#566178]">
+            {profile.isClassTeacher
+              ? "This teacher is a class teacher, so the class-teacher extras are part of their defaults."
+              : "This teacher is not a class teacher."}{" "}
+            Rows marked <b>Custom</b> differ from the All Teachers settings.
+          </p>
+        )}
       </div>
 
       {!teacherUid ? (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-6 text-center text-sm font-semibold text-blue-700">
+        <div className="rounded-2xl border border-dashed border-[#c9cdd8] bg-white px-4 py-8 text-center text-sm font-semibold text-[#566178]">
           Select a teacher to change their permissions.
         </div>
       ) : loadError ? (
@@ -185,26 +197,47 @@ function IndividualTeacherTab() {
         <Loader fullScreen={false} size="sm" label="Loading permissions..." />
       ) : (
         <>
-          <p className="text-sm text-gray-500">
-            {profile.isClassTeacher
-              ? "This teacher is a class teacher, so the class-teacher extras are included in the defaults."
-              : "This teacher is not a class teacher."}{" "}
-            Switches marked <b>Custom</b> differ from the All Teachers settings.
-          </p>
-
-          <PermissionSwitchList
-            isOn={isOn}
-            onToggle={handleToggle}
-            tagFor={tagFor}
+          <PermissionMatrix
             disabled={saving}
+            tagFor={tagFor}
+            columns={[
+              {
+                key: "default",
+                title: "Default",
+                subtitle: "From All Teachers",
+                countOn: true,
+                isOn: isDefaultOn,
+                onToggle: () => undefined,
+                // Read only: what this teacher would have without changes.
+                replace: (p) =>
+                  isDefaultOn(p) ? (
+                    <Chip className="bg-emerald-50 text-emerald-700">On</Chip>
+                  ) : (
+                    <Chip>Off</Chip>
+                  ),
+              },
+              {
+                key: "teacher",
+                title: "This teacher",
+                subtitle: "Switch to change",
+                countOn: true,
+                isOn,
+                onToggle: handleToggle,
+              },
+            ]}
           />
 
-          <div className="sticky bottom-0 flex flex-wrap items-center justify-end gap-2 border-t border-gray-200 bg-white py-3">
-            <span className="mr-auto text-xs text-gray-500">
-              {customCount === 0
-                ? "Same as the All Teachers settings."
-                : `${customCount} custom permission(s).`}
-            </span>
+          <PermissionFooter
+            note={
+              dirty ? (
+                <Chip className="bg-amber-100 text-amber-800">Unsaved changes</Chip>
+              ) : customCount === 0 ? (
+                "Same as the All Teachers settings."
+              ) : (
+                `${customCount} custom permission(s).`
+              )
+            }
+          >
             <Button
               buttonName="Reset to default"
               variant="outline"
@@ -215,7 +248,7 @@ function IndividualTeacherTab() {
             />
             <Button
               buttonName="Discard"
-              variant="ghost"
+              variant="outline"
               size="sm"
               disabled={!dirty || saving}
               onClick={() => setDraft(null)}
@@ -227,7 +260,7 @@ function IndividualTeacherTab() {
               disabled={!dirty || saving}
               onClick={handleSave}
             />
-          </div>
+          </PermissionFooter>
         </>
       )}
     </div>
