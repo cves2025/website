@@ -18,6 +18,7 @@ part of a file you change (use line ranges / grep), not the whole feature.
 | Add / edit student (admission form, Enrollment No. rules) | [docs/features/add-student.md](docs/features/add-student.md) |
 | Student List (filters, teacher scope, delete: left / wrong entry, recycle bin) | [docs/features/student-list.md](docs/features/student-list.md) |
 | Permissions (all teachers / class teachers / one teacher) | [docs/features/permissions.md](docs/features/permissions.md) |
+| Environments: dev / prod Firebase projects, deploy, migration checklist | [docs/features/environments.md](docs/features/environments.md) |
 | Fee module business rules (heads, dues, carry forward) | [docs/FEE_MANAGEMENT.md](docs/FEE_MANAGEMENT.md) |
 
 **Keep the maps true:** a commit that changes a mapped feature (new file, moved logic, new
@@ -43,7 +44,8 @@ components to use. Never invent a new colour or component when one there fits.
 - School gradient: Tailwind `bg-cves`; shared button classes `CVES_BUTTON`, `CVES_ON_HOVER`.
   One app loader: `Loader` / `Spinner` in `custom-components/Loader.tsx`.
 - Permissions: `src/permissions` (`PERMISSIONS`, `ROUTE_PERMISSIONS`); `can()` from `myContext`.
-- Firestore: database `(default)` = dev, `prod` = prod (`src/firebase/config.ts`). Index files
+- Firebase: dev = project `schoolproject-284dc`, prod = project `childrensvalley` (both use
+  Firestore `(default)`); see docs/features/environments.md. Index files
   `firestore.indexes.dev.json` / `.prod.json`; never deploy with `--force`.
 - Firestore rejects `undefined` values: build objects without undefined keys.
 - Many files use CRLF line endings; exact-string replacements must keep them.

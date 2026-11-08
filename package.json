@@ -1,7 +1,7 @@
 {
   "name": "dummy-site",
   "private": true,
-  "version": "0.0.22",
+  "version": "0.0.24",
   "type": "module",
   "homepage": "https://www.cves.in",
   "scripts": {
@@ -15,7 +15,7 @@
     "build:dev": "tsc && vite build --mode staging",
     "deploy:dev": "npm run build:dev && firebase deploy --only hosting:dev",
     "deploy:rules:dev": "firebase deploy --only \"firestore:(default)\"",
-    "deploy:rules:prod": "firebase deploy --only firestore:prod"
+    "deploy:rules:prod": "firebase deploy --config firebase.prod.json --project prod --only firestore,storage"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.4.1",

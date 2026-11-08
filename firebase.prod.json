@@ -1,0 +1,12 @@
+{
+  "firestore": [
+    {
+      "database": "(default)",
+      "rules": "firestore.rules",
+      "indexes": "firestore.indexes.prod.json"
+    }
+  ],
+  "storage": {
+    "rules": "storage.rules"
+  }
+}

@@ -1,6 +1,7 @@
 {
   "projects": {
-    "default": "schoolproject-284dc"
+    "default": "schoolproject-284dc",
+    "prod": "childrensvalley"
   },
   "targets": {
     "schoolproject-284dc": {
