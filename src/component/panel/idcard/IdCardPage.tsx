@@ -33,6 +33,7 @@ import { readIdCardSettings } from "../../../utils/idCardSettings";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import type { IdCardKind, IdCardPerson, IdCardSettings } from "../../../utils/type";
 import IdCardSettingsPanel from "./IdCardSettingsPanel";
+import IdCardEditor, { type IdCardFaces } from "./editor/IdCardEditor";
 import IdCardView, { CardFrame } from "./IdCardView";
 
 const KIND_PERMISSION: Record<IdCardKind, Permission> = {
@@ -80,6 +81,7 @@ function IdCardPage() {
   // Numbers typed in the panel arrive as text; read them as the card will.
   const draft = useMemo(() => readIdCardSettings(watched), [watched]);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [designerOpen, setDesignerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const signs = useSchoolSigns();
 
@@ -98,6 +100,19 @@ function IdCardPage() {
       setSaving(false);
     }
   });
+
+  /** The designer saves the tab's two faces (with any other unsaved change). */
+  const saveDesign = async (faces: IdCardFaces) => {
+    const values = getValues();
+    const next: IdCardSettings = {
+      ...values,
+      tabs: { ...values.tabs, [kind]: { ...values.tabs[kind], ...faces } },
+    };
+    await saveIdCardSettings(next, user?.uid ?? "");
+    const clean = readIdCardSettings(next);
+    saved.setSettings(clean);
+    reset(clean);
+  };
 
   // Who is on the list: one section's students, or the users of the tab.
   const filters = useForm<Filters>({
@@ -299,11 +314,26 @@ function IdCardPage() {
               dirty={formState.isDirty}
               saving={saving}
               onSave={() => void save()}
+              onOpenDesigner={() => setDesignerOpen(true)}
               onClose={() => setPanelOpen(false)}
             />
           </div>
         )}
       </div>
+
+      {designerOpen && isAdmin && (
+        <IdCardEditor
+          key={kind}
+          kind={kind}
+          tab={tab}
+          card={draft}
+          person={preview[0]}
+          session={cardSession}
+          signs={signs}
+          onSave={saveDesign}
+          onClose={() => setDesignerOpen(false)}
+        />
+      )}
     </div>
   );
 }

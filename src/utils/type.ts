@@ -640,33 +640,105 @@ export interface CarryForwardItem {
 /** Whose ID cards: one tab each on the ID Card page. */
 export type IdCardKind = "student" | "teacher" | "staff" | "admin";
 
-/** The four ID card templates; each comes horizontal and vertical. */
+/** The four starting templates; each comes horizontal and vertical. */
 export type IdCardDesign = "classic" | "modern" | "premium" | "vibrant";
 export type IdCardOrientation = "horizontal" | "vertical";
 
-/** "auto" leaves it to the template (centred on a vertical card). */
-export type IdCardAlign = "auto" | "left" | "center" | "right";
-/** Text longer than its line: shrink to fit, wrap, or cut with "...". */
+/** Text longer than its box: shrink to fit one line, wrap, or cut with "...". */
 export type IdCardOverflow = "fit" | "wrap" | "cut";
 
-/** One line of information on the card, and how it looks. */
-export interface IdCardField {
-  /** Which value it shows (name, className, employeeId ...). */
-  key: string;
+/**
+ * What a piece of the card is: plain text, a person's data (field), the
+ * photo, the school logo, the principal's sign, the school stamp, a QR code,
+ * an uploaded image, or a shape.
+ */
+export type IdCardElementType =
+  | "text"
+  | "field"
+  | "photo"
+  | "logo"
+  | "sign"
+  | "stamp"
+  | "qr"
+  | "image"
+  | "rect"
+  | "ellipse";
+
+/** One piece of the card, placed in mm from the card's top-left corner. */
+export interface IdCardElement {
+  id: string;
+  type: IdCardElementType;
+  /** Name in the layers list. */
+  name: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Degrees, clockwise. */
+  rotation: number;
+  locked: boolean;
+  hidden: boolean;
+  /** 0 - 1. */
+  opacity: number;
+  /** Text of a "text" element. */
+  text: string;
+  /**
+   * The same text in parts with their own colour / bold / italic /
+   * underline (letters or words styled one by one). Empty = all `text` in
+   * the element's own style.
+   */
+  spans: IdCardSpan[];
+  /** Data key of a "field" element (name, className ...). */
+  field: string;
   label: string;
-  show: boolean;
-  /** "Label: value" or just the value. */
   showLabel: boolean;
-  /** Font size in points on a standard size card (scales with the card). */
-  size: number;
+  fontFamily: string;
+  /** Points, at the size the layout was made for. */
+  fontSize: number;
   bold: boolean;
   italic: boolean;
   underline: boolean;
   uppercase: boolean;
-  /** "" = the template's colour. */
   color: string;
-  align: IdCardAlign;
+  /** Colour of a field's label ("" = the text colour). */
+  labelColor: string;
+  align: "left" | "center" | "right";
+  valign: "top" | "middle" | "bottom";
   overflow: IdCardOverflow;
+  /** Line height (1.2 = normal). */
+  lineHeight: number;
+  /** Letter spacing in em. */
+  letterSpacing: number;
+  /** Background colour ("" = none). */
+  fill: string;
+  /** Second colour of a gradient ("" = plain fill). */
+  fill2: string;
+  /** Gradient direction in degrees. */
+  gradientAngle: number;
+  /** Border colour and width (mm). */
+  stroke: string;
+  strokeWidth: number;
+  /** Corner radius (mm). */
+  radius: number;
+  /** Uploaded image URL ("image" elements). */
+  src: string;
+  fit: "cover" | "contain";
+}
+
+/** A part of a text with its own look; a style left out follows the element. */
+export interface IdCardSpan {
+  text: string;
+  color?: string;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+}
+
+/** The design of one card face, made for a card of `width` x `height` mm. */
+export interface IdCardLayout {
+  width: number;
+  height: number;
+  elements: IdCardElement[];
 }
 
 /** When the card is valid till. */
@@ -679,13 +751,10 @@ export interface IdCardValidity {
 
 /** Settings of one tab (students, teachers ...). */
 export interface IdCardTabSettings {
-  design: IdCardDesign;
+  /** Which of the two designs is printed. */
   orientation: IdCardOrientation;
-  fields: IdCardField[];
-  showPhoto: boolean;
-  showSign: boolean;
-  showStamp: boolean;
-  showQr: boolean;
+  horizontal: IdCardLayout;
+  vertical: IdCardLayout;
   validity: IdCardValidity;
 }
 
@@ -707,4 +776,45 @@ export interface IdCardPerson {
   code: string;
   /** Field key -> text. */
   values: Record<string, string>;
+}
+
+/** Colours of a template. */
+export interface IdCardTemplatePalette {
+  card: string;
+  card2: string;
+  header: string;
+  header2: string;
+  headerText: string;
+  subText: string;
+  chip: string;
+  chipText: string;
+  text: string;
+  label: string;
+  accent: string;
+  band: string;
+  band2: string;
+}
+
+/** Box of a part of the card: x, y, w, h in mm. */
+export type IdCardBox = [number, number, number, number];
+
+export interface IdCardTemplatePlan {
+  header: IdCardBox;
+  headerRadius: number;
+  logo: IdCardBox;
+  school: IdCardBox;
+  address: IdCardBox;
+  chip: IdCardBox;
+  textAlign: IdCardElement["align"];
+  photo: IdCardBox;
+  photoRadius: number;
+  name: IdCardBox;
+  /** First line of the other fields, and the gap between lines. */
+  fieldsAt: IdCardBox;
+  fieldStep: number;
+  qr: IdCardBox;
+  sign: IdCardBox;
+  band: IdCardBox;
+  /** Modern horizontal: a strip down the left with the title on it. */
+  strip?: IdCardBox;
 }

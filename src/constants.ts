@@ -2,8 +2,10 @@ import type {
   ClassFee,
   FeeHead,
   FeeSettings,
-  IdCardAlign,
   IdCardDesign,
+  IdCardElement,
+  IdCardTemplatePalette,
+  IdCardTemplatePlan,
   IdCardKind,
   IdCardOrientation,
   IdCardOverflow,
@@ -99,12 +101,65 @@ export const ID_CARD_ORIENTATION_OPTIONS: { value: IdCardOrientation; label: str
   { value: "vertical", label: "Vertical" },
 ];
 
-export const ID_CARD_ALIGN_OPTIONS: { value: IdCardAlign; label: string }[] = [
-  { value: "auto", label: "Auto" },
+export const ID_CARD_ALIGN_OPTIONS: { value: IdCardElement["align"]; label: string }[] = [
   { value: "left", label: "Left" },
   { value: "center", label: "Center" },
   { value: "right", label: "Right" },
 ];
+
+export const ID_CARD_VALIGN_OPTIONS: { value: IdCardElement["valign"]; label: string }[] = [
+  { value: "top", label: "Top" },
+  { value: "middle", label: "Middle" },
+  { value: "bottom", label: "Bottom" },
+];
+
+export const ID_CARD_FIT_OPTIONS: { value: IdCardElement["fit"]; label: string }[] = [
+  { value: "cover", label: "Fill the box" },
+  { value: "contain", label: "Show all" },
+];
+
+/** Fonts the card designer offers (Inter and Noto Serif are loaded in index.html). */
+export const ID_CARD_FONT_OPTIONS = [
+  { value: "Inter, system-ui, sans-serif", label: "Inter" },
+  { value: "'Noto Serif', Georgia, serif", label: "Noto Serif" },
+  { value: "Arial, Helvetica, sans-serif", label: "Arial" },
+  { value: "Georgia, serif", label: "Georgia" },
+  { value: "'Times New Roman', Times, serif", label: "Times New Roman" },
+  { value: "'Trebuchet MS', sans-serif", label: "Trebuchet" },
+  { value: "Verdana, sans-serif", label: "Verdana" },
+  { value: "'Courier New', monospace", label: "Courier" },
+  { value: "Cancun, sans-serif", label: "Cancun (school name)" },
+];
+
+/** What the designer's Add menu puts on the card. */
+export const ID_CARD_ADD_OPTIONS: { value: IdCardElement["type"]; label: string }[] = [
+  { value: "text", label: "Text" },
+  { value: "photo", label: "Photo" },
+  { value: "logo", label: "School logo" },
+  { value: "qr", label: "QR code" },
+  { value: "sign", label: "Principal's sign" },
+  { value: "stamp", label: "School stamp" },
+  { value: "rect", label: "Rectangle" },
+  { value: "ellipse", label: "Circle" },
+];
+
+/** Quick colours of the designer's text toolbar (the school's first). */
+export const ID_CARD_TEXT_SWATCHES = [
+  { value: "#15803d", label: "School green" },
+  { value: "#3730a3", label: "School indigo" },
+  { value: "#dc2626", label: "School red" },
+  { value: "#db2777", label: "School pink" },
+  { value: "#111827", label: "Black" },
+  { value: "#ffffff", label: "White" },
+  { value: "#d4af37", label: "Gold" },
+];
+
+/** Steps of the designer's zoom. */
+export const ID_CARD_ZOOM_STEPS = [1, 1.5, 2, 2.5, 3, 4, 5, 6];
+/** Designer: arrow keys move by this (mm), with Shift by the larger step. */
+export const ID_CARD_NUDGE_MM = { small: 0.5, large: 2 };
+/** Designer: how many changes Undo can go back. */
+export const ID_CARD_HISTORY_LIMIT = 80;
 
 export const ID_CARD_OVERFLOW_OPTIONS: { value: IdCardOverflow; label: string }[] = [
   { value: "fit", label: "Shrink to fit" },
@@ -158,7 +213,86 @@ export const ID_CARD_FIELD_KEYS: Record<IdCardKind, [string, string][]> = {
   ],
 };
 
-/** Fields shown on a new card; the others start hidden. */
+/** Colours of the designer's starting templates. */
+export const ID_CARD_TEMPLATE_PALETTES: Record<IdCardDesign, IdCardTemplatePalette> = {
+  classic: {
+    card: "#ffffff", card2: "", header: "#1e3a8a", header2: "#2563eb", headerText: "#ffffff", subText: "#dbeafe",
+    chip: "#ffffff", chipText: "#1e3a8a", text: "#111827", label: "#1e3a8a", accent: "#1e40af", band: "#1e3a8a", band2: "#2563eb",
+  },
+  modern: {
+    card: "#ffffff", card2: "", header: "#16a34a", header2: "#34d399", headerText: "#166534", subText: "#4b5563",
+    chip: "#16a34a", chipText: "#ffffff", text: "#111827", label: "#15803d", accent: "#16a34a", band: "#16a34a", band2: "#34d399",
+  },
+  premium: {
+    card: "#0f172a", card2: "#1e293b", header: "#0f172a", header2: "", headerText: "#d4af37", subText: "#cbd5e1",
+    chip: "#d4af37", chipText: "#0f172a", text: "#f8fafc", label: "#d4af37", accent: "#d4af37", band: "#b8860b", band2: "#f5d76e",
+  },
+  vibrant: {
+    card: "#ffffff", card2: "", header: "#ec4899", header2: "#f59e0b", headerText: "#ffffff", subText: "#fff1f2",
+    chip: "#ffffff", chipText: "#be185d", text: "#111827", label: "#be185d", accent: "#ec4899", band: "#ec4899", band2: "#f59e0b",
+  },
+};
+
+/** Where each part of a starting template sits, in mm on a standard card: [x, y, w, h]. */
+export const ID_CARD_TEMPLATE_PLANS: Record<IdCardOrientation, Record<IdCardDesign, IdCardTemplatePlan>> = {
+  horizontal: {
+    classic: {
+      header: [0, 0, 85.6, 13.5], headerRadius: 0, logo: [2.5, 2.2, 9, 9], school: [13, 1.8, 70, 4.6],
+      address: [13, 6.4, 70, 3], chip: [13, 9.8, 27, 3], textAlign: "left", photo: [3, 16.5, 17, 21], photoRadius: 0.8,
+      name: [23, 16.5, 44, 5], fieldsAt: [23, 22.5, 44, 3.6], fieldStep: 4, qr: [70, 16.5, 12.5, 12.5], sign: [67, 36, 16, 5.5],
+      band: [0, 51.2, 85.6, 2.8],
+    },
+    modern: {
+      header: [6, 15.4, 77, 0.35], headerRadius: 0, logo: [9, 2.8, 8.5, 8.5], school: [19, 2.6, 64, 4.6],
+      address: [19, 7.2, 64, 3], chip: [19, 10.6, 24, 3], textAlign: "left", photo: [62, 18, 19.5, 19.5], photoRadius: 9.75,
+      name: [9, 18, 50, 5], fieldsAt: [9, 24, 50, 3.6], fieldStep: 4, qr: [69.5, 39, 12, 12], sign: [46, 43.5, 16, 5],
+      band: [6, 51.5, 79.6, 2.5], strip: [0, 0, 6, 54],
+    },
+    premium: {
+      header: [3, 15.3, 79.6, 0.35], headerRadius: 0, logo: [3, 2.8, 8.5, 8.5], school: [13.5, 2.6, 69, 4.6],
+      address: [13.5, 7.2, 69, 3], chip: [13.5, 10.6, 27, 3], textAlign: "left", photo: [3, 18, 17, 21], photoRadius: 2,
+      name: [23, 18, 43, 5], fieldsAt: [23, 24, 43, 3.6], fieldStep: 4, qr: [69.5, 18, 12.5, 12.5], sign: [66.5, 36.5, 16, 5.5],
+      band: [0, 51.2, 85.6, 2.8],
+    },
+    vibrant: {
+      header: [-4, -8, 93.6, 22], headerRadius: 7, logo: [3, 2.2, 9, 9], school: [13.5, 1.8, 69, 4.6],
+      address: [13.5, 6.4, 69, 3], chip: [13.5, 9.8, 27, 3], textAlign: "left", photo: [3, 17, 17, 21], photoRadius: 2.5,
+      name: [23, 17, 44, 5], fieldsAt: [23, 23, 44, 3.6], fieldStep: 4, qr: [70, 17, 12.5, 12.5], sign: [66.5, 36, 16, 5.5],
+      band: [0, 51.2, 85.6, 2.8],
+    },
+  },
+  vertical: {
+    classic: {
+      header: [0, 0, 54, 22], headerRadius: 0, logo: [22.5, 2, 9, 9], school: [2, 11.5, 50, 4],
+      address: [2, 15.4, 50, 2.6], chip: [14.5, 18.2, 25, 3], textAlign: "center", photo: [17, 24.5, 20, 24], photoRadius: 0.8,
+      name: [3, 50, 48, 5], fieldsAt: [3, 55.8, 48, 3.2], fieldStep: 3.4, qr: [3, 72.5, 10.5, 10.5], sign: [35, 73, 16, 5.5],
+      band: [0, 83.6, 54, 2],
+    },
+    modern: {
+      header: [0, 0, 54, 3], headerRadius: 0, logo: [3, 5, 8.5, 8.5], school: [12.5, 5, 39, 4],
+      address: [12.5, 9, 39, 2.8], chip: [12.5, 12.2, 22, 2.8], textAlign: "center", photo: [16, 18, 22, 22], photoRadius: 11,
+      name: [3, 42, 48, 5], fieldsAt: [3, 47.8, 48, 3.2], fieldStep: 3.4, qr: [3, 70.5, 12, 12], sign: [35, 72.5, 16, 5.5],
+      band: [0, 83.6, 54, 2],
+    },
+    premium: {
+      header: [3, 22, 48, 0.35], headerRadius: 0, logo: [22.5, 2, 9, 9], school: [2, 11.5, 50, 4],
+      address: [2, 15.4, 50, 2.6], chip: [14.5, 18.2, 25, 3], textAlign: "center", photo: [17, 25, 20, 24], photoRadius: 2,
+      name: [3, 50.5, 48, 5], fieldsAt: [3, 56.2, 48, 3.2], fieldStep: 3.4, qr: [3, 72.5, 10.5, 10.5], sign: [35, 73, 16, 5.5],
+      band: [0, 83.6, 54, 2],
+    },
+    vibrant: {
+      header: [-4, -8, 62, 31], headerRadius: 9, logo: [22.5, 2, 9, 9], school: [2, 11.5, 50, 4],
+      address: [2, 15.4, 50, 2.6], chip: [14.5, 18.2, 25, 3], textAlign: "center", photo: [17, 25.5, 20, 24], photoRadius: 2.5,
+      name: [3, 51, 48, 5], fieldsAt: [3, 56.8, 48, 3.2], fieldStep: 3.4, qr: [3, 72.5, 10.5, 10.5], sign: [35, 73, 16, 5.5],
+      band: [0, 83.6, 54, 2],
+    },
+  },
+};
+
+/** Fields every tab has besides its own (the card's title, e.g. "STUDENT ID CARD"). */
+export const ID_CARD_COMMON_FIELDS: [string, string][] = [["cardTitle", "Card title"]];
+
+/** Fields a template leaves off the card (they can be added in the designer). */
 export const ID_CARD_HIDDEN_BY_DEFAULT = new Set(["email", "joiningDate"]);
 /** Document id inside COLLECTION.FEE_SETTINGS (due day, late fee, receipt prefix). */
 export const FEE_SETTINGS_DOC = "general";

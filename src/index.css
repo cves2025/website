@@ -309,3 +309,19 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .app-toast-enter, .app-toast-exit, .app-toast-enter .app-toast-icon { animation-duration: 0.01s; }
 }
+
+/* ID card designer: bigger handles and a wider grab area on each side,
+   in the school pink, so a box is easy to catch (the wider grab area along
+   each side is the Moveable linePadding prop). */
+.id-card-moveable {
+  --moveable-color: #db2777;
+}
+.id-card-moveable .moveable-control {
+  width: 16px !important;
+  height: 16px !important;
+  margin-top: -8px !important;
+  margin-left: -8px !important;
+  border: 2px solid #ffffff !important;
+  background: #db2777 !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.35);
+}
