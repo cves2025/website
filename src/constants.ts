@@ -2,6 +2,12 @@ import type {
   ClassFee,
   FeeHead,
   FeeSettings,
+  IdCardAlign,
+  IdCardDesign,
+  IdCardKind,
+  IdCardOrientation,
+  IdCardOverflow,
+  IdCardValidity,
   PaymentMode,
   ReceiptCopies,
   ReceiptDesign,
@@ -63,6 +69,97 @@ export const STAMP_SIGN_PRINCIPLE_DOC = "principle";
 export const ADMIT_CARD_SETTINGS_DOC = "admitCard";
 /** Document id inside COLLECTION.SETTINGS with the Home page banner slides. */
 export const HOME_BANNER_SETTINGS_DOC = "homeBanner";
+/** Document id inside COLLECTION.SETTINGS with the ID card size, templates and fields. */
+export const ID_CARD_SETTINGS_DOC = "idCard";
+
+/** The ID Card page; `?tab=` picks students / teachers / staff / admin. */
+export const ID_CARD_PATH = "/welcome/id-card";
+
+/** Standard ID card (CR80, an ATM card): 85.6 x 54 mm, landscape. */
+export const ID_CARD_STANDARD_SIZE = { width: 85.6, height: 54 };
+/** Smallest / largest side an admin can set, in mm. */
+export const ID_CARD_SIZE_LIMITS = { min: 30, max: 200 };
+
+export const ID_CARD_KIND_OPTIONS: { value: IdCardKind; label: string; title: string }[] = [
+  { value: "student", label: "Students", title: "STUDENT ID CARD" },
+  { value: "teacher", label: "Teachers", title: "TEACHER ID CARD" },
+  { value: "staff", label: "Staff", title: "STAFF ID CARD" },
+  { value: "admin", label: "Admin", title: "ADMIN ID CARD" },
+];
+
+export const ID_CARD_DESIGN_OPTIONS: { value: IdCardDesign; label: string; hint: string }[] = [
+  { value: "classic", label: "Classic", hint: "Blue band, photo frame" },
+  { value: "modern", label: "Modern", hint: "Green side strip, round photo" },
+  { value: "premium", label: "Premium", hint: "Dark navy with gold" },
+  { value: "vibrant", label: "Vibrant", hint: "Colourful gradient" },
+];
+
+export const ID_CARD_ORIENTATION_OPTIONS: { value: IdCardOrientation; label: string }[] = [
+  { value: "horizontal", label: "Horizontal" },
+  { value: "vertical", label: "Vertical" },
+];
+
+export const ID_CARD_ALIGN_OPTIONS: { value: IdCardAlign; label: string }[] = [
+  { value: "auto", label: "Auto" },
+  { value: "left", label: "Left" },
+  { value: "center", label: "Center" },
+  { value: "right", label: "Right" },
+];
+
+export const ID_CARD_OVERFLOW_OPTIONS: { value: IdCardOverflow; label: string }[] = [
+  { value: "fit", label: "Shrink to fit" },
+  { value: "wrap", label: "Wrap" },
+  { value: "cut", label: "Cut with ..." },
+];
+
+export const ID_CARD_VALIDITY_OPTIONS: { value: IdCardValidity["mode"]; label: string }[] = [
+  { value: "session", label: "End of session (31 March)" },
+  { value: "date", label: "A date" },
+  { value: "none", label: "Not shown" },
+];
+
+/** Fields a tab can show, in their default order: [key, label]. */
+export const ID_CARD_FIELD_KEYS: Record<IdCardKind, [string, string][]> = {
+  student: [
+    ["name", "Name"],
+    ["className", "Class"],
+    ["rollNumber", "Roll No."],
+    ["enrollment", "Enrollment No."],
+    ["fatherName", "Father's Name"],
+    ["phone", "Phone"],
+    ["validTill", "Valid Till"],
+  ],
+  teacher: [
+    ["name", "Name"],
+    ["jobRole", "Role"],
+    ["employeeId", "Employee ID"],
+    ["phone", "Phone"],
+    ["email", "Email"],
+    ["joiningDate", "Joining Date"],
+    ["validTill", "Valid Till"],
+  ],
+  staff: [
+    ["name", "Name"],
+    ["jobRole", "Role"],
+    ["employeeId", "Employee ID"],
+    ["phone", "Phone"],
+    ["email", "Email"],
+    ["joiningDate", "Joining Date"],
+    ["validTill", "Valid Till"],
+  ],
+  admin: [
+    ["name", "Name"],
+    ["jobRole", "Role"],
+    ["employeeId", "Employee ID"],
+    ["phone", "Phone"],
+    ["email", "Email"],
+    ["joiningDate", "Joining Date"],
+    ["validTill", "Valid Till"],
+  ],
+};
+
+/** Fields shown on a new card; the others start hidden. */
+export const ID_CARD_HIDDEN_BY_DEFAULT = new Set(["email", "joiningDate"]);
 /** Document id inside COLLECTION.FEE_SETTINGS (due day, late fee, receipt prefix). */
 export const FEE_SETTINGS_DOC = "general";
 

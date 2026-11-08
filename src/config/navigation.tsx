@@ -68,15 +68,11 @@ export const MENU: MenuItem[] = [
     ],
   },
   {
+    // One page; Students / Teachers / Staff / Admin are tabs on it.
     label: "ID Card",
     icon: <FaAddressCard />,
     accent: BRAND.pink,
-    subLinks: [
-      { label: "Students", path: "/welcome/id-card/students" },
-      { label: "Teachers", path: "/welcome/id-card/teachers" },
-      { label: "Staff", path: "/welcome/id-card/staff" },
-      { label: "Admin", path: "/welcome/id-card/admin" },
-    ],
+    path: "/welcome/id-card",
   },
   {
     label: "Exam",

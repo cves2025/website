@@ -31,10 +31,7 @@ import ResultTemplate from './panel/exams/exam-settings/ResultTemplate'
 
 import ExamMarks from './panel/marks/ExamMarks'
 import CrossList from './panel/marks/CrossList'
-import IdCardStudents from './panel/IdCardStudents'
-import IdCardTeachers from './panel/IdCardTeachers'
-import IdCardStaff from './panel/IdCardStaff'
-import IdCardAdmin from './panel/IdCardAdmin'
+import IdCardPage from './panel/idcard/IdCardPage'
 import Settings from './panel/settings/Settings'
 import Permissions from './panel/settings/permissions/Permissions'
 import Profile from './panel/settings/profile/Profile'
@@ -113,10 +110,12 @@ function Router() {
           <Route path="exam-settings/result-template" element={<ResultTemplate />} />
           <Route path="marks" element={<ExamMarks />} />
           <Route path="cross-list" element={<CrossList />} />
-          <Route path="id-card/students" element={<IdCardStudents />} />
-          <Route path="id-card/teachers" element={<IdCardTeachers />} />
-          <Route path="id-card/staff" element={<IdCardStaff />} />
-          <Route path="id-card/admin" element={<IdCardAdmin />} />
+          <Route path="id-card" element={<IdCardPage />} />
+          {/* One ID Card page with tabs now; the old links open their tab. */}
+          <Route path="id-card/students" element={<Navigate to="/welcome/id-card?tab=student" replace />} />
+          <Route path="id-card/teachers" element={<Navigate to="/welcome/id-card?tab=teacher" replace />} />
+          <Route path="id-card/staff" element={<Navigate to="/welcome/id-card?tab=staff" replace />} />
+          <Route path="id-card/admin" element={<Navigate to="/welcome/id-card?tab=admin" replace />} />
         </Route>
         </Route>
         </Route>

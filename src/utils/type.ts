@@ -634,3 +634,77 @@ export interface CarryForwardItem {
   toAccount: FeeAccount;
   amount: number;
 }
+
+/* -------------------------------------------------------------- ID cards -- */
+
+/** Whose ID cards: one tab each on the ID Card page. */
+export type IdCardKind = "student" | "teacher" | "staff" | "admin";
+
+/** The four ID card templates; each comes horizontal and vertical. */
+export type IdCardDesign = "classic" | "modern" | "premium" | "vibrant";
+export type IdCardOrientation = "horizontal" | "vertical";
+
+/** "auto" leaves it to the template (centred on a vertical card). */
+export type IdCardAlign = "auto" | "left" | "center" | "right";
+/** Text longer than its line: shrink to fit, wrap, or cut with "...". */
+export type IdCardOverflow = "fit" | "wrap" | "cut";
+
+/** One line of information on the card, and how it looks. */
+export interface IdCardField {
+  /** Which value it shows (name, className, employeeId ...). */
+  key: string;
+  label: string;
+  show: boolean;
+  /** "Label: value" or just the value. */
+  showLabel: boolean;
+  /** Font size in points on a standard size card (scales with the card). */
+  size: number;
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  uppercase: boolean;
+  /** "" = the template's colour. */
+  color: string;
+  align: IdCardAlign;
+  overflow: IdCardOverflow;
+}
+
+/** When the card is valid till. */
+export interface IdCardValidity {
+  /** none: not shown; session: end of the session (31 March); date: `date`. */
+  mode: "none" | "session" | "date";
+  /** "yyyy-MM-dd" when mode is "date". */
+  date: string;
+}
+
+/** Settings of one tab (students, teachers ...). */
+export interface IdCardTabSettings {
+  design: IdCardDesign;
+  orientation: IdCardOrientation;
+  fields: IdCardField[];
+  showPhoto: boolean;
+  showSign: boolean;
+  showStamp: boolean;
+  showQr: boolean;
+  validity: IdCardValidity;
+}
+
+/** The `settings/idCard` document. */
+export interface IdCardSettings {
+  /** Card size in mm when horizontal; a vertical card swaps them. */
+  width: number;
+  height: number;
+  tabs: Record<IdCardKind, IdCardTabSettings>;
+}
+
+/** One person's card: what each field shows. */
+export interface IdCardPerson {
+  id: string;
+  kind: IdCardKind;
+  name: string;
+  photo: string;
+  /** Put in the QR code (enrollment / employee ID). */
+  code: string;
+  /** Field key -> text. */
+  values: Record<string, string>;
+}

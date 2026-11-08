@@ -15,6 +15,8 @@ export interface SectionStudent {
   rollNumber: number;
   /** Photo URL when the enrollment carries one ("" = read it from `students`). */
   photo: string;
+  /** Parent's phone from the enrollment ("" when missing). */
+  phone: string;
 }
 
 /**
@@ -69,6 +71,7 @@ export function useSectionStudents(
               rollNumber:
                 rollNumbers.get(studentId) ?? rollNumbers.get(item.id) ?? 0,
               photo: typeof data.studentPhoto === "string" ? data.studentPhoto : "",
+              phone: String(data.phone ?? "").trim(),
             };
           });
         rows.sort(

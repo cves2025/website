@@ -20,6 +20,8 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
 
   "/welcome/teacher/add": P.TEACHER_CREATE,
 
+  // The page opens with any ID card permission; each tab checks its own.
+  "/welcome/id-card": [P.IDCARD_STUDENT, P.IDCARD_TEACHER, P.IDCARD_STAFF, P.IDCARD_ADMIN],
   "/welcome/id-card/students": P.IDCARD_STUDENT,
   "/welcome/id-card/teachers": P.IDCARD_TEACHER,
   "/welcome/id-card/staff": P.IDCARD_STAFF,

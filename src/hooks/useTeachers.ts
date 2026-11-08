@@ -56,7 +56,8 @@ export function teacherRecordFromData(
     uid: id,
     role,
     jobRole,
-    firstName: stringField("firstName"),
+    // An admin profile may only carry `fullName`.
+    firstName: stringField("firstName") || stringField("fullName").trim(),
     lastName: stringField("lastName"),
     gender: stringField("gender"),
     dateOfBirth: toDateOrNull(data.dateOfBirth),
@@ -81,7 +82,8 @@ export function teacherRecordFromData(
 
 /**
  * Live list of the users with `role` (teachers by default; also used for
- * the staff), newest first, deleted ones left out.
+ * the staff and the admins), newest first, deleted ones left out. An empty
+ * `role` reads nothing (for a hook that is not needed on this screen).
  */
 export function useTeachers(role: string = "teacher"): UseTeachersResult {
   const [teachers, setTeachers] = useState<TeacherRecord[]>([]);
@@ -89,6 +91,12 @@ export function useTeachers(role: string = "teacher"): UseTeachersResult {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!role) {
+      setTeachers([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     const teachersQuery = query(
       collection(db, COLLECTION.USERS),
       where("role", "==", role)
