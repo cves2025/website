@@ -7,8 +7,8 @@ The form looks like the printed admission form, in two pages (Student Info, then
 
 | File | What it does |
 |---|---|
-| `src/component/panel/students/AddStudent.tsx` | Page + form (`useForm<AdmissionStudentFormValues>`). `buildStudentFields` (master `students` doc) / `buildEnrollmentFields` (per-session `enrollments` doc), load for edit, page 1 -> 2 check (`page1RequiredFields`), photo paste routing, "Next Student" in edit mode (`findNextStudentToEdit`), submit (duplicate enrollment check, photo upload, save, counter update), Enrollment No. suggestion + note |
-| `src/component/panel/students/AdmissionFormSheet.tsx` | The two sheets: `AdmissionInfoSheet` (header, class / section / session / enrollment + `enrollmentNote`, names, DOB, contacts, photos via `renderPhoto`) and `AdmissionSchoolSheet`. Also used read-only by Student View |
+| `src/component/panel/students/AddStudent.tsx` | Page + form (`useForm<AdmissionStudentFormValues>`). `buildStudentFields` (master `students` doc) / `buildEnrollmentFields` (per-session `enrollments` doc), load for edit, page 1 -> 2 check (`page1RequiredFields`), photo paste routing, "Next Student" in edit mode (`findNextStudentToEdit`), submit (duplicate enrollment check, photo upload, save, counter update), Enrollment No. suggestion |
+| `src/component/panel/students/AdmissionFormSheet.tsx` | The two sheets: `AdmissionInfoSheet` (header, class / section / session / enrollment, names, DOB, contacts, photos via `renderPhoto`) and `AdmissionSchoolSheet`. Also used read-only by Student View |
 | `src/custom-components/admission/*` | Form-styled inputs: `AdmissionLineInput`, `AdmissionBoxedInput`, `AdmissionSelectInput`, `AdmissionSessionInput`, `AdmissionDateOfBirth`, `AdmissionPinInput`, `AdmissionCheckboxGroup`, `MobileNumberInputBox`, `PhotoUploadBox` |
 | `src/utils/enrollmentCounter.ts` | `fetchNextEnrollment` -> `{ next, highest, owner }`, `recordEnrollments` (moves the counter up after saves; Add Student and Bulk Import), `isEnrollmentTaken` |
 | `src/firebase/studentPhotos.ts` | `uploadStudentPhoto(studentId, kind, file)` (student / mother / father) |
@@ -27,10 +27,9 @@ The form looks like the printed admission form, in two pages (Student Info, then
 
 `fetchNextEnrollment`: read the counter, then check a student still holds that number (1 query).
 If nobody does (typo corrected, student deleted for good) or there is no counter, scan all
-students once, reset the counter to the real highest and save it. The form shows
-"Next after N, the highest in use (Name[, in the recycle bin])" under the field, so an outlier
-(e.g. 3456 among 11xx numbers) can be found and corrected. Recycle-bin students keep their
-numbers. Enrollment numbers may be saved as text or as a number; queries check both.
+students once, reset the counter to the real highest and save it. It also returns `highest`
+and `owner` (who holds it), not shown on the form (removed on request); handy for finding an
+outlier such as the "Test" student with 3456. Recycle-bin students keep their numbers. Enrollment numbers may be saved as text or as a number; queries check both.
 
 ## Change X -> look here
 

@@ -32,7 +32,6 @@ import {
 import { generateClassRollNumbers } from "../../../utils/rollNumbers";
 import {
   fetchNextEnrollment,
-  type EnrollmentSuggestion,
   isEnrollmentTaken,
   recordEnrollments,
 } from "../../../utils/enrollmentCounter";
@@ -355,9 +354,6 @@ function AddStudent() {
   const [loadingNextStudent, setLoadingNextStudent] = useState(false);
   // Bumped after a new student is saved, so the next number is suggested.
   const [enrollmentRefresh, setEnrollmentRefresh] = useState(0);
-  // Where the suggested Enrollment No. comes from (shown under the field).
-  const [enrollmentSuggestion, setEnrollmentSuggestion] =
-    useState<EnrollmentSuggestion | null>(null);
 
   /* Copy-paste photo routing: which photo box receives an image pasted from
      the clipboard. A focused photo box wins, otherwise the last-focused box is
@@ -534,9 +530,7 @@ function AddStudent() {
     let cancelled = false;
     fetchNextEnrollment()
       .then((suggestion) => {
-        if (cancelled) return;
-        setEnrollmentSuggestion(suggestion);
-        if (getValues("enrollment").trim()) return;
+        if (cancelled || getValues("enrollment").trim()) return;
         setValue("enrollment", suggestion.next);
       })
       .catch((error) => {
@@ -986,17 +980,6 @@ function AddStudent() {
               editingStudentId ? "UPDATE ADMISSION FORM" : "ADMISSION FORM"
             }
             renderPhoto={renderPhotoBox}
-            enrollmentNote={
-              !editingStudentId && enrollmentSuggestion && enrollmentSuggestion.highest > 0
-                ? `Next after ${enrollmentSuggestion.highest}, the highest in use${
-                    enrollmentSuggestion.owner
-                      ? ` (${enrollmentSuggestion.owner.name}${
-                          enrollmentSuggestion.owner.inRecycleBin ? ", in the recycle bin" : ""
-                        })`
-                      : ""
-                  }. You can type another number.`
-                : undefined
-            }
           />
 
           <div className="mt-8 flex flex-wrap items-center justify-end gap-3">

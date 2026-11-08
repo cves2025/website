@@ -106,8 +106,6 @@ interface InfoSheetProps extends SheetProps {
   bannerTitle: string;
   /** Draws one photo box (upload box when editing, plain photo when viewing). */
   renderPhoto: (kind: PhotoKind, label: string) => ReactNode;
-  /** Small note under the Enrollment No. (e.g. where the suggestion comes from). */
-  enrollmentNote?: ReactNode;
 }
 
 /** Page 1: Student Info. */
@@ -115,7 +113,6 @@ export function AdmissionInfoSheet({
   control,
   bannerTitle,
   renderPhoto,
-  enrollmentNote,
 }: InfoSheetProps) {
   return (
     <>
@@ -191,22 +188,15 @@ export function AdmissionInfoSheet({
           endName="sessionEnd"
           rules={{ required: "Please enter session" }}
         />
-        <div className="flex flex-col items-start gap-1">
-          <AdmissionLineInput
-            control={control}
-            name="enrollment"
-            prefix="Enrollment No. :"
-            maxLength={5}
-            numeric
-            className="w-32"
-            rules={{ required: "Enrollment number is required" }}
-          />
-          {enrollmentNote && (
-            <p className="max-w-[16rem] text-xs font-normal leading-snug text-gray-500 print:hidden">
-              {enrollmentNote}
-            </p>
-          )}
-        </div>
+        <AdmissionLineInput
+          control={control}
+          name="enrollment"
+          prefix="Enrollment No. :"
+          maxLength={5}
+          numeric
+          className="w-32"
+          rules={{ required: "Enrollment number is required" }}
+        />
       </div>
       {/* Student / Mother / Father / Occupation */}
       <div className="space-y-5 mb-6">
