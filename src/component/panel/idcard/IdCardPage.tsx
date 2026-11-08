@@ -9,7 +9,7 @@ import { useContext, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useForm, useWatch } from "react-hook-form";
 import toast from "react-hot-toast";
-import { Search, Settings2 } from "lucide-react";
+import { Search, Settings2, Upload } from "lucide-react";
 
 import {
   ADMISSION_SECTIONS,
@@ -35,6 +35,7 @@ import type { IdCardKind, IdCardPerson, IdCardSettings } from "../../../utils/ty
 import IdCardSettingsPanel from "./IdCardSettingsPanel";
 import IdCardEditor, { type IdCardFaces } from "./editor/IdCardEditor";
 import IdCardView, { CardFrame } from "./IdCardView";
+import IdCardExporter from "./IdCardExporter";
 
 const KIND_PERMISSION: Record<IdCardKind, Permission> = {
   student: PERMISSIONS.IDCARD_STUDENT,
@@ -82,6 +83,7 @@ function IdCardPage() {
   const draft = useMemo(() => readIdCardSettings(watched), [watched]);
   const [panelOpen, setPanelOpen] = useState(false);
   const [designerOpen, setDesignerOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
   const signs = useSchoolSigns();
 
@@ -288,6 +290,17 @@ function IdCardPage() {
                   : "· sample, tick people to see their cards"}
               </span>
             </h2>
+            {/* Every ticked card (not only the ones previewed): PNG, or a ZIP of PNGs. */}
+            <button
+              type="button"
+              disabled={selected.length === 0 || saved.loading || exporting}
+              onClick={() => setExporting(true)}
+              title={selected.length === 0 ? "Tick people to export their cards" : "300 DPI PNG for each card"}
+              className="flex items-center gap-2 rounded-md bg-cves px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:shadow-md hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Upload className="h-4 w-4" />
+              {selected.length > 1 ? `Export ${selected.length} (ZIP)` : "Export PNG"}
+            </button>
           </div>
           {saved.loading ? (
             <div className="flex justify-center py-10">
@@ -320,6 +333,25 @@ function IdCardPage() {
           </div>
         )}
       </div>
+
+      {exporting && (
+        <IdCardExporter
+          people={selected}
+          tab={tab}
+          settings={draft}
+          session={cardSession}
+          signs={signs}
+          zipName={[
+            "id-cards",
+            kind,
+            ...(isStudent ? [toOrdinalLabel(className), section, session] : []),
+          ]
+            .filter(Boolean)
+            .join("-")
+            .replace(/\s+/g, "")}
+          onClose={() => setExporting(false)}
+        />
+      )}
 
       {designerOpen && isAdmin && (
         <IdCardEditor

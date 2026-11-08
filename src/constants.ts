@@ -160,6 +160,9 @@ export const ID_CARD_TEXT_SWATCHES = [
   { value: "#d4af37", label: "Gold" },
 ];
 
+/** Resolution of exported ID card images (print quality). */
+export const ID_CARD_EXPORT_DPI = 300;
+
 /** Steps of the designer's zoom. */
 export const ID_CARD_ZOOM_STEPS = [1, 1.5, 2, 2.5, 3, 4, 5, 6];
 /** Designer: arrow keys move by this (mm), with Shift by the larger step. */

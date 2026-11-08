@@ -10,7 +10,8 @@ import { useAsyncData } from "./useAsyncData";
  */
 const photoCache = new Map<string, Promise<string>>();
 
-function loadStudentPhoto(studentId: string): Promise<string> {
+/** A student's photo URL ("" when none), read once per app session. */
+export function loadStudentPhoto(studentId: string): Promise<string> {
   let photo = photoCache.get(studentId);
   if (!photo) {
     photo = getDoc(doc(db, COLLECTION.STUDENTS, studentId)).then((snapshot) => {

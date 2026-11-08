@@ -23,6 +23,8 @@ Only admins see ID Settings and the designer.
 | `src/hooks/useIdCardSettings.ts` | `useIdCardSettings`, `useSchoolSigns` |
 | `src/hooks/useHistoryState.ts` | Undo/redo state: `set` (step), `preview` + `commit` (one step per drag) |
 | `src/firebase/idCardImages.ts` | `uploadIdCardImage` -> Storage `idCard/images/` (PNG/SVG/WebP <= 2 MB kept as is) |
+| `src/component/panel/idcard/IdCardExporter.tsx` | Export of the ticked people (all of them, not only the 24 previewed): draws each card off screen with `CardFace` at real size (student photo preloaded via `loadStudentPhoto`), waits for images + fonts, PNG per card; 1 card -> PNG download, more -> ZIP. Progress dialog with Stop; warns when an image could not be copied (CORS). Per-run token against React's double effect in dev |
+| `src/utils/idCardExport.ts` | `cardFileName` ("1156-Rahul-Kumar.png"), `waitForImages`, `inlineImages` (copies every picture into the card as a data URL first; one that cannot be copied becomes blank), `cardToPng` (html-to-image, `ID_CARD_EXPORT_DPI` = 300; font CSS read once, retries without fonts), `zipCards` (jszip, duplicate names get -2), `downloadBlob` |
 
 People come from `useSectionStudents` (students; has `phone`) and `useTeachers(role)` (`"teacher"`,
 `"staff"`, `"admin"`; `""` reads nothing). Student photos fall back to `useStudentPhoto` (cached).
@@ -53,4 +55,10 @@ Signature / stamp come from `stampSign/principle` (uploaded in admit card settin
 - Spans: only set styles are stored (no `undefined`); editing text in the side panel clears spans.
 - The designer works at the card's own size (`scaleLayout` on open); 1 mm = `PX_PER_MM * zoom` px.
 - Moveable: don't call `updateRect` during a gesture (`gesturing` ref).
-- Export (PNG/ZIP, Part 3) is not built yet.
+- Export button: preview header in `IdCardPage.tsx` ("Export PNG" / "Export N (ZIP)"); it uses the
+  on-screen (draft) settings, like the preview. ZIP name `id-cards-<kind>[-class-section-session]`.
+- Export copies every image into the PNG, so Firebase Storage must allow cross-origin GET:
+  `gsutil cors set storage-cors.json gs://<storage bucket>` (file in `website/`; one time).
+  Without it, photos / sign / stamp / uploaded images are left blank in the PNG (a toast says so).
+- The Google Fonts `<link>` in `index.html` has `crossorigin="anonymous"` so the export can embed
+  Inter / Noto Serif; don't remove it.
