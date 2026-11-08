@@ -48,6 +48,12 @@ export default {
   			primaryBlue: '#393186',
   			primaryRed: '#E31E25',
   			primaryPink: '#E7087E',
+  			// Navy: headings bars, table group rows, active tabs (instead of blue-*).
+  			navy: {
+  				DEFAULT: '#0f1f4b',
+  				light: '#1e3a8a',
+  				soft: '#e8ecf7'
+  			},
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {
