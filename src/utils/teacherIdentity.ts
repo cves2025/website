@@ -10,7 +10,7 @@ import { collection, getDocs } from "firebase/firestore";
 
 import { COLLECTION } from "../constants";
 import { db } from "../firebase/config";
-import { TEACHER_SECTIONS, sectionAssignmentsFromDoc } from "./teacherSections";
+import { TEACHER_SECTIONS, classTeacherClassesOf, sectionAssignmentsFromDoc } from "./teacherSections";
 import type { TeacherSectionAssignment } from "./type";
 
 export const EMPLOYEE_ID_PREFIX = "CVES-T-";
@@ -136,12 +136,10 @@ export function assignmentOwners(
     user.sectionAssignments.forEach((assignment) => {
       // Records saved before sections existed belong to the first section.
       const section = assignment.section || TEACHER_SECTIONS[0];
-      if (assignment.isClassTeacher && assignment.classTeacherOf) {
-        owners.classTeacher.set(
-          classTeacherKey(section, assignment.classTeacherOf),
-          label
-        );
-      }
+      // Every class this teacher is class teacher of in the section.
+      classTeacherClassesOf(assignment).forEach((className) =>
+        owners.classTeacher.set(classTeacherKey(section, className), label)
+      );
       assignment.classes.forEach((entry) =>
         entry.subjects.forEach((subject) =>
           owners.subject.set(
@@ -162,14 +160,12 @@ export function findAssignmentConflict(
 ): { section: string; message: string } | null {
   for (const assignment of assignments) {
     const { section } = assignment;
-    if (assignment.isClassTeacher && assignment.classTeacherOf) {
-      const owner = owners.classTeacher.get(
-        classTeacherKey(section, assignment.classTeacherOf)
-      );
+    for (const className of classTeacherClassesOf(assignment)) {
+      const owner = owners.classTeacher.get(classTeacherKey(section, className));
       if (owner) {
         return {
           section,
-          message: `${owner} is already the class teacher of Class ${assignment.classTeacherOf} in Section ${section}.`,
+          message: `${owner} is already the class teacher of Class ${className} in Section ${section}.`,
         };
       }
     }

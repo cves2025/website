@@ -1,4 +1,5 @@
 import type { TeacherSectionAssignment } from "../utils/type";
+import { classTeacherClassesOf } from "../utils/teacherSections";
 
 export type AccessScope =
   | { kind: "all" }
@@ -20,9 +21,7 @@ export function scopedClasses(
   const names = new Set<string>();
   scope.assignments.forEach((assignment) => {
     assignment.classes.forEach((entry) => names.add(entry.className));
-    if (assignment.isClassTeacher && assignment.classTeacherOf) {
-      names.add(assignment.classTeacherOf);
-    }
+    classTeacherClassesOf(assignment).forEach((name) => names.add(name));
   });
   return allClasses.filter((className) => names.has(className));
 }
@@ -40,7 +39,7 @@ export function scopedSections(
       (assignment) =>
         assignment.section === section &&
         (assignment.classes.some((entry) => entry.className === className) ||
-          (assignment.isClassTeacher && assignment.classTeacherOf === className))
+          classTeacherClassesOf(assignment).includes(className))
     )
   );
 }
@@ -64,7 +63,7 @@ export function subjectAccess(
   );
   if (teaches) return "edit";
 
-  if (assignment.isClassTeacher && assignment.classTeacherOf === className) {
+  if (classTeacherClassesOf(assignment).includes(className)) {
     return "view";
   }
   return "none";
@@ -76,11 +75,9 @@ export function isClassTeacherOf(
   section: string
 ): boolean {
   if (scope.kind !== "assigned") return false;
+  const name = String(className ?? "").trim();
   return scope.assignments.some(
-    (a) =>
-      a.isClassTeacher &&
-      a.section === section &&
-      String(a.classTeacherOf ?? "").trim() === String(className ?? "").trim()
+    (a) => a.section === section && classTeacherClassesOf(a).includes(name)
   );
 }
 /** The (class, section) pairs a teacher is class teacher of. */
@@ -88,10 +85,8 @@ export function classTeacherSections(
   scope: AccessScope
 ): { className: string; section: string }[] {
   if (scope.kind !== "assigned") return [];
-  return scope.assignments
-    .filter((a) => a.isClassTeacher && String(a.classTeacherOf ?? "").trim())
-    .map((a) => ({
-      className: String(a.classTeacherOf).trim(),
-      section: a.section,
-    }));
+  // One pair per class: a teacher may look after several classes of a section.
+  return scope.assignments.flatMap((a) =>
+    classTeacherClassesOf(a).map((className) => ({ className, section: a.section }))
+  );
 }

@@ -21,6 +21,19 @@ Route `/welcome/teacher/add` (the list lives here too; `/welcome/teacher/list` r
 Lists: `TEACHER_JOB_ROLES`, `STAFF_JOB_ROLES`, `ADMIN_JOB_ROLES`, `PERSON_TYPE_OPTIONS`,
 `STAFF_ROLE` in constants.
 
+## Class teacher of several classes
+
+In each section (`sectionAssignments[]`) a class teacher can look after **one or more classes**:
+`classTeacherClasses: string[]`. `classTeacherOf` still holds the first one, for older readers and
+records. Always read with `classTeacherClassesOf(assignment)` and write with
+`withClassTeacherClasses()` (`src/utils/teacherSections.ts`); `normalizeSectionAssignments` turns an
+old single-class record into a one-item list. Used by `teacherScope.ts` (`isClassTeacherOf`,
+`classTeacherSections`, `scopedClasses`, `scopedSections`, `subjectAccess`), the clash check
+(`teacherIdentity.ts`: one class of a section has one class teacher), the dashboard attendance card,
+My Profile, and the form (multi-select "Class Teacher of Class(es)"). The server's
+`normalizeSectionAssignments` keeps the list too; until it is redeployed the app writes
+`sectionAssignments` itself right after `/api/add-teacher`.
+
 ## Gotchas
 
 - Staff are not in `ROLES` (permissions): they can never log in, and every teacher feature

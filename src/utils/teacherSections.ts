@@ -45,8 +45,42 @@ export function createEmptySectionAssignment(
     section,
     isClassTeacher: false,
     classTeacherOf: "",
+    classTeacherClasses: [],
     classes: [],
   };
+}
+
+/** Class names in school order, each once. */
+export function sortClassNames(classNames: readonly string[]): string[] {
+  return [...new Set(classNames.map((name) => name.trim()).filter(Boolean))].sort(
+    (a, b) => classOrder(a) - classOrder(b)
+  );
+}
+
+/**
+ * The classes a section's class teacher looks after (none when not a class
+ * teacher). Records saved before a teacher could have several classes only
+ * have `classTeacherOf`; they count as that one class.
+ */
+export function classTeacherClassesOf(
+  assignment: Pick<TeacherSectionAssignment, "isClassTeacher" | "classTeacherOf"> & {
+    classTeacherClasses?: readonly string[];
+  }
+): string[] {
+  if (!assignment.isClassTeacher) return [];
+  const list = assignment.classTeacherClasses ?? [];
+  if (list.length > 0) return sortClassNames(list);
+  const single = String(assignment.classTeacherOf ?? "").trim();
+  return single ? [single] : [];
+}
+
+/** Sets the class teacher's classes (and the older single-class field with the first). */
+export function withClassTeacherClasses(
+  assignment: TeacherSectionAssignment,
+  classNames: readonly string[]
+): TeacherSectionAssignment {
+  const classTeacherClasses = sortClassNames(classNames);
+  return { ...assignment, classTeacherClasses, classTeacherOf: classTeacherClasses[0] ?? "" };
 }
 
 export function createEmptySectionAssignments(): TeacherSectionAssignment[] {
@@ -87,10 +121,16 @@ export function normalizeSectionAssignments(
 
   return value
     .filter(isRecord)
-    .map((item) => ({
+    .map((item) => {
+      // Several classes (classTeacherClasses), or the older single one.
+      const listed = sortClassNames(toStringList(item.classTeacherClasses));
+      const single = toText(item.classTeacherOf);
+      const classTeacherClasses = listed.length > 0 ? listed : single ? [single] : [];
+      return {
       section: toText(item.section),
       isClassTeacher: item.isClassTeacher === true,
-      classTeacherOf: toText(item.classTeacherOf),
+      classTeacherOf: classTeacherClasses[0] ?? "",
+      classTeacherClasses,
       classes: sortClassSubjects(
         (Array.isArray(item.classes) ? item.classes : [])
           .filter(isRecord)
@@ -100,7 +140,8 @@ export function normalizeSectionAssignments(
           }))
           .filter((entry) => entry.className !== "")
       ),
-    }))
+      };
+    })
     .filter((item) => item.section !== "");
 }
 
@@ -125,11 +166,13 @@ export function sectionAssignmentsFromDoc(
   const legacyClassTeacher = data.isClassTeacher === true;
   if (legacyClasses.length === 0 && !legacyClassTeacher) return [];
 
+  const legacyClassTeacherOf = toText(data.classTeacherOf);
   return [
     {
       section: "",
       isClassTeacher: legacyClassTeacher,
-      classTeacherOf: toText(data.classTeacherOf),
+      classTeacherOf: legacyClassTeacherOf,
+      classTeacherClasses: legacyClassTeacherOf ? [legacyClassTeacherOf] : [],
       classes: legacyClasses.map((className) => ({ className, subjects: [] })),
     },
   ];
@@ -154,9 +197,11 @@ export function toEditableSectionAssignments(data: Record<string, unknown>): {
     assignments: assignments.map((item) =>
       item.section === primarySection
         ? {
-            ...item,
+            ...withClassTeacherClasses(item, [
+              ...item.classTeacherClasses,
+              ...legacy.classTeacherClasses,
+            ]),
             isClassTeacher: legacy.isClassTeacher,
-            classTeacherOf: item.classTeacherOf || legacy.classTeacherOf,
             classes: sortClassSubjects([...legacy.classes, ...item.classes]),
           }
         : item
@@ -187,13 +232,13 @@ export function toLegacyTeacherFields(
   );
 
   const classTeacherSection = list.find(
-    (item) => item.isClassTeacher && item.classTeacherOf !== ""
+    (item) => classTeacherClassesOf(item).length > 0
   );
 
   return {
     assignedClasses: assignedClasses.sort((a, b) => classOrder(a) - classOrder(b)),
     isClassTeacher: Boolean(classTeacherSection),
-    classTeacherOf: classTeacherSection ? classTeacherSection.classTeacherOf : "",
+    classTeacherOf: classTeacherSection ? classTeacherClassesOf(classTeacherSection)[0] : "",
   };
 }
 
@@ -212,9 +257,10 @@ export function formatSectionSummary(
 ): string {
   const parts: string[] = [];
   if (assignment.isClassTeacher) {
+    const classNames = classTeacherClassesOf(assignment);
     parts.push(
-      assignment.classTeacherOf
-        ? `Class teacher of ${toClassLabel(assignment.classTeacherOf)}`
+      classNames.length > 0
+        ? `Class teacher of ${classNames.map(toClassLabel).join(", ")}`
         : "Class teacher (class not selected)"
     );
   }

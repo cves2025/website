@@ -23,7 +23,6 @@ import { FaEdit, FaTrash } from "react-icons/fa";
 import { API_BASE_URL, authHeaders } from "../../context/api";
 import {
   CLASSES,
-  CLASS_OPTIONS,
   COLLECTION,
   CVES_BUTTON,
   DEFAULT_TEACHER_JOB_ROLE,
@@ -42,7 +41,6 @@ import CustomInput from "../../../custom-components/CustomInput";
 import CustomSelect from "../../../custom-components/CustomSelect";
 import CustomTextarea from "../../../custom-components/CustomTextarea";
 import DatePicker, { INVALID_DATE } from "../../../custom-components/DatePicker";
-import SelectDropdown from "../../../custom-components/SelectDropdown";
 import { Switch } from "@/components/ui/switch";
 import FormMessage from "../../../custom-components/FormMessage";
 import Modal from "../../../custom-components/Modal";
@@ -80,6 +78,7 @@ import {
 } from "../../../utils/teacherIdentity";
 import {
   TEACHER_SECTIONS,
+  classTeacherClassesOf,
   createEmptySectionAssignment,
   createEmptySectionAssignments,
   formatSectionSummary,
@@ -89,6 +88,7 @@ import {
   toEditableSectionAssignments,
   toLegacyTeacherFields,
   toSectionTabs,
+  withClassTeacherClasses,
 } from "../../../utils/teacherSections";
 
 const CLASS_CHOICES: SearchableOption[] = CLASSES.map((className) => ({
@@ -298,7 +298,8 @@ interface SectionAssignmentCardProps {
   /** False for a Subject Teacher. */
   canBeClassTeacher: boolean;
   onToggleClassTeacher: (active: boolean) => void;
-  onClassTeacherClassChange: (className: string) => void;
+  /** The classes of this section the teacher is class teacher of (one or more). */
+  onClassTeacherClassesChange: (classNames: string[]) => void;
   onClassesChange: (classNames: string[]) => void;
   onClassSubjectsChange: (className: string, subjects: string[]) => void;
   onReset: () => void;
@@ -312,7 +313,7 @@ function SectionAssignmentCard({
   owners,
   canBeClassTeacher,
   onToggleClassTeacher,
-  onClassTeacherClassChange,
+  onClassTeacherClassesChange,
   onClassesChange,
   onClassSubjectsChange,
   onReset,
@@ -321,16 +322,19 @@ function SectionAssignmentCard({
   const subjectOwner = (className: string, subject: string) =>
     owners.subject.get(subjectAssignmentKey(section, className, subject));
 
-  // A class already taken by another class teacher of this section is locked.
-  const classTeacherChoices = CLASS_OPTIONS.map((option) => {
+  // A class already taken by another class teacher of this section is
+  // locked; one picked here that is taken stays clickable so it can be removed.
+  const classTeacherClasses = classTeacherClassesOf(assignment);
+  const classTeacherChoices: SearchableOption[] = CLASS_CHOICES.map((option) => {
     const owner = owners.classTeacher.get(classTeacherKey(section, option.value));
-    return owner && option.value !== assignment.classTeacherOf
-      ? { ...option, label: `${option.label} - ${owner}`, disabled: true }
+    const picked = classTeacherClasses.includes(option.value);
+    return owner
+      ? { ...option, hint: picked ? `Also with ${owner}` : `Class teacher: ${owner}`, disabled: !picked }
       : option;
   });
-  const classTeacherOwner = assignment.classTeacherOf
-    ? owners.classTeacher.get(classTeacherKey(section, assignment.classTeacherOf))
-    : undefined;
+  const takenClasses = classTeacherClasses.filter((className) =>
+    owners.classTeacher.get(classTeacherKey(section, className))
+  );
 
   // Classes whose every subject is taken in this section are only marked.
   const classChoices = CLASS_CHOICES.map((option) => {
@@ -400,27 +404,24 @@ function SectionAssignmentCard({
         </div>
 
         <div className="flex w-full flex-col gap-1.5">
-          <label
-            htmlFor={`section-${section}-class-teacher-class`}
-            className="block text-sm font-semibold text-gray-700"
-          >
-            Class
-            {assignment.isClassTeacher && (
-              <span className="ml-0.5 text-red-500">*</span>
-            )}
-          </label>
-          <SelectDropdown
+          {/* One or more classes of this section. */}
+          <SearchableMultiSelect
             id={`section-${section}-class-teacher-class`}
-            value={assignment.classTeacherOf}
-            disabled={!assignment.isClassTeacher}
-            onValueChange={onClassTeacherClassChange}
-            placeholder="Select class"
             options={classTeacherChoices}
-            aria-invalid={Boolean(classTeacherOwner)}
+            values={classTeacherClasses}
+            onChange={onClassTeacherClassesChange}
+            label="Class Teacher of Class(es)"
+            required={assignment.isClassTeacher}
+            disabled={!assignment.isClassTeacher}
+            placeholder={assignment.isClassTeacher ? "Select one or more classes" : "Turn on Class Teacher first"}
+            searchPlaceholder="Type to search classes..."
+            emptyMessage="No matching class found"
+            maxChips={4}
           />
-          {classTeacherOwner && (
+          {takenClasses.length > 0 && (
             <p className="text-xs font-medium text-red-600">
-              {classTeacherOwner} is already the class teacher of this class.
+              {takenClasses.map(toClassLabel).join(", ")} already{" "}
+              {takenClasses.length === 1 ? "has" : "have"} another class teacher in Section {section}.
             </p>
           )}
         </div>
@@ -654,13 +655,17 @@ function TeacherForm({ initialEditId, personType, onClose }: TeacherFormProps) {
       section,
       active
         ? { isClassTeacher: true }
-        : { isClassTeacher: false, classTeacherOf: "" }
+        : { isClassTeacher: false, classTeacherOf: "", classTeacherClasses: [] }
     );
 
-  const handleClassTeacherClassChange = (
-    section: string,
-    className: string
-  ) => updateSection(section, { classTeacherOf: className });
+  // A teacher may be class teacher of several classes of a section.
+  const handleClassTeacherClassesChange = (section: string, classNames: string[]) => {
+    const { classTeacherOf, classTeacherClasses } = withClassTeacherClasses(
+      assignmentOf(section),
+      classNames
+    );
+    updateSection(section, { classTeacherOf, classTeacherClasses });
+  };
 
   const handleClassesChange = (section: string, classNames: string[]) =>
     updateSection(section, {
@@ -684,6 +689,7 @@ function TeacherForm({ initialEditId, personType, onClose }: TeacherFormProps) {
     updateSection(section, {
       isClassTeacher: false,
       classTeacherOf: "",
+      classTeacherClasses: [],
       classes: [],
     });
 
@@ -714,7 +720,7 @@ function TeacherForm({ initialEditId, personType, onClose }: TeacherFormProps) {
       ? []
       : pruneSectionAssignments(toSectionTabs(sectionAssignments));
     const incompleteSection = sectionPayload.find(
-      (item) => item.isClassTeacher && item.classTeacherOf === ""
+      (item) => item.isClassTeacher && classTeacherClassesOf(item).length === 0
     );
     if (incompleteSection) {
       setActiveSection(incompleteSection.section);
@@ -822,12 +828,14 @@ function TeacherForm({ initialEditId, personType, onClose }: TeacherFormProps) {
             result?.error || "Failed to add teacher. Please try again."
           );
         }
-        // A server deployed before Job Roles existed does not save it.
+        // A server deployed before Job Roles / several class-teacher
+        // classes existed drops them; save them as the form has them.
         if (typeof result?.id === "string" && result.id) {
           await updateDoc(doc(db, COLLECTION.USERS, result.id), {
             jobRole: data.jobRole,
-          }).catch((jobRoleError) =>
-            console.error("Failed to save the job role:", jobRoleError)
+            sectionAssignments: sectionPayload,
+          }).catch((fieldsError) =>
+            console.error("Failed to save the job role / assignments:", fieldsError)
           );
         }
         toast.success(result?.message || "Teacher added successfully.");
@@ -1127,8 +1135,8 @@ function TeacherForm({ initialEditId, personType, onClose }: TeacherFormProps) {
               onToggleClassTeacher={(active) =>
                 handleToggleClassTeacher(activeSection, active)
               }
-              onClassTeacherClassChange={(className) =>
-                handleClassTeacherClassChange(activeSection, className)
+              onClassTeacherClassesChange={(classNames) =>
+                handleClassTeacherClassesChange(activeSection, classNames)
               }
               onClassesChange={(classNames) =>
                 handleClassesChange(activeSection, classNames)

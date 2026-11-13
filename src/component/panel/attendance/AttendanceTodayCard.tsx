@@ -9,7 +9,7 @@ import { NO_SCOPE, PERMISSIONS } from "../../../permissions";
 import useHolidayCalendar from "../../../hooks/useHolidayCalendar";
 import { useTeachers } from "../../../hooks/useTeachers";
 import { useAttendanceTotals, useMarkedSectionsOn } from "../../../hooks/useDashboardStats";
-import { TEACHER_SECTIONS } from "../../../utils/teacherSections";
+import { TEACHER_SECTIONS, classTeacherClassesOf } from "../../../utils/teacherSections";
 import { dayOffReason, sessionOfDate, todayKey } from "../../../utils/holidayCalendar";
 import { attendanceSections, sectionValue, type SectionOption } from "./attendanceShared";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
@@ -230,15 +230,16 @@ function AdminSummary() {
   const rows = useMemo(
     () =>
       teachers.flatMap((teacher) =>
-        teacher.sectionAssignments
-          .filter((a) => a.isClassTeacher && a.classTeacherOf.trim())
-          .map((a) => ({
-            className: a.classTeacherOf.trim(),
+        // One row per class: a teacher may look after several classes of a section.
+        teacher.sectionAssignments.flatMap((a) =>
+          classTeacherClassesOf(a).map((className) => ({
+            className,
             // Records saved before sections existed have none; like the
             // teacher's own scope, they count as the first section.
             section: a.section || TEACHER_SECTIONS[0],
             teacherName: `${teacher.firstName} ${teacher.lastName}`.trim(),
           }))
+        )
       ),
     [teachers]
   );

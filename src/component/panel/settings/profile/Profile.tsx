@@ -10,6 +10,7 @@ import { db } from "../../../../firebase/config";
 import PageHeader from "../../../../custom-components/PageHeader";
 import { teacherRecordFromData } from "../../../../hooks/useTeachers";
 import {
+  classTeacherClassesOf,
   formatSectionLabel,
   sortClassSubjects,
   toClassLabel,
@@ -134,8 +135,8 @@ function AssignmentsCard({ teacher }: { teacher: TeacherRecord }) {
                 {assignment.isClassTeacher && (
                   <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700">
                     Class teacher
-                    {assignment.classTeacherOf
-                      ? ` of ${toClassLabel(assignment.classTeacherOf)}`
+                    {classTeacherClassesOf(assignment).length > 0
+                      ? ` of ${classTeacherClassesOf(assignment).map(toClassLabel).join(", ")}`
                       : ""}
                   </span>
                 )}

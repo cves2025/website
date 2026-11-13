@@ -219,7 +219,13 @@ export interface TeacherClassSubjects {
 export interface TeacherSectionAssignment {
   section: string;
   isClassTeacher: boolean;
+  /**
+   * First class of `classTeacherClasses`; kept for readers of the older
+   * single-class field. Use classTeacherClassesOf() to read.
+   */
   classTeacherOf: string;
+  /** Every class of this section the teacher is class teacher of. */
+  classTeacherClasses: string[];
   classes: TeacherClassSubjects[];
 }
 
