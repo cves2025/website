@@ -7,7 +7,6 @@ import {
 } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "../../firebase/config";
-import Loader from "../../custom-components/Loader";
 import {
   Permission,
   PermissionOverrides,
@@ -257,7 +256,10 @@ export function MyContextProvider({ children }: { children: ReactNode }) {
     <myContext.Provider
       value={{ user, authReady, profileReady, login, error, logout, can }}
     >
-      {authReady ? children : <Loader label="Checking your session..." />}
+      {/* Never held back: public pages show at once while the session is
+          checked in the background. Private pages (/welcome) wait for it
+          themselves (RequireAccess shows "Checking your session..."). */}
+      {children}
     </myContext.Provider>
   );
 }
