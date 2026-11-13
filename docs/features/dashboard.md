@@ -1,13 +1,15 @@
 # Dashboard
 
 Route `/welcome` (index; `component/admin/Dashboard.tsx`). On the dashboard the top bar in
-`component/Welcome.tsx` shares the banner gradient (`DASHBOARD_GRADIENT`, `onDashboard`).
+`component/Welcome.tsx` shares the banner gradient (`DASHBOARD_GRADIENT`, `onDashboard`). The
+header (school name, Go to Website) is the same for admins and teachers; the rupee button needs
+`FEE_MANAGE`.
 
 ## Files
 
 | File | What it does |
 |---|---|
-| `src/component/admin/Dashboard.tsx` | Greeting banner + cards grid (attendance card; the fee card is a floating icon) |
+| `src/component/admin/Dashboard.tsx` | Greeting banner + cards grid (attendance card, Marks Entry card - see [marks-progress.md](marks-progress.md); the fee card is a floating icon) |
 | `src/component/panel/attendance/AttendanceTodayCard.tsx` | Today's attendance: admin = whole school by aggregation; teacher = own sections. `PendingDropdown` ("Not marked (N)", CustomSelect, animated cves ring, "Teacher - 5th A" -> opens Mark Attendance; marked list read lazily on open) |
 | `src/component/panel/fees/FeeTodayCard.tsx` | Fee icon fixed on the right edge; the card grows out of it / shrinks back (`FEE_PANEL_MS`), closes on X, Esc or a click outside; nothing is read until opened. Period dropdown (`FEE_PERIOD_OPTIONS`), ring = this month's collection vs `feeTargetOfMonth`, Receipts tile, one card with "View Dues Report" / "View Collection Report" |
 | `src/utils/dashboardStats.ts` | Aggregation queries: `collectionTotal` (sum + count, fallback on missing index), `schoolAttendanceOn`, `sectionsAttendanceOn`, `transportPerMonth` |
@@ -24,5 +26,7 @@ transport.amount). Missing index -> `failed-precondition` -> fallback to reading
 ## Change X -> look here
 
 - Card layout / greeting: `Dashboard.tsx`; header on the dashboard: `Welcome.tsx`.
+- Name in the greeting: `user.fullName`, built in `MyContextProvider` (`buildUser`) from
+  `fullName` or else `firstName` + `lastName` (teachers have no `fullName`).
 - Fee card animation / outside click: `FeeTodayCard` (bottom of the file).
 - Target formula: `feeTarget.ts`.

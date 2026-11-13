@@ -65,12 +65,11 @@ function Welcome() {
           >
             <BsList className="w-7 h-7" />
           </button>
-          {user.role === "admin" ? (
-            // Admins see the school name, styled like the AddStudent /
-            // result card letterhead.
-            // On the dashboard the coloured name sits on a white box, so it
-            // stays readable on the gradient.
-            <h1
+          {/* Everyone (admin and teacher) sees the school name, styled like the
+              AddStudent / result card letterhead. On the dashboard the
+              coloured name sits on a white box, so it stays readable on the
+              gradient. */}
+          <h1
               className={`min-w-0 truncate font-bold text-gray-800 ${
                 onDashboard
                   ? "rounded-md bg-white px-2 py-0.5 text-xs shadow-sm md:text-sm"
@@ -84,11 +83,6 @@ function Welcome() {
                 <span className="text-pink-600">SCHOOL</span>
               </span>
             </h1>
-          ) : (
-            <h1 className={`text-lg md:text-xl font-bold truncate ${onDashboard ? "text-white" : "text-gray-800"}`}>
-              Welcome{user?.fullName ? `, ${user.fullName}` : ""}!
-            </h1>
-          )}
           {can(PERMISSIONS.FEE_MANAGE) && (
             // Collect Fee from any page, with the cursor in the student search.
             // On that page already, the picked student stays.
@@ -114,8 +108,8 @@ function Welcome() {
               <IndianRupee className="h-4 w-4" strokeWidth={2.5} />
             </button>
           )}
-          {user.role === "admin" && (
-            <Link
+          {/* Go to Website: for everyone. */}
+          <Link
               to="/"
               title="Go to Website"
               className={`${can(PERMISSIONS.FEE_MANAGE) ? "" : "ml-auto "}flex shrink-0 items-center gap-2 rounded-full px-3 text-sm font-bold text-white shadow-sm transition-colors sm:px-4 ${
@@ -128,7 +122,6 @@ function Welcome() {
               {/* Icon only on small phones, so the school name keeps its room. */}
               <span className="hidden sm:inline">Go to Website</span>
             </Link>
-          )}
         </header>
 
         {/* Page content */}

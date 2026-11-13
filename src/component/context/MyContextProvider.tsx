@@ -109,7 +109,10 @@ function buildUser(
   const base = baseUser(firebaseUser);
   if (!data) return base;
 
-  const fullName = typeof data.fullName === "string" ? data.fullName : undefined;
+  // Admins may have `fullName`; teachers (Add Teacher) have first + last name.
+  const text = (key: string) => (typeof data[key] === "string" ? (data[key] as string).trim() : "");
+  const fullName =
+    text("fullName") || `${text("firstName")} ${text("lastName")}`.trim() || undefined;
   const lastSeenReleaseId =
     typeof data.lastSeenReleaseId === "string" &&
     data.lastSeenReleaseId.trim() !== ""
