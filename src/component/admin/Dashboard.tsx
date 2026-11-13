@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { myContext } from "../context/MyContextProvider";
 import { DASHBOARD_GRADIENT } from "../../constants";
 import AttendanceTodayCard from "../panel/attendance/AttendanceTodayCard";
+import MarksPendingCard from "../panel/marks/MarksPendingCard";
 import FeeTodayCard from "../panel/fees/FeeTodayCard";
 
 const greeting = (hour: number) =>
@@ -35,6 +36,7 @@ function Dashboard() {
         {/* Cards over the banner, all the same height */}
         <div className="-mt-20 grid grid-cols-1 items-stretch gap-6 px-6 md:px-12 xl:grid-cols-2">
           <AttendanceTodayCard />
+          <MarksPendingCard />
           <FeeTodayCard />
         </div>
       </div>

@@ -51,6 +51,12 @@ export const COLLECTION = {
   FEE_PAYMENTS: "feePayments",
   /** Last receipt serial of a session, id = session. */
   FEE_COUNTERS: "feeCounters",
+  /**
+   * Marks entry progress of one exam (dashboard card), id = {session}_{examId}:
+   * per class + section the students, the subject columns and how many
+   * students have marks in each. Kept up to date by saveStudentMarks.
+   */
+  MARKS_PROGRESS: "marksProgress",
 };
 
 /**
@@ -472,6 +478,8 @@ export const VIEW_STUDENT_PATH = "/welcome/student/view";
 export const FEE_STRUCTURE_PATH = "/welcome/fees/structure";
 
 export const FEE_COLLECT_PATH = "/welcome/fees/collect";
+/** Marks entry page; `?session=&exam=&class=&section=` opens that sheet. */
+export const MARKS_PATH = "/welcome/marks";
 
 export const FEE_DUES_REPORT_PATH = "/welcome/fees/dues";
 

@@ -21,6 +21,7 @@ import {
   limit,
   query,
   type QueryConstraint,
+  increment,
   runTransaction,
   serverTimestamp,
   setDoc,
@@ -112,6 +113,27 @@ export interface SaveStudentMarksParams {
    * result even when the settings change later.
    */
   rules: ExamRules;
+  /**
+   * The marks sheet this save comes from: how many students it has and its
+   * subject columns. Stored in the exam's marks progress document (dashboard
+   * card); without it only the counts change.
+   */
+  progress?: {
+    /** Left out when unknown (e.g. an upload); the dashboard counts them then. */
+    sectionStudents?: number;
+    subjects: { id: string; name: string }[];
+  };
+}
+
+/** Subject keys of a stored marks map that hold a mark (a record with a status). */
+function markedSubjectKeys(subjectMarks: unknown): Set<string> {
+  const keys = new Set<string>();
+  if (subjectMarks && typeof subjectMarks === "object") {
+    Object.entries(subjectMarks as Record<string, unknown>).forEach(([key, value]) => {
+      if (value && typeof value === "object" && "status" in value) keys.add(key);
+    });
+  }
+  return keys;
 }
 
 /**
@@ -135,6 +157,7 @@ export async function saveStudentMarks(
     legacySubjectKeysToDelete,
     existed,
     rules,
+    progress,
   } = params;
   const marksDocId = buildMarksDocId(session, examId, student.studentUid);
   const summary = calculateMarksSummary(subjectMarks, rules);
@@ -162,9 +185,8 @@ export async function saveStudentMarks(
     mergedSubjectMarks[key] = deleteField();
   });
 
-  await setDoc(
-    doc(db, COLLECTION.MARKS, marksDocId),
-    {
+  const marksRef = doc(db, COLLECTION.MARKS, marksDocId);
+  const marksData = {
       studentUid: student.studentUid,
       admissionNumber: student.admissionNumber,
       studentName: student.studentName,
@@ -183,9 +205,52 @@ export async function saveStudentMarks(
       result: summary.result,
       updatedAt: serverTimestamp(),
       ...(existed ? {} : { createdAt: serverTimestamp() }),
-    },
-    { merge: true },
-  );
+  };
+
+  // One transaction: the marks, and the exam's progress document moved by
+  // the subjects this save adds or removes for the student (read from the
+  // stored document, so the counts never drift with the page's state).
+  await runTransaction(db, async (transaction) => {
+    const before = await transaction.get(marksRef);
+    const had = markedSubjectKeys(before.exists() ? before.data().subjectMarks : undefined);
+    const removed = new Set([...clearedSubjectKeys, ...(legacySubjectKeysToDelete ?? [])]);
+    const has = new Set([...had].filter((key) => !removed.has(key)));
+    markedSubjectKeys(subjectMarks).forEach((key) => has.add(key));
+
+    const entered: Record<string, unknown> = {};
+    has.forEach((key) => {
+      if (!had.has(key)) entered[key] = increment(1);
+    });
+    had.forEach((key) => {
+      if (!has.has(key)) entered[key] = increment(-1);
+    });
+
+    transaction.set(marksRef, marksData, { merge: true });
+
+    if (Object.keys(entered).length > 0 || progress) {
+      const sectionKey = `${student.className}|${student.section}`;
+      transaction.set(
+        doc(db, COLLECTION.MARKS_PROGRESS, `${session}_${examId}`),
+        {
+          session,
+          examId,
+          sections: {
+            [sectionKey]: {
+              className: student.className,
+              section: student.section,
+              ...(progress?.sectionStudents !== undefined ? { students: progress.sectionStudents } : {}),
+              ...(progress
+                ? { subjects: Object.fromEntries(progress.subjects.map((subject) => [subject.id, subject.name])) }
+                : {}),
+              entered,
+            },
+          },
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+    }
+  });
 }
 /** Attendance record id is deterministic: one record per student and exam. */
 export function buildAttendanceDocId(

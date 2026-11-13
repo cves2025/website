@@ -135,6 +135,11 @@ export function useMarksUploadSave({
               legacySubjectKeysToDelete: [],
               existed: job.existed,
               rules,
+              // Subject columns for the dashboard's marks progress (the
+              // section's student count is not known here).
+              progress: {
+                subjects: columns.map((column) => ({ id: column.id, name: column.name })),
+              },
             });
             anyMarksSaved = true;
           } catch (error) {

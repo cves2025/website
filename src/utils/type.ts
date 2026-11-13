@@ -824,3 +824,37 @@ export interface IdCardTemplatePlan {
   /** Modern horizontal: a strip down the left with the title on it. */
   strip?: IdCardBox;
 }
+
+/* ------------------------------------------------- marks entry progress -- */
+
+/** One class + section in a marks progress document. */
+export interface MarksProgressSection {
+  className: string;
+  section: string;
+  /** Students on the marks sheet when it was last saved. */
+  students: number;
+  /** Subject columns of the sheet: id -> name. */
+  subjects: Record<string, string>;
+  /** Students with marks (or absent / exempt) in each subject: id -> count. */
+  entered: Record<string, number>;
+}
+
+/** The `marksProgress/{session}_{examId}` document. */
+export interface MarksProgressDoc {
+  session: string;
+  examId: string;
+  /** Key `${className}|${section}`. */
+  sections: Record<string, MarksProgressSection>;
+}
+
+/** A class + section of an exam on the dashboard's marks card. */
+export interface MarksPendingRow {
+  className: string;
+  section: string;
+  students: number;
+  status: "complete" | "progress" | "notStarted";
+  /** Subjects (names) still missing marks, with how many students each. */
+  pending: { name: string; missing: number }[];
+  /** Marks still to enter (students x subjects) where the sheet is started. */
+  missingMarks: number;
+}

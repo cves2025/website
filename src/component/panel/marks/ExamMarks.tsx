@@ -18,6 +18,7 @@ import {
 } from "firebase/firestore";
 
 import toast from "react-hot-toast";
+import { useSearchParams } from "react-router-dom";
 
 import { CLASSES, COLLECTION, CVES_ON_HOVER, SECTIONS } from "../../../constants";
 
@@ -288,13 +289,18 @@ function ExamMarks() {
 
   const [uploadOpen, setUploadOpen] = useState(false);
   const [attendanceFillOpen, setAttendanceFillOpen] = useState(false);
-  const [marksYear, setMarksYear] = useState(academicYears[0]?.value ?? "");
+  // ?session=&exam=&class=&section= (e.g. from the dashboard's marks card)
+  // opens that sheet straight away.
+  const [searchParams] = useSearchParams();
+  const [marksYear, setMarksYear] = useState(
+    searchParams.get("session") || academicYears[0]?.value || "",
+  );
 
-  const [marksExamId, setMarksExamId] = useState("");
+  const [marksExamId, setMarksExamId] = useState(searchParams.get("exam") ?? "");
 
-  const [marksClass, setMarksClass] = useState("");
+  const [marksClass, setMarksClass] = useState(searchParams.get("class") ?? "");
 
-  const [section, setSection] = useState("");
+  const [section, setSection] = useState(searchParams.get("section") ?? "");
 
   const [rowStudents, setRowStudents] = useState<MarksRowStudent[]>([]);
 
@@ -590,6 +596,18 @@ function ExamMarks() {
         existed,
 
         rules: rulesRef.current,
+
+        // The sheet (its students in this section and its subject columns)
+        // for the exam's marks progress on the dashboard.
+        progress: {
+          sectionStudents: rowStudentsRef.current.filter(
+            (row) => row.section === snapshot.section,
+          ).length,
+          subjects: subjectColumnsRef.current.map((column) => ({
+            id: column.id,
+            name: column.name,
+          })),
+        },
       });
 
       knownDocIdsRef.current.add(marksDocId);
