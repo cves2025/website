@@ -52,6 +52,7 @@ All in `src/custom-components`. Forms use react-hook-form; a screen without a fo
 | Dialog / confirm | `Modal` (has a secondary action, `hideSubmit`, children) |
 | Inline success / error message | `FormMessage`; toasts via `react-hot-toast` |
 | One-line text that must fit | `FitText` |
+| Tooltip on hover / focus (instead of the `title` attribute) | `Tooltip` (`content`, optional `side`, `delay`); navy bubble with an arrow, drawn in a portal |
 | Rich text | `RichText` (show), `RichTextEditor` (edit) |
 | Admission form look | `custom-components/admission/*` |
 
