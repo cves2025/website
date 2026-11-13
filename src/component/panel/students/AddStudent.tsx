@@ -991,7 +991,7 @@ function AddStudent() {
       ) : activeTab === "info" ? (
         <div
           ref={infoPageRef}
-          className="mx-auto max-w-5xl bg-white p-2 sm:p-2 font-serif text-slate-900"
+          className="mx-auto max-w-5xl bg-white p-2 sm:p-2 font-times lining-nums text-slate-900"
         >
           <AdmissionInfoSheet
             control={control}
@@ -1022,7 +1022,7 @@ function AddStudent() {
         <form
           onSubmit={handleSubmit(onSubmit)}
           noValidate
-          className="mx-auto max-w-5xl bg-white p-6 sm:p-10 font-serif text-slate-900"
+          className="mx-auto max-w-5xl bg-white p-6 sm:p-10 font-times lining-nums text-slate-900"
         >
           <AdmissionSchoolSheet control={control} />
 

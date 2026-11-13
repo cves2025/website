@@ -76,7 +76,7 @@ export function A4Sheet({ children }: { children: ReactNode }) {
       <div className="h-full w-full">
         <div
           ref={contentRef}
-          className="font-serif text-slate-900"
+          className="font-times lining-nums text-slate-900"
           style={{
             width: SHEET_DESIGN_WIDTH,
             transform: `translateX(${fit.offset}px) scale(${fit.scale})`,

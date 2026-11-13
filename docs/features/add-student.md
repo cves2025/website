@@ -44,6 +44,12 @@ outlier such as the "Test" student with 3456. Recycle-bin students keep their nu
   `ENROLLMENT_JUMP_WARNING` (10) after the highest in use (`farEnrollment` modal; confirmed once
   per number via `farEnrollmentConfirmed`).
 
+## Font
+
+The form (both pages, and Student View's sheet) uses `font-times lining-nums`: Times New Roman for
+letters and numbers. Not `font-serif`: on Windows that picks Georgia, whose old-style numbers sit
+up and down. `font-times` is defined in `tailwind.config.js`.
+
 ## Change X -> look here
 
 - A new admission field: `AdmissionStudentFormValues` (type.ts), the sheet in

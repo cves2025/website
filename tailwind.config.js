@@ -38,6 +38,13 @@ export default {
   		fontFamily: {
   			cancun: [
   				'Cancun'
+  			],
+  			// Admission form: Times New Roman for letters and numbers alike
+  			// (font-serif picks Georgia on Windows, whose numbers go up and down).
+  			times: [
+  				'"Times New Roman"',
+  				'Times',
+  				'serif'
   			]
   		},
   		height: {
