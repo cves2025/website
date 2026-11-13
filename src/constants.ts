@@ -478,6 +478,17 @@ export const VIEW_STUDENT_PATH = "/welcome/student/view";
 export const FEE_STRUCTURE_PATH = "/welcome/fees/structure";
 
 export const FEE_COLLECT_PATH = "/welcome/fees/collect";
+/**
+ * Idle lock of the admin panel: after this long without mouse / keyboard /
+ * touch activity the screen locks until the password is entered again.
+ */
+export const IDLE_LOCK_MS = 5 * 60 * 1000;
+/** Wrong passwords on the lock screen before the user is logged out. */
+export const IDLE_LOCK_MAX_ATTEMPTS = 5;
+/** Browser keys (shared by the tabs): last activity time, and the locked user. */
+export const IDLE_ACTIVITY_KEY = "cves:lastActivity";
+export const IDLE_LOCKED_KEY = "cves:lockedUid";
+
 /** Marks entry page; `?session=&exam=&class=&section=` opens that sheet. */
 export const MARKS_PATH = "/welcome/marks";
 
