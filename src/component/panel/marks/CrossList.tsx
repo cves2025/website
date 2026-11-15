@@ -20,7 +20,6 @@ import {
   computeRanks,
   formatMarks,
   isMarksDocComplete,
-  type SubjectColumnDefMap,
 } from "../../../utils/marks";
 import {
   getExamSheet,
@@ -30,7 +29,10 @@ import {
   type LiveSubject,
 } from "../../../utils/marksService";
 import { loadRollNumbers } from "../../../utils/rollNumbers";
-import { dropUnitTestPracticalSiblings } from "../../../utils/marksEntry";
+import {
+  buildCompletenessColumns,
+  dropUnitTestPracticalSiblings,
+} from "../../../utils/marksEntry";
 import { useExamRules } from "../../../hooks/useExamRules";
 import type {
   ExamDoc,
@@ -176,22 +178,6 @@ function buildCrossListGroups(
     ...sheetSubjects.filter((subject) => !subject.isGrade).map(toGroup),
     ...sheetSubjects.filter((subject) => subject.isGrade).map(toGroup),
   ];
-}
-
-/** Completeness column definitions, derived from the snapshot's componentMax. */
-function buildColumnDefs(
-  sheetSubjects: readonly ExamSheetSubjectColumn[]
-): SubjectColumnDefMap {
-  const defs: SubjectColumnDefMap = {};
-  sheetSubjects.forEach((subject) => {
-    defs[subject.id] = {
-      components: subject.componentMax
-        ? (Object.keys(subject.componentMax) as SubjectComponentName[])
-        : [],
-      isGrade: subject.isGrade,
-    };
-  });
-  return defs;
 }
 
 /** Text of one register cell of a subject (or "-" when no marks). */
@@ -861,7 +847,11 @@ function CrossList() {
         visibleSheetsByClass[className]?.subjects ??
         fallbackByClass[className] ??
         [];
-      const columnDefs = buildColumnDefs(sheetSubjects);
+      const columnDefs = buildCompletenessColumns(
+        sheetSubjects,
+        selectedExam,
+        className
+      );
       const completeRows = docs.filter((doc) =>
         isMarksDocComplete(doc, columnDefs)
       );
@@ -876,7 +866,7 @@ function CrossList() {
       );
     });
     return ranks;
-  }, [currentMarks, visibleSheetsByClass, fallbackByClass]);
+  }, [currentMarks, visibleSheetsByClass, fallbackByClass, selectedExam]);
 
   // Per-student ranks shared across every block of this view. Only COMPLETE
   // rows take part: incomplete rows (isMarksDocComplete false or a missing
@@ -889,7 +879,11 @@ function CrossList() {
       const sheetSubjects = block.sheet
         ? block.sheet.subjects
         : block.fallbackSubjects;
-      const columnDefs = buildColumnDefs(sheetSubjects);
+      const columnDefs = buildCompletenessColumns(
+        sheetSubjects,
+        selectedExam,
+        block.className
+      );
       const completeRows = block.rows.filter(
         (row): row is CrossListRow & { doc: MarksDoc } =>
           row.doc !== null && isMarksDocComplete(row.doc, columnDefs)
@@ -905,7 +899,7 @@ function CrossList() {
       );
     });
     return ranks;
-  }, [blocks, rules.rankScope, classWideRanks]);
+  }, [blocks, rules.rankScope, classWideRanks, selectedExam]);
 
   // Rank column header and the small rules line shown under every block
   // heading (visible on screen and in print).
@@ -1088,6 +1082,7 @@ function CrossList() {
             <CrossListBlock
               key={`${block.className}::${block.section}`}
               block={block}
+              exam={selectedExam}
               examName={selectedExam?.examName ?? ""}
               session={session}
               examCategory={selectedExam?.examCategory ?? null}
@@ -1105,6 +1100,7 @@ function CrossList() {
 /** One class-section register block: heading, warnings and the marks table. */
 function CrossListBlock({
   block,
+  exam,
   examName,
   session,
   examCategory,
@@ -1113,6 +1109,7 @@ function CrossListBlock({
   rulesSummary,
 }: {
   block: ClassSectionBlock;
+  exam: ExamDoc | null;
   examName: string;
   session: string;
   examCategory: ExamCategory | null;
@@ -1126,7 +1123,11 @@ function CrossListBlock({
   );
   const groups = buildCrossListGroups(examCategory, displaySubjects);
   const headerRows = groups.some((group) => group.parts.length > 1) ? 2 : 1;
-  const columnDefs = buildColumnDefs(sheetSubjects);
+  const columnDefs = buildCompletenessColumns(
+    sheetSubjects,
+    exam,
+    block.className
+  );
 
   const incompleteCount = block.rows.filter(
     (row) => row.doc === null || !isMarksDocComplete(row.doc, columnDefs)

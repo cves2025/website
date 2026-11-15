@@ -5,7 +5,7 @@
  * No React and no Firestore in this module.
  */
 import { isSchemeClass, subjectMarksBreakdown } from "./examMarksScheme";
-import { round2 } from "./marks";
+import { round2, type SubjectColumnDefMap } from "./marks";
 import type {
   ExamDoc,
   SubjectComponentName,
@@ -306,6 +306,54 @@ export function buildSubjectColumns(
         oralNames.has(nameKey(c.name)),
       ),
     );
+}
+
+/**
+ * Completeness rule of one class's subjects (Cross List "Incomplete", ranks):
+ * the components marks entry really saves, from the same layout as
+ * `enrichSubjectColumn`. Do not use a sheet's `componentMax` for this: it
+ * lists components marks entry never saves (e.g. "theory" on a Main Exam
+ * "Practical" row, or on a Written + Oral / Oral / Written row of classes
+ * 1-8), so fully entered students looked incomplete.
+ * A subject with no input (practical paper of 0 marks) is left out: marks
+ * entry never saves it, so it cannot be missing.
+ */
+export function buildCompletenessColumns(
+  subjects: readonly SubjectColumnBase[],
+  exam: ExamDoc | null,
+  className: string,
+): SubjectColumnDefMap {
+  const namesOfType = (type: string) =>
+    new Set(
+      subjects
+        .filter((subject) => subject.type === type)
+        .map((subject) => nameKey(subject.name)),
+    );
+  const practicalNames = namesOfType("Practical");
+  const oralNames = namesOfType("Oral");
+
+  const defs: SubjectColumnDefMap = {};
+  subjects.forEach((subject) => {
+    const column = enrichSubjectColumn(
+      subject,
+      exam,
+      className,
+      practicalNames.has(nameKey(subject.name)),
+      oralNames.has(nameKey(subject.name)),
+    );
+    if (column.isGrade) {
+      defs[subject.id] = { components: [], isGrade: true };
+      return;
+    }
+    if (column.inputs.length === 0) return;
+    defs[subject.id] = {
+      components: column.inputs.flatMap((input) =>
+        input.component ? [input.component] : [],
+      ),
+      isGrade: false,
+    };
+  });
+  return defs;
 }
 
 /** Status tokens a grade cell accepts besides the grades: absent / exempt. */
