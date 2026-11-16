@@ -11,6 +11,9 @@
       "indexes": "firestore.indexes.prod.json"
     }
   ],
+  "storage": {
+    "rules": "storage.rules"
+  },
   "hosting": {
     "target": "dev",
     "public": "dist",

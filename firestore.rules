@@ -1,34 +1,269 @@
 rules_version = '2';
 
 // ===========================================================================
-// Cloud Firestore security rules for CVES
+// Cloud Firestore security rules for CVES (website + mobile app)
 // ---------------------------------------------------------------------------
-// Fee module: locked to active admins (see the fee section below). The public
-// Pay Fee page may read the fee structure only.
+// The same file is deployed to dev (schoolproject-284dc) and prod
+// (childrensvalley). Map of who may do what: docs/features/security-rules.md
 //
-// TEMPORARY: every other collection is still open, as during development.
-// TODO: lock those per role (admin / teacher) before going to production.
+// Who is who (same as MyContextProvider.buildUser):
+//   - staff   = signed in, users/{uid} exists, role "admin" or "teacher",
+//               not deleted, status "Active" or empty
+//   - admin   = staff with role "admin"
+//   - can(p)  = admin, or a teacher who has permission p
+//               (mirror of resolvePermissions: school defaults from
+//               panelSettings/rolePermissions + the teacher's own
+//               permissionOverrides; admin-only permissions never)
+//   - public  = anyone, also not signed in (the school website pages)
+//
+// Anything not listed below is denied.
 // ===========================================================================
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ---------- helpers ----------
+    // ---------- who is signed in ----------
+
     function signedIn() {
       return request.auth != null;
     }
 
-    // Same rule as the app (MyContextProvider): role "admin", not deleted,
-    // status "Active" or empty.
-    function isActiveAdmin(profile) {
-      return profile.role == 'admin'
-        && profile.get('isDeleted', false) != true
-        && profile.get('status', 'Active') in ['Active', ''];
+    function userPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function profile() {
+      return get(userPath()).data;
+    }
+
+    // Not deleted, status "Active" or empty (an old profile has no status).
+    function isActive(data) {
+      return data.get('isDeleted', false) != true
+        && data.get('status', 'Active') in ['Active', ''];
+    }
+
+    function hasRole(roles) {
+      return signedIn()
+        && exists(userPath())
+        && isActive(profile())
+        && profile().get('role', '') in roles;
+    }
+
+    function isStaff() {
+      return hasRole(['admin', 'teacher']);
     }
 
     function isAdmin() {
-      let path = /databases/$(database)/documents/users/$(request.auth.uid);
-      return signedIn() && exists(path) && isActiveAdmin(get(path).data);
+      return hasRole(['admin']);
+    }
+
+    function isTeacher() {
+      return hasRole(['teacher']);
+    }
+
+    // ---------- teacher permissions ----------
+    // MIRROR of src/permissions (rolePermissions.ts, resolvePermissions.ts,
+    // permissionCatalog.ts, utils/permissionSettingsService.ts). When a
+    // permission list changes there, change it here too.
+
+    // ROLE_PERMISSIONS.teacher
+    function builtInTeacher() {
+      return ['student.read', 'student.formView', 'marks.enter', 'marks.view',
+              'result.view', 'profile.view', 'attendance.mark'];
+    }
+
+    // CLASS_TEACHER_BONUS
+    function builtInClassTeacher() {
+      return ['admitcard.view', 'crosslist.view', 'attendance.view'];
+    }
+
+    // TEACHER_BLOCKED_PERMISSIONS: a teacher never gets these.
+    function teacherBlocked() {
+      return ['student.create', 'student.promote', 'teacher.create', 'exam.manage',
+              'examSettings.access', 'settings.access', 'permissions.manage', 'fee.manage'];
+    }
+
+    // LEGACY_CATALOG_PERMISSIONS: what the Permissions page offered before it
+    // saved `known` (the whole catalog without profile.view, student.formView).
+    function legacyCatalog() {
+      return ['banner.manage', 'news.manage', 'gallery.manage', 'downloads.manage',
+              'student.read', 'subject.manage',
+              'attendance.mark', 'attendance.view', 'holiday.manage',
+              'idcard.student', 'idcard.teacher', 'idcard.staff', 'idcard.admin',
+              'admitcard.view', 'admitcard.generate', 'deskslip.access',
+              'marks.enter', 'marks.view', 'crosslist.view', 'result.view'];
+    }
+
+    function asList(value) {
+      return value is list ? value : [];
+    }
+
+    // parseTeacherRoleDefaults: the saved list, plus a built-in default that
+    // the page did not know about when the document was saved.
+    function savedOn(saved, builtIn, known, p) {
+      return p in asList(saved) || (p in builtIn && !(p in known));
+    }
+
+    function defaultsDocOn(d, p, classTeacher) {
+      let known = d.get('known', null) is list ? d.known : legacyCatalog();
+      return savedOn(d.get('teacher', []), builtInTeacher(), known, p)
+        || (classTeacher && savedOn(d.get('classTeacher', []), builtInClassTeacher(), known, p));
+    }
+
+    // isClassTeacherProfile. Rules cannot look inside the sectionAssignments
+    // list, so this reads the isClassTeacher flag that Add Teacher keeps in
+    // step with it.
+    function isClassTeacher() {
+      return profile().get('isClassTeacher', false) == true;
+    }
+
+    function teacherDefaultOn(p) {
+      let path = /databases/$(database)/documents/panelSettings/rolePermissions;
+      return exists(path)
+        ? defaultsDocOn(get(path).data, p, isClassTeacher())
+        : (p in builtInTeacher() || (isClassTeacher() && p in builtInClassTeacher()));
+    }
+
+    function teacherCan(p) {
+      let overrides = profile().get('permissionOverrides', {});
+      return isTeacher()
+        && !(p in teacherBlocked())
+        && !(p in asList(overrides.get('revoke', [])))
+        && (p in asList(overrides.get('grant', [])) || teacherDefaultOn(p));
+    }
+
+    function can(p) {
+      return isAdmin() || teacherCan(p);
+    }
+
+    // ---------- users (teachers, staff, admins) ----------
+
+    match /users/{userId} {
+      // Own profile always (the app shows "inactive" / "no access" from it);
+      // the staff list for staff (ID cards, class teacher names...).
+      allow read: if (signedIn() && request.auth.uid == userId) || isStaff();
+      // Add / edit / delete (isDeleted) teacher and staff, permission
+      // overrides. Teachers with a login are created by the server.
+      allow create, update, delete: if isAdmin();
+      // "What's new" dialog: a user may only mark the release as seen.
+      allow update: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['lastSeenReleaseId', 'updatedAt']);
+    }
+
+    // ---------- students and classes ----------
+
+    match /students/{studentId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
+    match /enrollments/{enrollmentId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
+    match /rollNumber/{docId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
+    match /subjects/{subjectId} {
+      allow read: if isStaff();
+      allow write: if can('subject.manage');
+    }
+
+    // ---------- exams, marks, results ----------
+
+    match /exams/{examId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
+    match /examSchedules/{docId} {
+      allow read: if isStaff();
+      allow write: if can('admitcard.generate');
+    }
+
+    // Marks entry writes marks + marksProgress (+ examSheets the first time)
+    // together; Student Promote (admin) moves marks / attendance.
+    match /marks/{docId} {
+      allow read: if isStaff();
+      allow write: if can('marks.enter');
+    }
+
+    match /marksProgress/{docId} {
+      allow read: if isStaff();
+      allow write: if can('marks.enter');
+    }
+
+    match /examSheets/{docId} {
+      allow read: if isStaff();
+      allow write: if can('marks.enter');
+    }
+
+    // Present / total days of an exam term (result card), saved on Marks.
+    match /attendance/{docId} {
+      allow read: if isStaff();
+      allow write: if can('marks.enter');
+    }
+
+    // Principal's signature and school stamp (result card, ID cards).
+    match /stampSign/{docId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // ---------- daily attendance ----------
+
+    match /dailyAttendance/{docId} {
+      allow read: if isStaff();
+      allow write: if can('attendance.mark');
+    }
+
+    match /holidayCalendar/{session} {
+      allow read: if isStaff();
+      allow write: if can('holiday.manage');
+    }
+
+    // ---------- website content (public pages) ----------
+    // The public pages only ask for published items (where isPublished ==
+    // true); the manage pages read everything.
+
+    match /news/{newsId} {
+      allow read: if resource.data.isPublished == true || isStaff();
+      allow write: if can('news.manage');
+    }
+
+    match /gallery/{photoId} {
+      allow read: if resource.data.isPublished == true || isStaff();
+      allow write: if can('gallery.manage');
+    }
+
+    match /downloads/{fileId} {
+      allow read: if resource.data.isPublished == true || isStaff();
+      allow write: if can('downloads.manage');
+    }
+
+    // ---------- settings ----------
+
+    // homeBanner: Home page slides (public). admitCard, idCard: templates.
+    match /settings/{docId} {
+      allow read: if docId == 'homeBanner' || isStaff();
+      allow write: if (docId == 'homeBanner' && can('banner.manage'))
+        || (docId != 'homeBanner' && isAdmin());
+    }
+
+    // siteImages (school photo) + galleryImport: public pages, Settings > Gallery.
+    // rolePermissions: read by every signed-in app when it starts.
+    // exam (exam rules), suggestedRemarks, enrollmentCounter...: admin pages.
+    match /panelSettings/{docId} {
+      allow read: if docId in ['siteImages', 'galleryImport']
+        || (docId == 'rolePermissions' && signedIn())
+        || isStaff();
+      allow write: if (docId in ['siteImages', 'galleryImport'] && can('gallery.manage'))
+        || isAdmin();
     }
 
     // ---------- fee module (admin only) ----------
@@ -72,15 +307,6 @@ service cloud.firestore {
       allow update: if isAdmin()
         && request.resource.data.lastSerial == resource.data.lastSerial + 1;
       allow delete: if false;
-    }
-
-    // ---------- everything else (TEMPORARY, still open) ----------
-    // Rules are OR-ed, so this match must leave the fee collections out,
-    // otherwise it would open them again.
-    match /{collectionName}/{document=**} {
-      allow read, write: if !(collectionName in [
-        'feeStructures', 'feeSettings', 'feeAccounts', 'feePayments', 'feeCounters'
-      ]);
     }
   }
 }

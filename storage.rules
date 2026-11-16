@@ -1,8 +1,107 @@
 rules_version = '2';
+
+// ===========================================================================
+// Cloud Storage security rules for CVES (website + mobile app)
+// ---------------------------------------------------------------------------
+// Same file for dev and prod. Map: docs/features/security-rules.md
+//
+// - The pages show files through their download URL (it has a token), which
+//   does not go through these rules, so the public website keeps showing
+//   photos and PDFs.
+// - staff / admin are read from Firestore users/{uid}, like firestore.rules
+//   (the (default) database; both projects use it). On the first deploy the
+//   Firebase CLI asks to let Storage read Firestore: say yes.
+// - Each folder only takes its own kind of file (JPEG photos, PDFs), with a
+//   size limit. Folders not listed here are closed.
+// ===========================================================================
+
 service firebase.storage {
   match /b/{bucket}/o {
+
+    function profile() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasRole(roles) {
+      return request.auth != null
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        && profile().get('isDeleted', false) != true
+        && profile().get('status', 'Active') in ['Active', '']
+        && profile().get('role', '') in roles;
+    }
+
+    function isStaff() {
+      return hasRole(['admin', 'teacher']);
+    }
+
+    function isAdmin() {
+      return hasRole(['admin']);
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/.*')
+        && request.resource.size < 10 * 1024 * 1024;
+    }
+
+    function isPdf() {
+      return request.resource.contentType == 'application/pdf'
+        && request.resource.size < 20 * 1024 * 1024;
+    }
+
+    // Staff may read any file (getDownloadURL right after an upload).
     match /{allPaths=**} {
-      allow read, write: if request.auth != null;
+      allow read: if isStaff();
+    }
+
+    // ---------- website content (Settings pages, website + mobile) ----------
+    // Teachers given News / Gallery / Downloads / Banner manage these too;
+    // which teacher may change which Firestore item is checked in
+    // firestore.rules.
+
+    match /news/{newsId}/{fileName} {
+      allow create, update: if isStaff() && isImage();
+      allow delete: if isStaff();
+    }
+
+    match /gallery/{fileName} {
+      allow create, update: if isStaff() && isImage();
+      allow delete: if isStaff();
+    }
+
+    match /banner/{fileName} {
+      allow create, update: if isStaff() && isImage();
+      allow delete: if isStaff();
+    }
+
+    // The school photo of Home / About (Settings > Gallery).
+    match /site/{fileName} {
+      allow create, update: if isStaff() && isImage();
+      allow delete: if isStaff();
+    }
+
+    match /downloads/{fileName} {
+      allow create, update: if isStaff() && isPdf();
+      allow delete: if isStaff();
+    }
+
+    // ---------- admin pages ----------
+
+    // Student, father and mother photos (Add Student).
+    match /students/{studentId}/{fileName} {
+      allow create, update: if isAdmin() && isImage();
+      allow delete: if isAdmin();
+    }
+
+    // Teacher / staff photos (Add Teacher).
+    match /teachers/photos/{fileName} {
+      allow create, update: if isAdmin() && isImage();
+      allow delete: if isAdmin();
+    }
+
+    // ID card designer images (logo, signature, background...).
+    match /idCard/images/{fileName} {
+      allow create, update: if isAdmin() && isImage();
+      allow delete: if isAdmin();
     }
   }
 }

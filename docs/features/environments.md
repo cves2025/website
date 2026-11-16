@@ -7,7 +7,7 @@
 | Auth | dev project | prod project (own users) |
 | Storage (new uploads) | `schoolproject-284dc.appspot.com` | `childrensvalley.firebasestorage.app` |
 | Website env file | `.env.development` (`npm run dev`), `.env.staging` (`build:dev`) | `.env.production` |
-| Deploy rules / indexes | `npm run deploy:rules:dev` | `npm run deploy:rules:prod` (firebase.prod.json: rules, indexes, storage rules) |
+| Deploy rules / indexes | `npm run deploy:rules:dev` (Firestore + Storage rules) | `npm run deploy:rules:prod` (firebase.prod.json: rules, indexes, storage rules) |
 | Deploy website | `npm run deploy:dev` (Firebase Hosting, dev target) | `npm run deploy` (GitHub Pages, www.cves.in) |
 | Deploy server | `npm run deploy` in `server/` (one Cloud Run service for both, `env.yaml`) | same |
 

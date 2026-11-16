@@ -28,6 +28,7 @@ teachers / students, promotion, exams, fees, settings) are never offered to teac
 
 - A new permission on the page: `PERMISSIONS` (permissions.ts), its route in `routePermissions.ts`,
   and an item in `TEACHER_PERMISSION_GROUPS`; the table picks it up.
+  If it lets a teacher write data, also add it to `firestore.rules` (see `security-rules.md`).
 - Look of the table / switches: `PermissionMatrix.tsx`. Switches are the app's `CustomToggle`
   (react-hook-form): a small form there mirrors what is ON (`values`), a click calls the column's
   `onToggle`. Field names replace "." with "_" (`fieldName`), or they would be nested paths.

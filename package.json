@@ -14,7 +14,7 @@
     "deploy": "gh-pages -d dist",
     "build:dev": "tsc && vite build --mode staging",
     "deploy:dev": "npm run build:dev && firebase deploy --only hosting:dev",
-    "deploy:rules:dev": "firebase deploy --only \"firestore:(default)\"",
+    "deploy:rules:dev": "firebase deploy --only \"firestore:(default),storage\"",
     "deploy:rules:prod": "firebase deploy --config firebase.prod.json --project prod --only firestore,storage"
   },
   "dependencies": {
