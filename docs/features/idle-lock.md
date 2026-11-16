@@ -19,3 +19,26 @@ entered again. Teachers are not locked (yet); later the same lock can guard sens
 - Lock time / tries: constants. Who is locked: the `enabled` argument in `Welcome.tsx`
   (`user?.role === "admin"`).
 - Locking before a sensitive action: call `lock()` (or reuse `IdleLockScreen`) at that action.
+
+## Password before sensitive actions
+
+`src/hooks/usePasswordConfirm.tsx` (Modal + CustomInput + `utils/verifyAccountPassword.ts`) asks for the account
+password every time before:
+
+| Page | Action |
+|---|---|
+| Fees > Fee Structure | Save |
+| Fees > Fee Settings | Save |
+| Fees > Collect Fee | Cancel a receipt |
+| Fees > Dues Report | Carry forward dues |
+| Students > List | Delete (recycle bin) / Wrong entry |
+| Students > Promote | Promote, Undo promotion |
+| Add Teacher | Delete a teacher / staff |
+| Settings > Permissions | Save (All Teachers and Individual Teacher) |
+| Settings > All Class Lists | Delete a class's students (own password step, older code) |
+
+The mobile app does the same for Permissions (`mobile/src/hooks/usePasswordConfirm.tsx`).
+
+Usage: `const { confirmPassword, passwordDialog } = usePasswordConfirm();`, then
+`if (!(await confirmPassword({ title }))) return;` at the start of the save, and `{passwordDialog}` once in the page.
+It is checked in the browser only (Firestore rules do not ask for a recent login).

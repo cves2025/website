@@ -12,6 +12,7 @@ import { DEFAULT_FEE_SETTINGS } from "../../../constants";
 import { formatRupees, toAmount } from "../../../utils/feeStructure";
 import { saveFeeSettings } from "../../../utils/feeService";
 import useFeeSettings from "../../../hooks/useFeeSettings";
+import { usePasswordConfirm } from "../../../hooks/usePasswordConfirm";
 import type { FeeSettings as Settings } from "../../../utils/type";
 import { inputClass, labelClass } from "../attendance/attendanceShared";
 
@@ -28,6 +29,7 @@ const currentSession = generateAcademicYears()[0]?.value ?? "2026-27";
  */
 function FeeSettings() {
   const { user } = useContext(myContext);
+  const { confirmPassword, passwordDialog } = usePasswordConfirm();
   const { settings, loading, error } = useFeeSettings();
   const [saved, setSaved] = useState<Settings>(DEFAULT_FEE_SETTINGS);
   const [draft, setDraft] = useState<Settings>(DEFAULT_FEE_SETTINGS);
@@ -59,6 +61,12 @@ function FeeSettings() {
       return;
     }
     const next: Settings = { ...draft, receiptPrefix: prefix };
+    const confirmed = await confirmPassword({
+      title: "Save Fee Settings",
+      message: "Due day, late fee and receipt prefix will be changed.",
+      confirmText: "Save",
+    });
+    if (!confirmed) return;
     setSaving(true);
     try {
       await saveFeeSettings(next, user.uid);
@@ -190,6 +198,7 @@ function FeeSettings() {
           </div>
         </>
       )}
+      {passwordDialog}
     </div>
   );
 }

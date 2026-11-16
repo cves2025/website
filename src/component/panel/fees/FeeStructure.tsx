@@ -27,6 +27,7 @@ import {
 } from "../../../utils/feeStructure";
 import { saveFeeStructure } from "../../../utils/feeService";
 import useFeeStructure from "../../../hooks/useFeeStructure";
+import { usePasswordConfirm } from "../../../hooks/usePasswordConfirm";
 import type { ClassFee, ExamFeeItem, FeeStructure as Structure } from "../../../utils/type";
 import { inputClass, labelClass } from "../attendance/attendanceShared";
 
@@ -47,6 +48,7 @@ const sameStructure = (a: Structure, b: Structure) =>
  */
 function FeeStructure() {
   const { user } = useContext(myContext);
+  const { confirmPassword, passwordDialog } = usePasswordConfirm();
   const [session, setSession] = useState(currentSessions[0]?.value ?? "");
   const { structure, loading, error } = useFeeStructure(session);
   const fromSession = previousAcademicYear(session);
@@ -123,6 +125,12 @@ function FeeStructure() {
       return;
     }
     const next: Structure = { ...draft, examFees };
+    const confirmed = await confirmPassword({
+      title: "Save Fee Structure",
+      message: `The fees of session ${session} will be changed.`,
+      confirmText: "Save",
+    });
+    if (!confirmed) return;
     setSaving(true);
     try {
       await saveFeeStructure(next, user.uid);
@@ -345,6 +353,7 @@ function FeeStructure() {
           setExamToDelete(null);
         }}
       />
+      {passwordDialog}
     </div>
   );
 }

@@ -32,6 +32,7 @@ import {
 import useSectionStudents from "../../../hooks/useSectionStudents";
 import useFeeAccount from "../../../hooks/useFeeAccount";
 import useAccountPayments from "../../../hooks/useAccountPayments";
+import { usePasswordConfirm } from "../../../hooks/usePasswordConfirm";
 import useFeeStructure from "../../../hooks/useFeeStructure";
 import useStudentPhoto from "../../../hooks/useStudentPhoto";
 import useIsStuck, { scrollParentOf } from "../../../hooks/useIsStuck";
@@ -75,6 +76,7 @@ const emptyForm = (): PaymentForm => ({
  */
 function CollectFee() {
   const { user } = useContext(myContext);
+  const { confirmPassword, passwordDialog } = usePasswordConfirm();
   const navigate = useNavigate();
   // Set by the header's ₹ button: put the cursor in the student search.
   const focusSearch = (useLocation().state as { focusSearch?: number } | null)?.focusSearch;
@@ -311,6 +313,12 @@ function CollectFee() {
       document.getElementById("cancelReason")?.focus();
       return;
     }
+    const confirmed = await confirmPassword({
+      title: "Cancel Receipt",
+      message: `Receipt ${toCancel.receiptNo} will be cancelled and its amount becomes due again.`,
+      confirmText: "Cancel Receipt",
+    });
+    if (!confirmed) return;
     setCancelling(true);
     try {
       await cancelFeePayment(toCancel, cancelReason, {
@@ -741,6 +749,7 @@ function CollectFee() {
           </div>
         )}
       </Modal>
+      {passwordDialog}
     </div>
   );
 }

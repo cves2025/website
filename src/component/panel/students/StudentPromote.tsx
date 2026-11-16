@@ -43,6 +43,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { myContext } from "../../context/MyContextProvider";
+import { usePasswordConfirm } from "../../../hooks/usePasswordConfirm";
 
 const academicYears = generateAcademicYears();
 
@@ -172,6 +173,7 @@ interface RowTarget {
  */
 function StudentPromote() {
   const { user } = useContext(myContext);
+  const { confirmPassword, passwordDialog } = usePasswordConfirm();
   const { exams, loadingExam } = useExamList();
   const { rules, loading: rulesLoading, error: rulesError } = useExamRules();
 
@@ -411,6 +413,12 @@ function StudentPromote() {
 
   const handlePromote = async () => {
     if (!user || !canSubmit) return;
+    const confirmed = await confirmPassword({
+      title: "Promote Students",
+      message: `${pendingItems.length} student(s) will be moved from ${fromYear} to ${toYear}.`,
+      confirmText: "Promote",
+    });
+    if (!confirmed) return;
     setSaving(true);
     try {
       const outcome = await promoteStudents({
@@ -438,6 +446,12 @@ function StudentPromote() {
 
   const handleUndo = async () => {
     if (!undoTarget) return;
+    const confirmed = await confirmPassword({
+      title: "Undo Promotion",
+      message: "The promotion will be undone.",
+      confirmText: "Undo",
+    });
+    if (!confirmed) return;
     setUndoing(true);
     try {
       const outcome =
@@ -952,6 +966,7 @@ function StudentPromote() {
           The {fromYear} record becomes active again.
         </div>
       </Modal>
+      {passwordDialog}
     </div>
   );
 }

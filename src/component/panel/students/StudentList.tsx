@@ -35,6 +35,7 @@ import {
 import { db } from "../../../firebase/config";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
 import { generateClassRollNumbers } from "../../../utils/rollNumbers";
+import { usePasswordConfirm } from "../../../hooks/usePasswordConfirm";
 import {
   allowedClassSections,
   buildQuerySpecs,
@@ -219,6 +220,7 @@ function compareByClassOrder(a: StudentListRow, b: StudentListRow): number {
 export default function StudentList() {
   const navigate = useNavigate();
   const { user, can, profileReady } = useContext(myContext);
+  const { confirmPassword, passwordDialog } = usePasswordConfirm();
 
   const scope = user?.scope ?? NO_SCOPE;
   const isAdmin = scope.kind === "all";
@@ -519,6 +521,15 @@ export default function StudentList() {
     }
 
     const removedStudent = studentToDelete;
+    const confirmed = await confirmPassword({
+      title: reason === "wrong" ? "Remove Wrong Entry" : "Delete Student",
+      message:
+        reason === "wrong"
+          ? `${removedStudent.studentName} (Enrollment No. ${removedStudent.enrollment}) will be removed for good.`
+          : `${removedStudent.studentName} will be moved to the recycle bin.`,
+      confirmText: "Delete",
+    });
+    if (!confirmed) return;
     setDeletingId(removedStudent.id);
     setDeleteReason(reason);
 
@@ -1093,6 +1104,7 @@ export default function StudentList() {
           </div>
         </div>
       </Modal>
+      {passwordDialog}
     </div>
   );
 }

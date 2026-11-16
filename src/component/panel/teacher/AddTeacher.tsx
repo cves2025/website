@@ -53,6 +53,7 @@ import { db } from "../../../firebase/config";
 import { uploadTeacherPhoto } from "../../../firebase/teacherPhotos";
 import { useClassSubjects } from "../../../hooks/useClassSubjects";
 import { useTeachers } from "../../../hooks/useTeachers";
+import { usePasswordConfirm } from "../../../hooks/usePasswordConfirm";
 import type {
   TeacherFormValues,
   TeacherRecord,
@@ -1188,6 +1189,7 @@ function TeacherForm({ initialEditId, personType, onClose }: TeacherFormProps) {
  */
 function AddTeacher() {
   const teachersList = useTeachers();
+  const { confirmPassword, passwordDialog } = usePasswordConfirm();
   const staffList = useTeachers(STAFF_ROLE);
   const [personType, setPersonType] = useState("teacher");
   const isStaffTab = personType === STAFF_ROLE;
@@ -1223,6 +1225,12 @@ function AddTeacher() {
 
   const handleDelete = async () => {
     if (!teacherToDelete) return;
+    const confirmed = await confirmPassword({
+      title: `Delete ${noun}`,
+      message: `${teacherToDelete.firstName} ${teacherToDelete.lastName} will be deleted.`,
+      confirmText: "Delete",
+    });
+    if (!confirmed) return;
     setDeleting(true);
     try {
       await updateDoc(doc(db, COLLECTION.USERS, teacherToDelete.id), {
@@ -1432,6 +1440,7 @@ function AddTeacher() {
         loading={deleting}
         onSubmit={() => void handleDelete()}
       />
+      {passwordDialog}
     </div>
   );
 }

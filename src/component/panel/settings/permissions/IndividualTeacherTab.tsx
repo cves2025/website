@@ -8,6 +8,7 @@ import Button from "../../../../custom-components/Button";
 import SelectDropdown from "../../../../custom-components/SelectDropdown";
 import { Label } from "@/components/ui/label";
 import { useTeachers } from "../../../../hooks/useTeachers";
+import { usePasswordConfirm } from "../../../../hooks/usePasswordConfirm";
 import {
   cleanPermissionList,
   isClassTeacherProfile,
@@ -46,6 +47,7 @@ const sameSet = (a: readonly Permission[], b: readonly Permission[]) =>
  */
 function IndividualTeacherTab() {
   const { teachers, loading: teachersLoading } = useTeachers();
+  const { confirmPassword, passwordDialog } = usePasswordConfirm();
   const {
     defaults,
     loading: defaultsLoading,
@@ -138,6 +140,12 @@ function IndividualTeacherTab() {
 
   const handleSave = async () => {
     if (!teacherUid) return;
+    const confirmed = await confirmPassword({
+      title: "Save Teacher Permissions",
+      message: "What this teacher can do will change.",
+      confirmText: "Save",
+    });
+    if (!confirmed) return;
     setSaving(true);
     try {
       await saveTeacherOverrides(teacherUid, current);
@@ -263,6 +271,7 @@ function IndividualTeacherTab() {
           </PermissionFooter>
         </>
       )}
+      {passwordDialog}
     </div>
   );
 }

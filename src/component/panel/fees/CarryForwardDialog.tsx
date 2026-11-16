@@ -9,6 +9,7 @@ import { previousAcademicYear } from "../../../utils/generateAcademicYears";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import { carryForwardStudent } from "../../../utils/feeService";
 import useCarryForwardPlan from "../../../hooks/useCarryForwardPlan";
+import { usePasswordConfirm } from "../../../hooks/usePasswordConfirm";
 
 /** Students carried forward at the same time. */
 const PARALLEL = 5;
@@ -30,6 +31,7 @@ interface CarryForwardDialogProps {
  */
 function CarryForwardDialog({ isOpen, session, onClose, onDone }: CarryForwardDialogProps) {
   const { user } = useContext(myContext);
+  const { confirmPassword, passwordDialog } = usePasswordConfirm();
   const fromSession = previousAcademicYear(session);
   const { items, loading, error } = useCarryForwardPlan(session, isOpen);
   const [progress, setProgress] = useState<number | null>(null);
@@ -39,6 +41,12 @@ function CarryForwardDialog({ isOpen, session, onClose, onDone }: CarryForwardDi
 
   const handleRun = async () => {
     if (!user || items.length === 0) return;
+    const confirmed = await confirmPassword({
+      title: "Carry Forward Dues",
+      message: `Unpaid fees of ${fromSession} of ${items.length} student(s) will move into ${session}.`,
+      confirmText: "Carry Forward",
+    });
+    if (!confirmed) return;
     const actor = { uid: user.uid, name: user.fullName || user.email || "" };
     let done = 0;
     let carried = 0;
@@ -67,6 +75,7 @@ function CarryForwardDialog({ isOpen, session, onClose, onDone }: CarryForwardDi
   };
 
   return (
+    <>
     <Modal
       isOpen={isOpen}
       onClose={() => {
@@ -116,6 +125,8 @@ function CarryForwardDialog({ isOpen, session, onClose, onDone }: CarryForwardDi
         )}
       </div>
     </Modal>
+    {passwordDialog}
+    </>
   );
 }
 

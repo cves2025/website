@@ -10,6 +10,7 @@ import {
   type TeacherRoleDefaults,
 } from "../../../../permissions";
 import { saveTeacherRoleDefaults } from "../../../../utils/permissionSettingsService";
+import { usePasswordConfirm } from "../../../../hooks/usePasswordConfirm";
 import { myContext } from "../../../context/MyContextProvider";
 import PermissionMatrix, { Chip, PermissionFooter } from "./PermissionMatrix";
 import { useTeacherRoleDefaults } from "./useTeacherRoleDefaults";
@@ -37,6 +38,7 @@ const toggled = (list: Permission[], permission: Permission, on: boolean) =>
  */
 function TeacherDefaultsTab() {
   const { user } = useContext(myContext);
+  const { confirmPassword, passwordDialog } = usePasswordConfirm();
   const { defaults, loading, error } = useTeacherRoleDefaults();
   const saved = defaults ?? BUILT_IN_DEFAULTS;
 
@@ -55,6 +57,12 @@ function TeacherDefaultsTab() {
 
   const handleSave = async () => {
     if (!user) return;
+    const confirmed = await confirmPassword({
+      title: "Save Teacher Permissions",
+      message: "What every teacher (and class teacher) can do will change.",
+      confirmText: "Save",
+    });
+    if (!confirmed) return;
     setSaving(true);
     try {
       await saveTeacherRoleDefaults(current, user.uid);
@@ -144,6 +152,7 @@ function TeacherDefaultsTab() {
           onClick={handleSave}
         />
       </PermissionFooter>
+      {passwordDialog}
     </div>
   );
 }
