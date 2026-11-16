@@ -12,6 +12,7 @@ import { useContext, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { myContext } from "../component/context/MyContextProvider";
+import { CVES_BUTTON } from "../constants";
 import CustomInput from "../custom-components/CustomInput";
 import Modal from "../custom-components/Modal";
 import { verifyAccountPassword } from "../utils/verifyAccountPassword";
@@ -74,6 +75,7 @@ export function usePasswordConfirm() {
       submitText={checking ? "Checking..." : request?.confirmText ?? "Confirm"}
       onSubmit={() => void submit()}
       loading={checking}
+      submitClassName={CVES_BUTTON}
     >
       <form
         onSubmit={(event) => {
