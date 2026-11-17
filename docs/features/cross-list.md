@@ -13,6 +13,18 @@ student's marks per subject, total, result and rank. Printable. Rows with missin
 | `src/utils/marks.ts` | `isSubjectComplete` / `isMarksDocComplete` (the check), `computeRanks`, `formatMarks` |
 | `src/utils/marksService.ts` | `getExamSheet` (frozen subject columns of exam + class), `loadMarksForExam`, `loadLiveSubjects`, `syncSheetWithLiveSubjects` (subjects added after the sheet: display only) |
 | `src/hooks/useExamRules.ts` | Rank scope (class / section) and the rules line under each block |
+| `src/utils/examRules.ts` | `rankScopeOf(rules, className)`: the class's own rank scope (`rankScopeByClass`), else the school-wide `rankScope` |
+
+## Rank scope (per class)
+
+Settings > Exam has one switch per class: ON = Class-wise (one rank list for every section of
+the class), OFF = Section-wise. Saved in `panelSettings/exam.rankScopeByClass`
+(`{ "2": "class", "5": "section", ... }`); a class missing there uses `rankScope`. The mobile
+app's Settings > Exam screen edits the same field.
+
+Used by the Cross List (each block: its column header "Rank (Class)" / "Rank (Section)" and
+rules line) and the result cards (`GeneratedResultCards`). The result cards always load the
+whole class, so a class-wise rank is right even when one section is printed.
 
 ## Completeness rule
 

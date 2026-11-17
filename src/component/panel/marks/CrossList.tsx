@@ -34,6 +34,7 @@ import {
   dropUnitTestPracticalSiblings,
 } from "../../../utils/marksEntry";
 import { useExamRules } from "../../../hooks/useExamRules";
+import { rankColumnLabel, rankScopeOf } from "../../../utils/examRules";
 import type {
   ExamDoc,
   ExamSheetDoc,
@@ -317,7 +318,7 @@ function CrossList() {
   const { rules, loading: rulesLoading, error: rulesError, reload: reloadRules } =
     useExamRules();
   /** Rules change (from the Settings page) -> marks are re-fetched under them. */
-  const rulesKey = `${rules.rankScope}|${rules.passMode}|${rules.totalPassPercentage}|${rules.subjectPassPercentage}`;
+  const rulesKey = `${rules.rankScope}|${JSON.stringify(rules.rankScopeByClass)}|${rules.passMode}|${rules.totalPassPercentage}|${rules.subjectPassPercentage}`;
 
   // A teacher only sees the register of the classes/sections they are
   // assigned to; "All Classes" / "All Sections" stays admin-only.
@@ -831,7 +832,7 @@ function CrossList() {
     extraByClass,
   ]);
 
-  // Class-wide ranks, used when rankScope is "class". They are computed over
+  // Class-wide ranks, used for a class ranked "class"-wise. They are computed over
   // ALL complete rows of the same class from the FULL loaded exam data (before
   // the class/section filters), so filtering never changes anyone's rank.
   const classWideRanks = useMemo<Record<string, number>>(() => {
@@ -872,10 +873,17 @@ function CrossList() {
   // rows take part: incomplete rows (isMarksDocComplete false or a missing
   // marks doc) never receive a rank and always show "-" in the Rank column.
   // Failed students keep their computed rank but the column still shows "-".
+  // Each class follows its own rank setting (Settings > Exam).
   const ranksByStudent = useMemo(() => {
-    if (rules.rankScope === "class") return classWideRanks;
     const ranks: Record<string, number> = {};
     blocks.forEach((block) => {
+      if (rankScopeOf(rules, block.className) === "class") {
+        block.rows.forEach((row) => {
+          const rank = classWideRanks[row.studentUid];
+          if (rank !== undefined) ranks[row.studentUid] = rank;
+        });
+        return;
+      }
       const sheetSubjects = block.sheet
         ? block.sheet.subjects
         : block.fallbackSubjects;
@@ -899,19 +907,16 @@ function CrossList() {
       );
     });
     return ranks;
-  }, [blocks, rules.rankScope, classWideRanks, selectedExam]);
+  }, [blocks, rules, classWideRanks, selectedExam]);
 
-  // Rank column header and the small rules line shown under every block
-  // heading (visible on screen and in print).
-  const rankLabel =
-    rules.rankScope === "class" ? "Rank (Class)" : "Rank (Section)";
-  const rankRuleText =
-    rules.rankScope === "class" ? "Rank: Class-wise" : "Rank: Section-wise";
+  // The small rules line under every block heading (on screen and in print);
+  // the rank part depends on the block's class.
   const passRuleText =
     rules.passMode === "subject"
       ? `Pass: each subject >= ${formatMarks(rules.subjectPassPercentage)}%`
       : `Pass: Total >= ${formatMarks(rules.totalPassPercentage)}%`;
-  const rulesSummary = `${rankRuleText} | ${passRuleText}`;
+  const rulesSummaryOf = (className: string) =>
+    `${rankScopeOf(rules, className) === "class" ? "Rank: Class-wise" : "Rank: Section-wise"} | ${passRuleText}`;
 
   return (
     <div className="mx-auto flex w-full flex-col gap-4">
@@ -1087,8 +1092,8 @@ function CrossList() {
               session={session}
               examCategory={selectedExam?.examCategory ?? null}
               ranks={ranksByStudent}
-              rankLabel={rankLabel}
-              rulesSummary={rulesSummary}
+              rankLabel={rankColumnLabel(rules, block.className)}
+              rulesSummary={rulesSummaryOf(block.className)}
             />
           ))}
         </div>

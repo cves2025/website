@@ -10,9 +10,16 @@
 /** Minimum percentage of the total marks needed to pass an exam. */
 export const PASS_PERCENTAGE = 33;
 
+export type RankScope = "section" | "class";
+
 export interface ExamRules {
-  /** "section" = one rank list per class-section; "class" = across all sections of a class. */
-  rankScope: "section" | "class";
+  /**
+   * "section" = one rank list per class-section; "class" = across all sections
+   * of a class. Used for a class that has no entry in `rankScopeByClass`.
+   */
+  rankScope: RankScope;
+  /** Rank scope chosen per class on the Settings page (className -> scope). */
+  rankScopeByClass: Record<string, RankScope>;
   /** "total" = pass decided on the total percentage; "subject" = must pass every subject. */
   passMode: "total" | "subject";
   /** Percentage of the total marks needed to pass when passMode is "total". */
@@ -23,6 +30,7 @@ export interface ExamRules {
 
 export const DEFAULT_EXAM_RULES: ExamRules = {
   rankScope: "section",
+  rankScopeByClass: {},
   passMode: "total",
   totalPassPercentage: PASS_PERCENTAGE,
   subjectPassPercentage: PASS_PERCENTAGE,
@@ -30,6 +38,25 @@ export const DEFAULT_EXAM_RULES: ExamRules = {
 
 function readRankScope(value: unknown): ExamRules["rankScope"] {
   return value === "class" ? "class" : "section";
+}
+
+function readRankScopeByClass(value: unknown): Record<string, RankScope> {
+  if (!value || typeof value !== "object") return {};
+  const byClass: Record<string, RankScope> = {};
+  Object.entries(value as Record<string, unknown>).forEach(([className, scope]) => {
+    if (className && (scope === "class" || scope === "section")) byClass[className] = scope;
+  });
+  return byClass;
+}
+
+/** How a class is ranked: its own setting, else the school-wide one. */
+export function rankScopeOf(rules: ExamRules, className: string): RankScope {
+  return rules.rankScopeByClass[className] ?? rules.rankScope;
+}
+
+/** "Rank (Class)" / "Rank (Section)": the Rank column header of a class. */
+export function rankColumnLabel(rules: ExamRules, className: string): string {
+  return rankScopeOf(rules, className) === "class" ? "Rank (Class)" : "Rank (Section)";
 }
 
 function readPassMode(value: unknown): ExamRules["passMode"] {
@@ -54,6 +81,7 @@ export function sanitizeExamRules(value: unknown): ExamRules {
       : {};
   return {
     rankScope: readRankScope(data.rankScope),
+    rankScopeByClass: readRankScopeByClass(data.rankScopeByClass),
     passMode: readPassMode(data.passMode),
     totalPassPercentage: readPercentage(
       data.totalPassPercentage,

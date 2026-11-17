@@ -9,6 +9,7 @@ import { useClassRollNumbers } from "../../../hooks/useClassRollNumbers";
 import { compareStudentsByRoll } from "../../../utils/rollNumber";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import { buildResultTable } from "../../../utils/resultCardModel";
+import { rankScopeOf } from "../../../utils/examRules";
 import { ADMIT_CARD_PATH, useExamTemplates } from "./examScheduleShared";
 import { useResultCardStudents } from "./useResultCardStudents";
 import ResultCard from "./result/ResultCard";
@@ -86,16 +87,19 @@ function GeneratedResultCards() {
     getDistributionDate,
   } = useSuggestedRemarks();
 
+  // The whole class is loaded even when one section is picked: a class
+  // ranked class-wise needs every section's marks. Only the picked section's
+  // cards are shown (`results` below).
   const data = useResultCardData({
     session: year,
     className: effectiveClassName,
-    section,
+    section: "",
     exams: selectedExams,
   });
   const students = useResultCardStudents({
     year,
     className: effectiveClassName,
-    section,
+    section: "",
     enrollments: [],
     allStudents: true,
   });
@@ -202,39 +206,47 @@ function GeneratedResultCards() {
     [sortedStudents, data.inputsFor, className, rules, getRollNumber],
   );
 
+  // One rank list per section, or one for the whole class when this class
+  // is ranked class-wise (Settings > Exam).
   const rankByStudent = useMemo(() => {
-    const rankedStudents = allResults
+    const classWise = rankScopeOf(rules, className) === "class";
+    const groups = new Map<string, { studentId: string; total: number }[]>();
+    allResults
       .filter(
         ({ model }) => model.grandTotals.hasMarks && model.grandTotals.max > 0,
       )
-      .map(({ card, model }) => ({
-        studentId: card.studentId,
-        total: model.grandTotals.obtained,
-      }))
-      .sort((a, b) => b.total - a.total);
+      .forEach(({ card, model }) => {
+        const key = classWise ? "" : card.section;
+        const group = groups.get(key) ?? [];
+        group.push({ studentId: card.studentId, total: model.grandTotals.obtained });
+        groups.set(key, group);
+      });
 
     const ranks: Record<string, number> = {};
-    let previousTotal: number | null = null;
-    let currentRank = 0;
-
-    rankedStudents.forEach((student, index) => {
-      if (student.total !== previousTotal) {
-        currentRank = index + 1;
-        previousTotal = student.total;
-      }
-
-      ranks[student.studentId] = currentRank;
+    groups.forEach((group) => {
+      let previousTotal: number | null = null;
+      let currentRank = 0;
+      [...group]
+        .sort((a, b) => b.total - a.total)
+        .forEach((student, index) => {
+          if (student.total !== previousTotal) {
+            currentRank = index + 1;
+            previousTotal = student.total;
+          }
+          ranks[student.studentId] = currentRank;
+        });
     });
-
     return ranks;
-  }, [allResults]);
+  }, [allResults, rules, className]);
 
   const results = useMemo(
     () =>
       allResults.filter(
-        ({ card }) => allStudents || enrollments.includes(card.enrollment),
+        ({ card }) =>
+          (!section || section === "all" || card.section === section) &&
+          (allStudents || enrollments.includes(card.enrollment)),
       ),
-    [allResults, allStudents, enrollments],
+    [allResults, allStudents, enrollments, section],
   );
 
   if (className && !classAllowed) {

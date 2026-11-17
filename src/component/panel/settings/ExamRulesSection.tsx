@@ -5,15 +5,18 @@ import Modal from "../../../custom-components/Modal";
 import { useExamRules } from "../../../hooks/useExamRules";
 import {
   type ExamRules,
+  type RankScope,
+  rankScopeOf,
   validateExamRules,
 } from "../../../utils/examRules";
+import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import { saveExamRules } from "../../../utils/examRulesService";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import Loader from "../../../custom-components/Loader";
-import { CVES_BUTTON } from "../../../constants";
+import { CLASSES, CVES_BUTTON } from "../../../constants";
 
 /** Warning shown before the rules are saved (applies to past exams too). */
 const SAVE_WARNING =
@@ -109,11 +112,83 @@ function parsePercentage(text: string): number | null {
     ? numeric
     : null;
 }
+/** Every class's rank scope (the saved per-class one, else the school-wide one). */
+const rankScopesOf = (rules: ExamRules): Record<string, RankScope> =>
+  Object.fromEntries(CLASSES.map((className) => [className, rankScopeOf(rules, className)]));
+
+/**
+ * Class-wise / section-wise rank, one switch per class (ON = one rank list for
+ * all sections of the class, OFF = each section ranked separately).
+ */
+function RankScopeRows({
+  value,
+  onChange,
+}: {
+  value: Record<string, RankScope>;
+  onChange: (next: Record<string, RankScope>) => void;
+}) {
+  const allClassWise = CLASSES.every((className) => value[className] === "class");
+  const setAll = (scope: RankScope) =>
+    onChange(Object.fromEntries(CLASSES.map((className) => [className, scope])));
+
+  return (
+    <div className="py-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-gray-700">Rank of each class</p>
+          <p className="mt-0.5 text-xs text-gray-500">
+            ON = Class-wise: one rank list for the whole class with every section.
+            OFF = Section-wise: each section (A, B...) is ranked separately. Used by the
+            Cross List and the result cards.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="text-xs font-semibold text-gray-500">All classes</span>
+          <Switch
+            checked={allClassWise}
+            onCheckedChange={(checked) => setAll(checked ? "class" : "section")}
+            aria-label="Rank every class class-wise"
+          />
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {CLASSES.map((className) => {
+          const classWise = value[className] === "class";
+          return (
+            <div
+              key={className}
+              className="flex items-center justify-between gap-3 rounded-md border border-gray-200 px-3 py-2"
+            >
+              <span className="text-sm font-semibold text-gray-700">
+                Class {toOrdinalLabel(className)}
+              </span>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`text-xs font-semibold ${classWise ? "text-green-700" : "text-gray-500"}`}
+                >
+                  {classWise ? "Class-wise" : "Section-wise"}
+                </span>
+                <Switch
+                  checked={classWise}
+                  onCheckedChange={(checked) =>
+                    onChange({ ...value, [className]: checked ? "class" : "section" })
+                  }
+                  aria-label={`Rank class ${toOrdinalLabel(className)} class-wise`}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /** "Exam" section of the Settings page: rank scope + pass rule of all exams. */
 function ExamRulesSection() {
   const { rules, loading, error, reload } = useExamRules();
 
-  const [rankClass, setRankClass] = useState(rules.rankScope === "class");
+  const [rankScopes, setRankScopes] = useState(() => rankScopesOf(rules));
   const [passSubject, setPassSubject] = useState(rules.passMode === "subject");
   const [totalPassText, setTotalPassText] = useState(
     String(rules.totalPassPercentage)
@@ -129,7 +204,7 @@ function ExamRulesSection() {
 
   // Sync the draft whenever rules arrive or are replaced by another screen.
   useEffect(() => {
-    setRankClass(rules.rankScope === "class");
+    setRankScopes(rankScopesOf(rules));
     setPassSubject(rules.passMode === "subject");
     setTotalPassText(String(rules.totalPassPercentage));
     setSubjectPassText(String(rules.subjectPassPercentage));
@@ -142,13 +217,15 @@ function ExamRulesSection() {
   // "Save rules" stays disabled until the draft differs from the saved rules
   // (percentages are compared as numbers, so "40" and "40.0" are the same).
   const isDirty =
-    (rankClass ? "class" : "section") !== rules.rankScope ||
+    CLASSES.some((className) => rankScopes[className] !== rankScopeOf(rules, className)) ||
     (passSubject ? "subject" : "total") !== rules.passMode ||
     totalPass !== rules.totalPassPercentage ||
     subjectPass !== rules.subjectPassPercentage;
 
   const buildDraft = (): ExamRules => ({
-    rankScope: rankClass ? "class" : "section",
+    // School-wide value for a class added later (not in the list yet).
+    rankScope: rules.rankScope,
+    rankScopeByClass: rankScopes,
     passMode: passSubject ? "subject" : "total",
     totalPassPercentage: totalPass ?? 0,
     subjectPassPercentage: subjectPass ?? 0,
@@ -208,14 +285,7 @@ function ExamRulesSection() {
       ) : (
         <>
           <div className="mt-2 divide-y divide-gray-100">
-            <SwitchRow
-              checked={rankClass}
-              onChange={setRankClass}
-              label="Rank across the whole class (all sections together)"
-              helper="ON = one rank list for the entire class with every section; OFF = each class-section is ranked separately."
-              onLabel="Class-wise"
-              offLabel="Section-wise"
-            />
+            <RankScopeRows value={rankScopes} onChange={setRankScopes} />
 
             <SwitchRow
               checked={passSubject}

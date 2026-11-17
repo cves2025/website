@@ -1,4 +1,4 @@
-import type { ExamRules } from "./examRules";
+import { rankScopeOf, type ExamRules } from "./examRules";
 import {
   defaultMarksScheme,
   NOT_APPLICABLE,
@@ -855,8 +855,8 @@ export function buildResultTable(params: {
 /**
  * marksPerExam: selected har exam ke liye poori class ke MarksDoc (ek array
  * per exam). Rank un students ko milta hai jinke SABHI selected exams mein
- * marks saved hain. rules.rankScope ke hisaab se rank section ya poori class
- * mein hota hai. Result: { [studentUid]: rank }.
+ * marks saved hain. Har class ki rank setting (rankScopeOf) ke hisaab se rank
+ * section ya poori class mein hota hai. Result: { [studentUid]: rank }.
  */
 export function computeResultRanks(params: {
   marksPerExam: MarksDoc[][];
@@ -869,7 +869,7 @@ export function computeResultRanks(params: {
   marksPerExam.forEach((list) => {
     list.forEach((marks) => {
       const groupKey =
-        rules.rankScope === "class"
+        rankScopeOf(rules, marks.className) === "class"
           ? marks.className
           : `${marks.className}|${marks.section}`;
       const group =
