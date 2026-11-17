@@ -74,7 +74,7 @@ service cloud.firestore {
 
     // CLASS_TEACHER_BONUS
     function builtInClassTeacher() {
-      return ['admitcard.view', 'crosslist.view', 'attendance.view'];
+      return ['admitcard.view', 'crosslist.view', 'attendance.view', 'student.photo'];
     }
 
     // TEACHER_BLOCKED_PERMISSIONS: a teacher never gets these.
@@ -157,6 +157,10 @@ service cloud.firestore {
     match /students/{studentId} {
       allow read: if isStaff();
       allow write: if isAdmin();
+      // Students page of the mobile app: only the three photos.
+      allow update: if can('student.photo')
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['studentPhoto', 'fatherPhoto', 'motherPhoto', 'updatedAt']);
     }
 
     match /enrollments/{enrollmentId} {

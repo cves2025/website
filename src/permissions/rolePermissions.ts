@@ -22,6 +22,8 @@ export const CLASS_TEACHER_BONUS: Permission[] = [
   P.ADMITCARD_VIEW,
   P.CROSSLIST_VIEW,
   P.ATTENDANCE_VIEW,
+  // Photos of the students of their class (mobile app).
+  P.STUDENT_PHOTO,
 ];
 
 /**

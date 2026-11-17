@@ -68,6 +68,12 @@ export const TEACHER_PERMISSION_GROUPS: PermissionCatalogGroup[] = [
           "Open and print the admission form of a student of their own classes.",
       },
       {
+        permission: P.STUDENT_PHOTO,
+        label: "Update Student Photos",
+        description:
+          "Change the student, father and mother photos of their own classes (mobile app).",
+      },
+      {
         permission: P.SUBJECT_MANAGE,
         label: "Subjects",
         description: "Add, edit and delete subjects of a class.",
@@ -179,9 +185,11 @@ export const TEACHER_CATALOG_PERMISSIONS: Permission[] =
 /**
  * The page's permissions before `known` was saved with the defaults. A
  * permission added to the catalog later is missing here, so a document saved
- * earlier falls back to that permission's built-in default.
+ * earlier falls back to that permission's built-in default. Keep it frozen:
+ * a permission added later goes into the exclusions, not into this list.
  */
 export const LEGACY_CATALOG_PERMISSIONS: Permission[] =
   TEACHER_CATALOG_PERMISSIONS.filter(
-    (p) => p !== P.PROFILE_VIEW && p !== P.STUDENT_FORM_VIEW
+    (p) =>
+      p !== P.PROFILE_VIEW && p !== P.STUDENT_FORM_VIEW && p !== P.STUDENT_PHOTO
   );

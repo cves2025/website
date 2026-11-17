@@ -86,9 +86,11 @@ service firebase.storage {
 
     // ---------- admin pages ----------
 
-    // Student, father and mother photos (Add Student).
+    // Student, father and mother photos: Add Student (admin), and the mobile
+    // app's Students page (teachers with student.photo; which student they may
+    // change is checked in firestore.rules).
     match /students/{studentId}/{fileName} {
-      allow create, update: if isAdmin() && isImage();
+      allow create, update: if isStaff() && isImage();
       allow delete: if isAdmin();
     }
 

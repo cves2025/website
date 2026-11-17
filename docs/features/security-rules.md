@@ -39,7 +39,8 @@ Class teacher is read from the `isClassTeacher` flag on the user document. Rules
 | Collection | Read | Write |
 |---|---|---|
 | `users` | own doc, staff | admin; own doc: only `lastSeenReleaseId`, `updatedAt` |
-| `students`, `enrollments`, `rollNumber`, `exams`, `stampSign` | staff | admin |
+| `students` | staff | admin; with `student.photo` only `studentPhoto`, `fatherPhoto`, `motherPhoto` (+ `updatedAt`) |
+| `enrollments`, `rollNumber`, `exams`, `stampSign` | staff | admin |
 | `subjects` | staff | `subject.manage` |
 | `examSchedules` | staff | `admitcard.generate` |
 | `marks`, `marksProgress`, `examSheets`, `attendance` | staff | `marks.enter` |
@@ -63,7 +64,8 @@ Files are shown through download URLs. The token in the URL skips the rules, so 
 |---|---|---|
 | `news/`, `gallery/`, `banner/`, `site/` | staff | image < 10 MB |
 | `downloads/` | staff | PDF < 20 MB |
-| `students/`, `teachers/photos/`, `idCard/images/` | admin | image < 10 MB |
+| `students/` | upload: staff (which student may change: firestore.rules); delete: admin | image < 10 MB |
+| `teachers/photos/`, `idCard/images/` | admin | image < 10 MB |
 | anything else | no | |
 
 ## Change X -> look here

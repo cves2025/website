@@ -5,6 +5,8 @@ export const PERMISSIONS = {
   STUDENT_CREATE: "student.create",
   STUDENT_READ: "student.read",
   STUDENT_FORM_VIEW: "student.formView",
+  /** Change the student, father and mother photos (mobile app Students page). */
+  STUDENT_PHOTO: "student.photo",
   STUDENT_PROMOTE: "student.promote",
   SUBJECT_MANAGE: "subject.manage",
   TEACHER_CREATE: "teacher.create",
