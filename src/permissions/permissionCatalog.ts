@@ -78,6 +78,17 @@ export const TEACHER_PERMISSION_GROUPS: PermissionCatalogGroup[] = [
         label: "Subjects",
         description: "Add, edit and delete subjects of a class.",
       },
+      {
+        permission: P.TC_VIEW,
+        label: "View Transfer Certificates",
+        description: "Open the TC page of any class, see the saved TCs and print them.",
+      },
+      {
+        permission: P.TC_ISSUE,
+        label: "Generate Transfer Certificates",
+        description:
+          "Make, edit and issue the TC of a student of any class. Issuing a TC marks the student as Left.",
+      },
     ],
   },
   {
@@ -191,5 +202,9 @@ export const TEACHER_CATALOG_PERMISSIONS: Permission[] =
 export const LEGACY_CATALOG_PERMISSIONS: Permission[] =
   TEACHER_CATALOG_PERMISSIONS.filter(
     (p) =>
-      p !== P.PROFILE_VIEW && p !== P.STUDENT_FORM_VIEW && p !== P.STUDENT_PHOTO
+      p !== P.PROFILE_VIEW &&
+      p !== P.STUDENT_FORM_VIEW &&
+      p !== P.STUDENT_PHOTO &&
+      p !== P.TC_VIEW &&
+      p !== P.TC_ISSUE
   );

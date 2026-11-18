@@ -52,6 +52,9 @@ import FeeReceipt from './panel/fees/FeeReceipt'
 import DuesReport from './panel/fees/DuesReport'
 import CollectionReport from './panel/fees/CollectionReport'
 import FeeSettings from './panel/fees/FeeSettings'
+import TcList from './panel/students/tc/TcList'
+import TcEditor from './panel/students/tc/TcEditor'
+import TcSettingsPage from './panel/students/tc/TcSettingsPage'
 
 function Router() {
   return (
@@ -79,6 +82,9 @@ function Router() {
           <Route path="student/view" element={<StudentView />} />
           <Route path="student/promote" element={<StudentPromote />} />
           <Route path="student/subject" element={<Subject />} />
+          <Route path="student/tc" element={<TcList />} />
+          <Route path="student/tc/edit" element={<TcEditor />} />
+          <Route path="student/tc/settings" element={<TcSettingsPage />} />
           <Route path="attendance/mark" element={<MarkAttendance />} />
           <Route path="attendance/report" element={<AttendanceReport />} />
           <Route path="attendance/holidays" element={<HolidayCalendar />} />

@@ -15,6 +15,10 @@ import type {
   ReceiptDesign,
   ReceiptPaper,
   ReceiptPrintSettings,
+  TcFields,
+  TcRow,
+  TcSettings,
+  TcStatus,
 } from "./utils/type";
 
 export const COLLECTION = {
@@ -57,6 +61,8 @@ export const COLLECTION = {
    * students have marks in each. Kept up to date by saveStudentMarks.
    */
   MARKS_PROGRESS: "marksProgress",
+  /** Transfer certificates: one document per TC (draft / issued / cancelled). */
+  TRANSFER_CERTIFICATES: "transferCertificates",
 };
 
 /**
@@ -594,3 +600,167 @@ export const SCHOOL_NAME = "CHILDREN'S VALLEY ENGLISH SCHOOL";
 
 /** School name inside messages (e.g. the WhatsApp fee reminder). */
 export const SCHOOL_DISPLAY_NAME = "Children's Valley English School";
+
+/* ---------------------------------------------- Transfer Certificate -- */
+
+/** Document id inside COLLECTION.SETTINGS: TC letterhead, book no., last Sr. No. */
+export const TC_SETTINGS_DOC = "transferCertificate";
+
+/** TC page: class-wise students with their TC status (class "all" = TC register). */
+export const TC_PATH = "/welcome/student/tc";
+/** One TC: `?session=&enrollment=<enrollmentId>` and `&id=<tcId>` for a saved one. */
+export const TC_EDIT_PATH = "/welcome/student/tc/edit";
+export const TC_SETTINGS_PATH = "/welcome/student/tc/settings";
+
+/** Class filter value of the TC page that lists every TC of the session. */
+export const TC_REGISTER_CLASS = "all";
+
+export const DEFAULT_TC_NOTE =
+  "नोट : यदि यह स्थानान्तरण प्रमाण पत्र इंचार्ज-प्रधानाचार्य द्वारा हस्ताक्षरित हो तो प्रबंधक, अध्यक्ष, विद्यालय प्रबंधन समिति द्वारा प्रतिहस्ताक्षरित अवश्य कराएं।\nNote: If this transfer certificate is signed by the Incharge-Principal, then be sure to be countersigned by the Manager SMC.";
+
+export const DEFAULT_TC_SETTINGS: TcSettings = {
+  schoolName: SCHOOL_NAME,
+  affiliationText: "",
+  affiliationNo: "",
+  schoolCode: "",
+  udiseCode: "",
+  address: "Mahmoorganj, Varanasi",
+  email: "",
+  website: "",
+  phone: SCHOOL_CONTACT.PHONE,
+  note: DEFAULT_TC_NOTE,
+  showQr: true,
+  principalSign: true,
+  schoolCategory: "Private",
+  bookNo: "1",
+  lastSerial: 0,
+};
+
+/** The only address line printed under the school name on a TC. */
+export const TC_SCHOOL_ADDRESS = "Mahmoorganj, Varanasi";
+
+/** Colours of the school name on the TC, word by word (the cves gradient colours). */
+export const TC_NAME_COLORS = ["#009746", "#393186", "#e31e25", "#e7087e"];
+
+export const TC_STATUS_META: Record<TcStatus | "none", { label: string; className: string }> = {
+  none: { label: "Not issued", className: "bg-gray-100 text-gray-600" },
+  draft: { label: "Draft", className: "bg-amber-100 text-amber-800" },
+  issued: { label: "Issued", className: "bg-emerald-50 text-emerald-700" },
+  cancelled: { label: "Cancelled", className: "bg-red-50 text-red-700" },
+};
+
+/**
+ * The 21 numbered rows of the printed TC (Hindi / English), in order. Row 2
+ * has a second line (mother), rows 6 and 8 a second value (DOB in words,
+ * admission class).
+ */
+export const TC_ROWS: TcRow[] = [
+  { hi: "विद्यार्थी का नाम", en: "Name of Pupil", field: "studentName" },
+  {
+    hi: "(A). पिता का नाम",
+    en: "Father's Name",
+    field: "fatherName",
+    sub: { hi: "(B). माता का नाम", en: "Mother's Name", field: "motherName" },
+  },
+  { hi: "पता", en: "Address", field: "address" },
+  { hi: "राष्ट्रीयता", en: "Nationality", field: "nationality" },
+  {
+    hi: "क्या विद्यार्थी अनु० जा०/ज० जा०/पिछड़ा वर्ग से सम्बन्धित है?",
+    en: "Whether the Pupil belongs to SC/ST/OBC Category?",
+    field: "category",
+  },
+  {
+    hi: "प्रवेश पुस्तिका के अनुसार जन्म तिथि",
+    en: "Date of birth according to admission register",
+    field: "dob",
+    extra: "dobInWords",
+  },
+  {
+    hi: "पिछली कक्षा जिसमे विद्यार्थी अध्ययनरत था",
+    en: "Class in which the pupil last studied",
+    field: "lastClass",
+  },
+  {
+    hi: "विद्यालय में प्रवेश लेने की तिथि और कक्षा",
+    en: "Date of admission in the school with class",
+    field: "admissionDate",
+    extra: "admissionClass",
+  },
+  { hi: "पठित विषय", en: "Subjects studied", field: "subjects" },
+  {
+    hi: "पिछले विद्यालय / बोर्ड / वार्षिक परीक्षा का परिणाम",
+    en: "Result of last taken School/Board/Annual Examination",
+    field: "lastResult",
+  },
+  {
+    hi: "क्या उच्च कक्षा में पदोन्नति के योग्य है?",
+    en: "Whether qualified for promotion to the next higher class?",
+    field: "promotion",
+  },
+  {
+    hi: "क्या विद्यार्थी ने विद्यालय के सभी देय राशि का भुगतान कर दिया है?",
+    en: "Whether the pupil has paid all dues to the school?",
+    field: "duesPaid",
+  },
+  {
+    hi: "क्या विद्यार्थी को कोई शुल्क रियायत प्रदान की गयी थी?",
+    en: "Whether the student was given any fee concession?",
+    field: "feeConcession",
+  },
+  {
+    hi: "क्या विद्यार्थी एन०सी०सी० कैडेट/स्काउट है?",
+    en: "Whether the pupil is NCC Cadet/Boy Scout/Girl Guide?",
+    field: "nccCadet",
+  },
+  {
+    hi: "विद्यालय से विद्यार्थी के नाम काटे जाने की तिथि",
+    en: "Date on which pupil's name is struck off rolls of the school",
+    field: "struckOffDate",
+  },
+  { hi: "विद्यालय छोड़ने का कारण", en: "Reason for leaving the school", field: "reason" },
+  {
+    hi: "अंतिम तिथि तक उपस्थितियों की कुल संख्या",
+    en: "No. of attendance up to date",
+    field: "attendance",
+  },
+  { hi: "विद्यालय दिवसों की कुल संख्या", en: "No. of school days", field: "schoolDays" },
+  { hi: "सामान्य आचरण", en: "General Conduct", field: "conduct" },
+  {
+    hi: "क्या विद्यालय सरकारी/अल्पसंख्यक/स्वतंत्र श्रेणी में आता है?",
+    en: "Whether the school is recognized under Govt./Minority/Independent Category?",
+    field: "schoolCategory",
+  },
+  {
+    hi: "प्रमाण पत्र जारी करने की तिथि",
+    en: "Date of issue of certificate",
+    field: "issueDate",
+  },
+];
+
+/** TC fields typed as dates ("yyyy-MM-dd", printed dd-MM-yyyy). */
+export const TC_DATE_FIELDS = new Set<keyof TcFields>([
+  "dob",
+  "admissionDate",
+  "struckOffDate",
+  "issueDate",
+]);
+
+/** One-click answers under a TC field (the field stays free text). */
+export const TC_SUGGESTIONS: Partial<Record<keyof TcFields, string[]>> = {
+  category: ["General", "OBC", "SC", "ST"],
+  lastResult: ["PASSED", "FAILED", "APPEARED", "RESULT AWAITED", "N/A"],
+  promotion: ["Yes", "No", "N/A"],
+  duesPaid: ["Yes", "No"],
+  feeConcession: ["Yes", "No"],
+  nccCadet: ["N/A", "Yes", "No"],
+  reason: [
+    "Pass Out",
+    "Parent's Transfer",
+    "Shifting to another place",
+    "Parent's wish",
+    "Admission in another school",
+    "Health reasons",
+  ],
+  conduct: ["Excellent", "Very Good", "Good", "Satisfactory"],
+  schoolCategory: ["Private", "Independent", "Government", "Minority"],
+};

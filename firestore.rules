@@ -80,7 +80,8 @@ service cloud.firestore {
     // TEACHER_BLOCKED_PERMISSIONS: a teacher never gets these.
     function teacherBlocked() {
       return ['student.create', 'student.promote', 'teacher.create', 'exam.manage',
-              'examSettings.access', 'settings.access', 'permissions.manage', 'fee.manage'];
+              'examSettings.access', 'settings.access', 'permissions.manage', 'fee.manage',
+              'tc.settings'];
     }
 
     // LEGACY_CATALOG_PERMISSIONS: what the Permissions page offered before it
@@ -166,6 +167,11 @@ service cloud.firestore {
     match /enrollments/{enrollmentId} {
       allow read: if isStaff();
       allow write: if isAdmin();
+      // Issuing a TC marks the student Left.
+      allow update: if can('tc.issue')
+        && request.resource.data.isDeleted == true
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['isDeleted', 'leftReason', 'tcNo', 'leftAt', 'updatedAt']);
     }
 
     match /rollNumber/{docId} {
@@ -257,6 +263,40 @@ service cloud.firestore {
       allow read: if docId == 'homeBanner' || isStaff();
       allow write: if (docId == 'homeBanner' && can('banner.manage'))
         || (docId != 'homeBanner' && isAdmin());
+      // transferCertificate: issuing a TC (tc.issue) only moves the Sr. No. up by one.
+      allow create: if docId == 'transferCertificate' && can('tc.issue')
+        && request.resource.data.keys().hasOnly(['lastSerial', 'updatedAt'])
+        && request.resource.data.lastSerial == 1;
+      allow update: if docId == 'transferCertificate' && can('tc.issue')
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSerial', 'updatedAt'])
+        && request.resource.data.lastSerial == resource.data.get('lastSerial', 0) + 1;
+    }
+
+    // ---------- transfer certificates ----------
+
+    // Draft -> issued (Sr. No. from settings/transferCertificate) -> cancelled
+    // (admin). An issued TC is never deleted and keeps its number.
+    match /transferCertificates/{tcId} {
+      allow read: if can('tc.view') || can('tc.issue');
+      allow create: if can('tc.issue')
+        && request.resource.data.status in ['draft', 'issued'];
+      // Draft saved again or issued; an issued TC revised (number kept).
+      allow update: if can('tc.issue')
+        && ((resource.data.status == 'draft'
+              && request.resource.data.status in ['draft', 'issued'])
+          || (resource.data.status == 'issued'
+              && request.resource.data.status == 'issued'
+              && request.resource.data.srNo == resource.data.srNo
+              && request.resource.data.tcNo == resource.data.tcNo));
+      // Printing an issued TC counts the copies (later ones say DUPLICATE).
+      allow update: if (can('tc.view') || can('tc.issue'))
+        && resource.data.status == 'issued'
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['printCount', 'lastPrintedAt']);
+      allow update: if isAdmin()
+        && resource.data.status == 'issued'
+        && request.resource.data.status == 'cancelled';
+      allow delete: if can('tc.issue') && resource.data.status == 'draft';
     }
 
     // siteImages (school photo) + galleryImport: public pages, Settings > Gallery.

@@ -33,6 +33,8 @@ rules: [add-student.md](add-student.md).
     refused when the student has fee receipts or another session.
   In the bin only "Wrong entry" is offered (`hideSubmit={showBin}`).
 - **Restore** (`handleRestore`): enrollment `isDeleted: false`.
+- Issuing a Transfer Certificate also removes the student this way (`leftReason: "tc"`, `tcNo`):
+  see [transfer-certificate.md](transfer-certificate.md).
 - `updateRow(id, patch | null)` changes / removes a row in the cache and the list (no re-read).
 
 ## Change X -> look here

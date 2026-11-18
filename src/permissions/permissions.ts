@@ -35,6 +35,12 @@ export const PERMISSIONS = {
   ATTENDANCE_VIEW: "attendance.view",
   HOLIDAY_MANAGE: "holiday.manage",
   FEE_MANAGE: "fee.manage",
+  /** Transfer Certificate page: see saved TCs and print them. */
+  TC_VIEW: "tc.view",
+  /** Make, edit, issue and revise TCs (issuing marks the student Left). */
+  TC_ISSUE: "tc.issue",
+  /** TC Settings (letterhead, book no., Sr. No.); admin only. */
+  TC_SETTINGS: "tc.settings",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

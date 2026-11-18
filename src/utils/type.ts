@@ -858,3 +858,152 @@ export interface MarksPendingRow {
   /** Marks still to enter (students x subjects) where the sheet is started. */
   missingMarks: number;
 }
+
+/* ---------------------------------------------- Transfer Certificate -- */
+
+export type TcStatus = "draft" | "issued" | "cancelled";
+
+/** What a TC prints; all text and all editable. Dates are "yyyy-MM-dd". */
+export interface TcFields {
+  scholarNo: string;
+  /** Board registration no. (classes IX to XII); printed only when filled. */
+  registrationNo: string;
+  /** Permanent Education Number (UDISE+), from the admission form. */
+  pen: string;
+  studentName: string;
+  fatherName: string;
+  motherName: string;
+  address: string;
+  nationality: string;
+  category: string;
+  dob: string;
+  dobInWords: string;
+  lastClass: string;
+  admissionDate: string;
+  admissionClass: string;
+  subjects: string;
+  lastResult: string;
+  promotion: string;
+  duesPaid: string;
+  feeConcession: string;
+  nccCadet: string;
+  struckOffDate: string;
+  reason: string;
+  attendance: string;
+  schoolDays: string;
+  conduct: string;
+  schoolCategory: string;
+  issueDate: string;
+  /** Names printed over "Prepared By" / "Checked By" (optional). */
+  preparedBy: string;
+  checkedBy: string;
+}
+
+/** One numbered row of the printed TC (TC_ROWS). */
+export interface TcRow {
+  hi: string;
+  en: string;
+  field: keyof TcFields;
+  /** A second value on the same row (DOB in words, admission class). */
+  extra?: keyof TcFields;
+  /** A second line of the row (2B: mother's name). */
+  sub?: { hi: string; en: string; field: keyof TcFields };
+}
+
+/** The TC letterhead (TC Settings); copied into a TC when it is issued. */
+export interface TcSchoolDetails {
+  schoolName: string;
+  /** e.g. "Affiliated to C.B.S.E. New Delhi" ("" = not printed). */
+  affiliationText: string;
+  affiliationNo: string;
+  schoolCode: string;
+  udiseCode: string;
+  address: string;
+  email: string;
+  website: string;
+  phone: string;
+  /** Note under the signatures (new lines kept). */
+  note: string;
+  showQr: boolean;
+  /** Print the principal's signature + school stamp (Admit Card settings). */
+  principalSign: boolean;
+}
+
+/** `settings/transferCertificate`. */
+export interface TcSettings extends TcSchoolDetails {
+  /** Default answer of row 20 on a new TC. */
+  schoolCategory: string;
+  /** Book No. printed on the TCs issued from now on. */
+  bookNo: string;
+  /** Sr. No. of the last issued TC; the next TC gets this + 1. */
+  lastSerial: number;
+}
+
+export interface TcHistoryEntry {
+  /** ISO date-time. */
+  at: string;
+  byName: string;
+  action: "Issued" | "Revised" | "Cancelled";
+  reason: string;
+  /** Revised: the fields as they were before. */
+  previous?: TcFields;
+}
+
+/** The `transferCertificates/{id}` document. */
+export interface TransferCertificate {
+  id: string;
+  studentId: string;
+  enrollmentId: string;
+  session: string;
+  className: string;
+  section: string;
+  status: TcStatus;
+  /** 0 until issued. */
+  srNo: number;
+  bookNo: string;
+  /** "" until issued, e.g. "2026-2027/1/12". */
+  tcNo: string;
+  fields: TcFields;
+  /** Letterhead at the time of issue; null on a draft (it uses the settings). */
+  school: TcSchoolDetails | null;
+  printCount: number;
+  /** ISO date-times ("" when not yet). */
+  createdAt: string;
+  issuedAt: string;
+  issuedByName: string;
+  /** Fee due when it was issued (null = could not be checked). */
+  duesAtIssue: number | null;
+  cancelReason: string;
+  cancelledAt: string;
+  cancelledByName: string;
+  history: TcHistoryEntry[];
+}
+
+/** The student a TC is made for. */
+export interface TcStudent {
+  enrollmentId: string;
+  studentId: string;
+  session: string;
+  className: string;
+  section: string;
+  studentName: string;
+  admissionNo: string;
+  fatherName: string;
+}
+
+/** A row of the TC page. */
+export interface TcStudentRow extends TcStudent {
+  rollNumber: number;
+  /** Removed from the Student List (left / TC issued). */
+  left: boolean;
+  /** The TC that counts: the issued or draft one, else the last cancelled. */
+  tc: TransferCertificate | null;
+}
+
+/** Attendance and fee figures read for a TC (null = not available). */
+export interface TcRecords {
+  attendance: { present: number; days: number } | null;
+  /** Fee due up to the struck-off month; null when it could not be read. */
+  due: number | null;
+  concession: boolean | null;
+}
