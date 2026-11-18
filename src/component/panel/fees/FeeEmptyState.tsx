@@ -20,13 +20,22 @@ interface FeeEmptyStateProps {
   text: string;
   steps: EmptyStep[];
   className?: string;
+  /** The two small icons on the big one (default: rupee and receipt, for the fee pages). */
+  badges?: [LucideIcon, LucideIcon];
 }
 
 /**
- * The colourful "nothing picked yet" card of the fee pages: a big icon in
+ * The colourful "nothing picked yet" card of the fee pages (also the TC page): a big icon in
  * the school colours, a heading and the numbered steps to get started.
  */
-function FeeEmptyState({ icon: Icon, title, text, steps, className = "" }: FeeEmptyStateProps) {
+function FeeEmptyState({
+  icon: Icon,
+  title,
+  text,
+  steps,
+  className = "",
+  badges: [TopBadge, BottomBadge] = [IndianRupee, Receipt],
+}: FeeEmptyStateProps) {
   return (
     <div
       className={`relative flex flex-col items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-white px-6 py-6 text-center ${className}`}
@@ -41,10 +50,10 @@ function FeeEmptyState({ icon: Icon, title, text, steps, className = "" }: FeeEm
           <Icon className="h-10 w-10 text-white" strokeWidth={1.75} />
         </div>
         <span className="absolute -right-4 -top-2 grid h-9 w-9 place-items-center rounded-full bg-amber-400 text-white shadow-md ring-4 ring-white">
-          <IndianRupee className="h-4 w-4" strokeWidth={2.5} />
+          <TopBadge className="h-4 w-4" strokeWidth={2.5} />
         </span>
         <span className="absolute -bottom-1 -left-5 grid h-9 w-9 place-items-center rounded-full bg-sky-500 text-white shadow-md ring-4 ring-white">
-          <Receipt className="h-4 w-4" strokeWidth={2.5} />
+          <BottomBadge className="h-4 w-4" strokeWidth={2.5} />
         </span>
       </div>
 

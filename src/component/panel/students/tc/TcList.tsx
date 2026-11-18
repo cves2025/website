@@ -1,7 +1,7 @@
 import { useContext, useMemo } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { Link, useSearchParams } from "react-router-dom";
-import { FileText, Search, Settings2 } from "lucide-react";
+import { FilePen, FileText, Printer, Search, Settings2, Stamp, Users } from "lucide-react";
 
 import {
   ADMISSION_SECTIONS,
@@ -24,7 +24,15 @@ import useStudentPhoto from "../../../../hooks/useStudentPhoto";
 import { generateAcademicYears } from "../../../../utils/generateAcademicYears";
 import { toOrdinalLabel } from "../../../../utils/toOrdinalLabel";
 import { tcDateText } from "../../../../utils/transferCertificate";
+import FeeEmptyState from "../../fees/FeeEmptyState";
+import type { EmptyStep } from "../../fees/FeeEmptyState";
 import type { TcStatus, TcStudentRow } from "../../../../utils/type";
+
+const EMPTY_STEPS: EmptyStep[] = [
+  { icon: Users, title: "Pick a class", text: "Class and section, or All classes for the TC register.", tone: "green" },
+  { icon: FilePen, title: "Fill the TC", text: "Most rows come from the records; save a draft any time.", tone: "blue" },
+  { icon: Printer, title: "Issue and print", text: "Issue locks the TC and marks the student Left.", tone: "pink" },
+];
 
 interface Filters {
   session: string;
@@ -153,11 +161,13 @@ function TcList() {
       </div>
 
       {!className ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-gray-300 bg-white p-10 text-center text-gray-500">
-          <FileText className="h-8 w-8 text-gray-400" />
-          <p className="font-semibold text-gray-700">Pick a class and section</p>
-          <p className="text-sm">Or choose "All classes (TC register)" to see every TC of the session.</p>
-        </div>
+        <FeeEmptyState
+          icon={FileText}
+          title="Make or find a Transfer Certificate"
+          text={'Pick a class and section to see its students, or choose "All classes (TC register)" for every TC of the session.'}
+          steps={EMPTY_STEPS}
+          badges={[Stamp, Printer]}
+        />
       ) : loading ? (
         <Loader label="Loading students..." fullScreen={false} />
       ) : error ? (
