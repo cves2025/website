@@ -20,6 +20,7 @@ import PageHeader from "../../../../custom-components/PageHeader";
 import { PERMISSIONS } from "../../../../permissions";
 import { myContext } from "../../../context/MyContextProvider";
 import useTcRows from "../../../../hooks/useTcRows";
+import useStudentPhoto from "../../../../hooks/useStudentPhoto";
 import { generateAcademicYears } from "../../../../utils/generateAcademicYears";
 import { toOrdinalLabel } from "../../../../utils/toOrdinalLabel";
 import { tcDateText } from "../../../../utils/transferCertificate";
@@ -52,6 +53,23 @@ const editLink = (row: TcStudentRow) =>
     enrollment: row.enrollmentId,
     ...(row.tc ? { id: row.tc.id } : {}),
   }).toString()}`;
+
+/** A student's photo in the table (read once per app session, cached); a blank circle when none. */
+function StudentPhoto({ studentId, name }: { studentId: string; name: string }) {
+  const photo = useStudentPhoto(studentId);
+  return photo ? (
+    <img
+      src={photo}
+      alt={`Photo of ${name}`}
+      loading="lazy"
+      className="h-10 w-10 shrink-0 rounded-full border border-gray-200 object-cover"
+    />
+  ) : (
+    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-400">
+      {name.trim().charAt(0) || "-"}
+    </span>
+  );
+}
 
 /**
  * Transfer Certificate page: pick a class and section to see its students
@@ -196,10 +214,15 @@ function TcList() {
                         </td>
                         <td className="px-4 py-3 text-gray-700">{row.admissionNo || "-"}</td>
                         <td className="px-4 py-3">
-                          <div className="font-semibold text-gray-900">{row.studentName}</div>
-                          <div className="text-xs text-gray-500">
-                            {row.fatherName}
-                            {row.left && row.tc?.status === "issued" && " · Left"}
+                          <div className="flex items-center gap-3">
+                            <StudentPhoto studentId={row.studentId} name={row.studentName} />
+                            <div className="min-w-0">
+                              <div className="font-semibold text-gray-900">{row.studentName}</div>
+                              <div className="text-xs text-gray-500">
+                                {row.fatherName}
+                                {row.left && row.tc?.status === "issued" && " · Left"}
+                              </div>
+                            </div>
                           </div>
                         </td>
                         {isRegister && (

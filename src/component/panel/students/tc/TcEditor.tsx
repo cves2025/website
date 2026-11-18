@@ -1,14 +1,17 @@
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import type { Control } from "react-hook-form";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
+import { addYears, format, subYears } from "date-fns";
 import { AlertTriangle, ArrowLeft, History, Printer, RefreshCw } from "lucide-react";
 
 import {
   CVES_BUTTON,
   CVES_ON_HOVER,
   TC_DATE_FIELDS,
+  TC_DATE_YEARS_AHEAD,
+  TC_DATE_YEARS_BACK,
   TC_PATH,
   TC_EDIT_PATH,
   TC_ROWS,
@@ -16,6 +19,7 @@ import {
   TC_SUGGESTIONS,
 } from "../../../../constants";
 import CustomInput from "../../../../custom-components/CustomInput";
+import DatePicker, { INVALID_DATE } from "../../../../custom-components/DatePicker";
 import CustomTextarea from "../../../../custom-components/CustomTextarea";
 import Loader, { Spinner } from "../../../../custom-components/Loader";
 import Modal from "../../../../custom-components/Modal";
@@ -23,6 +27,7 @@ import { myContext } from "../../../context/MyContextProvider";
 import { PERMISSIONS } from "../../../../permissions";
 import useTcEditor from "../../../../hooks/useTcEditor";
 import useTcRecords from "../../../../hooks/useTcRecords";
+import useLastTcNo from "../../../../hooks/useLastTcNo";
 import { useSchoolSigns } from "../../../../hooks/useIdCardSettings";
 import { formatRupees } from "../../../../utils/feeStructure";
 import { generateClassRollNumbers } from "../../../../utils/rollNumbers";
@@ -34,6 +39,8 @@ import {
   reviseTc,
   saveTcDraft,
   TC_NOT_DRAFT,
+  TC_NO_USED,
+  TC_SERIAL_USED,
   type TcActor,
 } from "../../../../utils/tcService";
 import {
@@ -41,7 +48,11 @@ import {
   emptyTcFields,
   readTcFields,
   schoolDetailsOf,
+  nextTcNo,
   tcDateText,
+  tcNumberProblem,
+  tcSerial,
+  tcVerifyUrl,
 } from "../../../../utils/transferCertificate";
 import { toOrdinalLabel } from "../../../../utils/toOrdinalLabel";
 import type { TcFields } from "../../../../utils/type";
@@ -49,7 +60,11 @@ import TcPreview from "./TcSheet";
 
 type Dialog = "issue" | "revise" | "cancel" | "delete" | null;
 
-/** Text input of one TC field + its one-click answers. */
+// Year range of the date pickers: far back (birth dates) to a little ahead.
+const TC_DATE_MIN = format(subYears(new Date(), TC_DATE_YEARS_BACK), "yyyy-01-01");
+const TC_DATE_MAX = format(addYears(new Date(), TC_DATE_YEARS_AHEAD), "yyyy-12-31");
+
+/** Input of one TC field (date picker for dates) + its one-click answers. */
 function TcInput({
   control,
   name,
@@ -66,14 +81,33 @@ function TcInput({
   const options = TC_SUGGESTIONS[name];
   return (
     <div className="flex flex-col gap-1.5">
-      <CustomInput
-        control={control}
-        name={name}
-        label={label}
-        type={TC_DATE_FIELDS.has(name) ? "date" : "text"}
-        disabled={disabled}
-        className="py-1.5"
-      />
+      {TC_DATE_FIELDS.has(name) ? (
+        <Controller
+          control={control}
+          name={name}
+          render={({ field }) => (
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor={`tc-${name}`} className="block text-sm font-semibold text-gray-700">
+                {label}
+              </label>
+              {/* Month / year dropdowns: a birth date years ago or a date ahead is quick to pick. */}
+              <DatePicker
+                id={`tc-${name}`}
+                typeable
+                yearDropdown
+                min={TC_DATE_MIN}
+                max={TC_DATE_MAX}
+                value={field.value}
+                disabled={disabled}
+                onChange={(next) => field.onChange(next === INVALID_DATE ? "" : next)}
+                onBlur={field.onBlur}
+              />
+            </div>
+          )}
+        />
+      ) : (
+        <CustomInput control={control} name={name} label={label} disabled={disabled} className="py-1.5" />
+      )}
       {options && !disabled && (
         <div className="flex flex-wrap gap-1.5">
           {options.map((option) => (
@@ -108,12 +142,18 @@ function TcEditor() {
 
   const enrollmentId = params.get("enrollment") ?? "";
   const tcId = params.get("id") ?? "";
-  const { data, setData, loading, error } = useTcEditor(enrollmentId, tcId, actor.name);
+  const { data, setData, loading, error } = useTcEditor(enrollmentId, tcId);
   const { student, tc, settings } = data;
   const signs = useSchoolSigns();
 
   const form = useForm<TcFields>({ defaultValues: emptyTcFields() });
-  const { control, reset, setValue, getValues } = form;
+  const {
+    control,
+    reset,
+    setValue,
+    getValues,
+    formState: { isDirty },
+  } = form;
   useEffect(() => {
     if (data.fields) reset(data.fields);
   }, [data.fields, reset]);
@@ -128,6 +168,19 @@ function TcEditor() {
 
   const status = tc?.status ?? "new";
   const editable = canIssue && (status === "new" || status === "draft" || (status === "issued" && revising));
+  // Book No. / Sr. No. are typed by the admin; fixed once the TC is issued.
+  const numberEditable = canIssue && (status === "new" || status === "draft");
+  const numberProblem = tcNumberProblem(fields);
+
+  // TC No.: filled once with the last issued TC No. + 1 when empty; the admin may change it.
+  const { lastTcNo, loading: lastTcNoLoading } = useLastTcNo(numberEditable);
+  const tcNoSuggested = useRef(false);
+  useEffect(() => {
+    if (!numberEditable || lastTcNoLoading || !data.fields || tcNoSuggested.current) return;
+    tcNoSuggested.current = true;
+    const next = nextTcNo(lastTcNo);
+    if (next && !getValues("tcNo")) setValue("tcNo", next, { shouldDirty: true });
+  }, [numberEditable, lastTcNoLoading, lastTcNo, data.fields, getValues, setValue]);
   const records = useTcRecords(student, fields.struckOffDate, canIssue && (status === "new" || status === "draft"));
 
   // DOB in words follows the date (it can still be typed over).
@@ -193,10 +246,17 @@ function TcEditor() {
       await action();
     } catch (cause) {
       console.error(`TC: ${label} failed.`, cause);
+      const message = cause instanceof Error ? cause.message : "";
       toast.error(
-        cause instanceof Error && cause.message === TC_NOT_DRAFT
+        message === TC_NOT_DRAFT
           ? "This TC was already issued. Reload the page."
-          : "Could not save. Please check your connection and try again."
+          : message.startsWith(TC_SERIAL_USED)
+            ? `This Book No. + Sr. No. is already used by TC ${message.slice(TC_SERIAL_USED.length).trim() || "another TC"}. Enter another Sr. No.`
+            : message === TC_NO_USED
+              ? `TC No. ${fields.tcNo} is already used by another TC. Enter another TC No.`
+              : message === numberProblem && numberProblem
+                ? numberProblem
+                : "Could not save. Please check your connection and try again."
       );
     } finally {
       setBusy("");
@@ -357,7 +417,8 @@ function TcEditor() {
                   Delete draft
                 </button>
               )}
-              <button type="button" disabled={Boolean(busy)} onClick={saveDraft} className={outlineButton}>
+              {/* A saved draft: on only after a change (RHF isDirty); a new TC can always be saved. */}
+              <button type="button" disabled={Boolean(busy) || (Boolean(tc) && !isDirty)} onClick={saveDraft} className={outlineButton}>
                 {busy === "save" && <Spinner size="xs" />}
                 Save Draft
               </button>
@@ -376,7 +437,7 @@ function TcEditor() {
               <button type="button" disabled={Boolean(busy)} onClick={discardRevision} className={outlineButton}>
                 Discard changes
               </button>
-              <button type="button" disabled={Boolean(busy)} onClick={() => setDialog("revise")} className={mainButton}>
+              <button type="button" disabled={Boolean(busy) || !isDirty} onClick={() => setDialog("revise")} className={mainButton}>
                 Save changes
               </button>
             </>
@@ -436,13 +497,30 @@ function TcEditor() {
         )}
       </div>
 
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,21rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,23rem)_minmax(0,1fr)] print:block">
+      <div className="grid items-start gap-4 lg:items-stretch lg:grid-cols-[minmax(0,21rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,23rem)_minmax(0,1fr)] print:block">
         {/* Form */}
         <form
           onSubmit={(event) => event.preventDefault()}
-          className="flex flex-col gap-4 rounded-lg bg-white p-4 shadow-sm print:hidden lg:max-h-[calc(100vh-9rem)] lg:overflow-y-auto"
+          className="flex flex-col gap-4 rounded-lg bg-white p-4 shadow-sm print:hidden lg:h-0 lg:min-h-full lg:overflow-y-auto"
         >
           <div className="grid grid-cols-2 gap-3">
+            <TcInput control={control} name="bookNo" label="Book No." disabled={!numberEditable} onPick={pick} />
+            <TcInput control={control} name="srNo" label="Sr. No." disabled={!numberEditable} onPick={pick} />
+            <div className="col-span-2 flex flex-col gap-1">
+              <TcInput control={control} name="tcNo" label="TC No." disabled={!numberEditable} onPick={pick} />
+              {numberEditable && (
+                <p className="text-xs text-gray-500">
+                  {lastTcNo ? (
+                    <>
+                      Last issued TC No.: <b className="text-gray-700">{lastTcNo}</b>. The next one is filled in; change it if
+                      needed.
+                    </>
+                  ) : (
+                    "No TC issued yet: type the TC No."
+                  )}
+                </p>
+              )}
+            </div>
             <TcInput control={control} name="scholarNo" label="Scholar No." disabled={!editable} onPick={pick} />
             <TcInput control={control} name="pen" label="P.E.N." disabled={!editable} onPick={pick} />
             <TcInput control={control} name="registrationNo" label="Registration No. (IX-XII)" disabled={!editable} onPick={pick} />
@@ -473,10 +551,6 @@ function TcEditor() {
               )}
             </div>
           ))}
-          <div className="grid grid-cols-2 gap-3 border-t border-gray-100 pt-3">
-            <TcInput control={control} name="preparedBy" label="Prepared by (name)" disabled={!editable} onPick={pick} />
-            <TcInput control={control} name="checkedBy" label="Checked by (name)" disabled={!editable} onPick={pick} />
-          </div>
 
           {tc && tc.history.length > 0 && (
             <div className="border-t border-gray-100 pt-3">
@@ -502,11 +576,12 @@ function TcEditor() {
             fields={fields}
             school={school}
             status={status}
-            tcNo={tc?.tcNo ?? ""}
-            srNo={tc?.srNo ?? 0}
-            bookNo={tc?.bookNo ?? ""}
+            tcNo={tc && tc.status !== "draft" ? tc.tcNo : fields.tcNo}
+            srNo={tc && tc.status !== "draft" ? tc.srNo : tcSerial(fields)}
+            bookNo={tc && tc.status !== "draft" ? tc.bookNo : fields.bookNo}
             duplicate={(tc?.printCount ?? 0) > 0}
             signs={signs}
+            verifyUrl={tc && tc.status !== "draft" ? tcVerifyUrl(tc.id) : ""}
           />
         </div>
       </div>
@@ -518,14 +593,14 @@ function TcEditor() {
         title="Issue Transfer Certificate?"
         submitText="Issue TC"
         submitClassName={CVES_BUTTON}
-        submitDisabled={!fields.struckOffDate || !fields.issueDate}
+        submitDisabled={!fields.struckOffDate || !fields.issueDate || Boolean(numberProblem)}
         onSubmit={issue}
         loading={busy === "issue"}
       >
         <div className="flex flex-col gap-3 text-sm text-gray-700">
           <p>
-            The TC gets the next Sr. No. (Book No. {settings?.bookNo}, Sr. No. {(settings?.lastSerial ?? 0) + 1}) and is
-            locked. <b>{student.studentName}</b> will be marked <b>Left</b> and leave the Student List.
+            The TC is issued as <b>TC No. {fields.tcNo || "-"}</b> (Book No. {fields.bookNo || "-"}, Sr. No.{" "}
+            {fields.srNo || "-"}) and is locked. A number already on another TC cannot be used again. <b>{student.studentName}</b> will be marked <b>Left</b> and leave the Student List.
           </p>
           {due !== null && due > 0 && (
             <p className="flex items-start gap-2 rounded-md bg-amber-50 p-3 text-amber-800">
@@ -533,6 +608,7 @@ function TcEditor() {
               Fee due of {formatRupees(due)} is still pending.
             </p>
           )}
+          {numberProblem && <p className="rounded-md bg-red-50 p-3 text-red-700">{numberProblem}</p>}
           {!fields.struckOffDate || !fields.issueDate ? (
             <p className="rounded-md bg-red-50 p-3 text-red-700">Fill the struck-off date and the date of issue first.</p>
           ) : null}

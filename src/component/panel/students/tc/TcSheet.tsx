@@ -10,7 +10,8 @@ import { QRCodeSVG } from "qrcode.react";
 
 import schoolLogo from "../../../../assets/image/schoolLogo1.png";
 import { TC_DATE_FIELDS, TC_NAME_COLORS, TC_ROWS, TC_SCHOOL_ADDRESS } from "../../../../constants";
-import { tcDateText, tcQrText } from "../../../../utils/transferCertificate";
+import FitText from "../../../../custom-components/FitText";
+import { tcDateText } from "../../../../utils/transferCertificate";
 import type { TcFields, TcSchoolDetails, TcStatus } from "../../../../utils/type";
 
 export interface TcSheetProps {
@@ -23,6 +24,8 @@ export interface TcSheetProps {
   /** Printed after the first copy: a DUPLICATE mark in the corner. */
   duplicate: boolean;
   signs: { sign: string; stamp: string };
+  /** Public verify link put in the QR code ("" on a draft: placeholder box). */
+  verifyUrl: string;
 }
 
 const INK = "#111827";
@@ -101,57 +104,43 @@ function Signature({ label, name, children }: { label: string; name: string; chi
 
 const box: CSSProperties = { border: `1.5px solid ${INK}` };
 
-const NAME_MAX_PX = 30;
-
 /**
- * The school name on one line, in the Cancun font, each word in a school
- * colour. The font shrinks when the name is wider than its box.
+ * The school name on one line (FitText shrinks it when it is too wide), in
+ * the Cancun font, each word in a school colour.
  */
 function SchoolName({ words }: { words: string[] }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState(NAME_MAX_PX);
-  const text = words.join(" ");
-
-  useLayoutEffect(() => {
-    const element = ref.current;
-    if (!element) return;
-    const fit = () => {
-      // Measured at the largest size; scrollWidth / clientWidth do not
-      // change with a CSS transform, so the preview scale does not matter.
-      element.style.fontSize = `${NAME_MAX_PX}px`;
-      const ratio = element.clientWidth / Math.max(1, element.scrollWidth);
-      const next = ratio < 1 ? Math.floor(NAME_MAX_PX * ratio * 10) / 10 : NAME_MAX_PX;
-      element.style.fontSize = `${next}px`;
-      setSize(next);
-    };
-    fit();
-    // Cancun loads late: fit again once it is ready.
-    document.fonts?.ready.then(fit).catch(() => undefined);
-  }, [text]);
-
   return (
-    <div
-      ref={ref}
-      style={{ fontFamily: "Cancun, " + FONT, fontSize: size, letterSpacing: 0.3, textTransform: "uppercase", lineHeight: 1.15, whiteSpace: "nowrap", overflow: "hidden" }}
-    >
-      {words.map((word, index) => (
-        <span key={index} style={{ color: TC_NAME_COLORS[index % TC_NAME_COLORS.length] }}>
-          {index > 0 ? " " : ""}
-          {word}
-        </span>
-      ))}
+    <div style={{ fontFamily: "Cancun, " + FONT, fontSize: 30, letterSpacing: 0.3, textTransform: "uppercase", lineHeight: 1.15 }}>
+      <FitText minScale={0.6}>
+        {words.map((word, index) => (
+          <span key={index} style={{ color: TC_NAME_COLORS[index % TC_NAME_COLORS.length] }}>
+            {index > 0 ? " " : ""}
+            {word}
+          </span>
+        ))}
+      </FitText>
     </div>
   );
 }
 
-export function TcSheet({ fields, school, status, tcNo, srNo, bookNo, duplicate, signs }: TcSheetProps) {
+/** Where the QR code goes on a draft: it gets its link only when issued. */
+function QrPlaceholder() {
+  return (
+    <div style={{ width: 118, height: 118, border: `1.5px dashed ${MUTED}`, color: MUTED, display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", fontSize: 11, lineHeight: 1.3 }}>
+      QR code
+      <br />
+      after issue
+    </div>
+  );
+}
+
+export function TcSheet({ fields, school, status, tcNo, srNo, bookNo, duplicate, signs, verifyUrl }: TcSheetProps) {
   const nameWords = school.schoolName.trim().split(/\s+/).filter(Boolean);
   const contact = [
     school.email && `E-Mail : ${school.email}`,
     school.website && `Website : ${school.website}`,
     !school.email && !school.website && school.phone && `Phone : ${school.phone}`,
   ].filter(Boolean);
-  const issued = status === "issued" || status === "cancelled";
 
   return (
     <div style={{ position: "relative", display: "flex", flexDirection: "column", flex: 1, color: INK, fontFamily: FONT }}>
@@ -195,10 +184,10 @@ export function TcSheet({ fields, school, status, tcNo, srNo, bookNo, duplicate,
           {/* Two lines: Scholar / Book / Sr. No., then P.E.N. / TC No. */}
           <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr)", columnGap: "4mm", lineHeight: 1.7 }}>
             <span>प्रवेश सं. / Scholar No. : {fields.scholarNo}</span>
-            <span>पुस्तक सं. / Book No. : {issued ? bookNo : ""}</span>
-            <span>क्र.सं. / Sr. No. : {issued && srNo ? srNo : ""}</span>
+            <span>पुस्तक सं. / Book No. : {bookNo}</span>
+            <span>क्र.सं. / Sr. No. : {srNo || ""}</span>
             <span>P.E.N. : {fields.pen}</span>
-            <span style={{ gridColumn: "span 2" }}>TC No. : {issued ? tcNo : ""}</span>
+            <span style={{ gridColumn: "span 2" }}>TC No. : {tcNo}</span>
           </div>
           {fields.registrationNo && (
             <div style={{ marginTop: "1.5mm" }}>
@@ -216,7 +205,7 @@ export function TcSheet({ fields, school, status, tcNo, srNo, bookNo, duplicate,
               <div key={row.field} style={{ position: "relative" }}>
                 {school.showQr && no === 11 && (
                   <div style={{ position: "absolute", right: "1mm", top: "1mm", zIndex: 1, background: "#fff", padding: 2 }}>
-                    <QRCodeSVG value={tcQrText({ tcNo: issued ? tcNo : "", fields }, school.schoolName)} size={118} level="M" />
+                    {verifyUrl ? <QRCodeSVG value={verifyUrl} size={118} level="M" /> : <QrPlaceholder />}
                   </div>
                 )}
                 <Row no={`${no}.`} label={<Label hi={row.hi} en={row.en} />} roomForQr={roomForQr}>
@@ -249,10 +238,10 @@ export function TcSheet({ fields, school, status, tcNo, srNo, bookNo, duplicate,
 
       {/* Signatures */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1.2fr", gap: "6mm", marginTop: "8mm" }}>
-        <Signature label="तैयारकर्ता / Prepared By" name={fields.preparedBy}>
+        <Signature label="तैयारकर्ता / Prepared By" name={school.preparedBy}>
           <div style={{ fontSize: 11, color: MUTED, fontStyle: "italic", order: 2 }}>(name &amp; designation)</div>
         </Signature>
-        <Signature label="जांचकर्ता / Checked By" name={fields.checkedBy}>
+        <Signature label="जांचकर्ता / Checked By" name={school.checkedBy}>
           <div style={{ fontSize: 11, color: MUTED, fontStyle: "italic", order: 2 }}>(name &amp; designation)</div>
         </Signature>
         <Signature label="ह० प्रधानाचार्य / कार्यालय मोहर" name="">
@@ -303,8 +292,8 @@ export function TcPage(props: TcSheetProps) {
   }, []);
 
   return (
-    // 8 mm margin at the top / bottom, 7 mm at the sides; the sheet fills the rest.
-    <div className="h-[296mm] w-[210mm] shrink-0 bg-white px-[7mm] py-[8mm] shadow-lg print:shadow-none">
+    // 8 mm margin at the top / bottom, 4 mm at the sides; the sheet fills the rest.
+    <div className="h-[296mm] w-[210mm] shrink-0 bg-white px-[4mm] py-[8mm] shadow-lg print:shadow-none">
       <div ref={outer} className="h-full overflow-hidden">
         <div
           ref={inner}

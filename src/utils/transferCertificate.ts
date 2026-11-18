@@ -4,13 +4,14 @@
  */
 import { format, isValid, parse } from "date-fns";
 
-import { DEFAULT_TC_SETTINGS } from "../constants";
+import { DEFAULT_TC_SETTINGS, TC_BOOK_NO_PATTERN, TC_NO_PATTERN, TC_VERIFY_PATH } from "../constants";
 import type {
   TcFields,
   TcHistoryEntry,
   TcSchoolDetails,
   TcSettings,
   TcStatus,
+  TcVerifyRecord,
   TransferCertificate,
 } from "./type";
 
@@ -19,6 +20,9 @@ const text = (value: unknown): string =>
 
 const TC_FIELD_KEYS: (keyof TcFields)[] = [
   "scholarNo",
+  "bookNo",
+  "srNo",
+  "tcNo",
   "registrationNo",
   "pen",
   "studentName",
@@ -45,8 +49,6 @@ const TC_FIELD_KEYS: (keyof TcFields)[] = [
   "conduct",
   "schoolCategory",
   "issueDate",
-  "preparedBy",
-  "checkedBy",
 ];
 
 export function emptyTcFields(): TcFields {
@@ -72,6 +74,8 @@ const SCHOOL_TEXT_KEYS = [
   "website",
   "phone",
   "note",
+  "preparedBy",
+  "checkedBy",
 ] as const;
 
 export function readSchoolDetails(data: unknown): TcSchoolDetails {
@@ -87,16 +91,44 @@ export function readSchoolDetails(data: unknown): TcSchoolDetails {
 
 export function readTcSettings(data: unknown): TcSettings {
   const source = data && typeof data === "object" ? (data as Record<string, unknown>) : {};
-  const serial = Number(source.lastSerial);
   return {
     ...readSchoolDetails(source),
     schoolCategory:
       typeof source.schoolCategory === "string"
         ? source.schoolCategory
         : DEFAULT_TC_SETTINGS.schoolCategory,
-    bookNo: text(source.bookNo).trim() || DEFAULT_TC_SETTINGS.bookNo,
-    lastSerial: Number.isInteger(serial) && serial > 0 ? serial : 0,
   };
+}
+
+/** Sr. No. typed by the admin as a number (0 when it is not a whole number above 0). */
+export function tcSerial(fields: Pick<TcFields, "srNo">): number {
+  const value = fields.srNo.trim();
+  return /^[0-9]{1,6}$/.test(value) && Number(value) > 0 ? Number(value) : 0;
+}
+
+/** What is wrong with the Book No. / Sr. No. / TC No. typed by the admin ("" when all are fine). */
+export function tcNumberProblem(fields: Pick<TcFields, "bookNo" | "srNo" | "tcNo">): string {
+  if (!fields.bookNo.trim()) return "Enter the Book No.";
+  if (!TC_BOOK_NO_PATTERN.test(fields.bookNo.trim())) return "Book No.: only letters, digits or -";
+  if (!fields.srNo.trim()) return "Enter the Sr. No.";
+  if (!tcSerial(fields)) return "Sr. No. must be a number above 0";
+  if (!fields.tcNo.trim()) return "Enter the TC No.";
+  if (!TC_NO_PATTERN.test(fields.tcNo.trim())) return "TC No.: only letters, digits, / or -";
+  return "";
+}
+
+/** Ids of the `tcNumbers` locks: one for the Book No. + Sr. No., one for the TC No. */
+export const tcSerialLockKey = (bookNo: string, srNo: number): string => `sr_${bookNo.trim()}_${srNo}`;
+export const tcNoLockKey = (tcNo: string): string => `tc_${tcNo.trim().replace(/\//g, "_")}`;
+
+/**
+ * The TC No. suggested for the next TC: the last issued one with its last
+ * number + 1 ("2026-2027/1/12" -> "2026-2027/1/13"); "" when there is none.
+ */
+export function nextTcNo(lastTcNo: string): string {
+  const last = lastTcNo.trim();
+  if (!/\d/.test(last)) return "";
+  return last.replace(/(\d+)(?!.*\d)/, (digits) => String(Number(digits) + 1).padStart(digits.length, "0"));
 }
 
 /** The letterhead part of the settings (copied into a TC when issued). */
@@ -114,6 +146,8 @@ export function schoolDetailsOf(settings: TcSettings): TcSchoolDetails {
     note: settings.note,
     showQr: settings.showQr,
     principalSign: settings.principalSign,
+    preparedBy: settings.preparedBy,
+    checkedBy: settings.checkedBy,
   };
 }
 
@@ -178,15 +212,6 @@ export function currentTc(list: TransferCertificate[]): TransferCertificate | nu
   return newestFirst.find((tc) => tc.status !== "cancelled") ?? newestFirst[0] ?? null;
 }
 
-/** "2026-27" -> "2026-2027" (as the TC No. prints it). */
-export function fullSession(session: string): string {
-  const start = Number.parseInt(session.slice(0, 4), 10);
-  return Number.isFinite(start) ? `${start}-${start + 1}` : session;
-}
-
-/** e.g. "2026-2027/1/12": session / book no. / Sr. No. */
-export const formatTcNo = (session: string, bookNo: string, srNo: number): string =>
-  `${fullSession(session)}/${bookNo}/${srNo}`;
 
 const ROMAN: [number, string][] = [
   [10, "X"],
@@ -254,20 +279,44 @@ export function dateInWords(key: string): string {
   return `${format(date, "do")} of ${format(date, "MMMM")} ${yearInWords(date.getFullYear())}`;
 }
 
-/** What the QR code on a TC holds: the main facts, readable by any scanner. */
-export function tcQrText(tc: Pick<TransferCertificate, "tcNo" | "fields">, schoolName: string): string {
-  const { fields } = tc;
-  return [
+/**
+ * What the QR code on an issued TC holds: only the public link of its
+ * verify page, which shows the live status (valid / cancelled).
+ */
+export function tcVerifyUrl(tcId: string): string {
+  return `${window.location.origin}${TC_VERIFY_PATH}/${tcId}`;
+}
+
+/** The public copy of a TC (`tcVerify/{tcId}`): no DOB, address or fees. */
+export function tcVerifyRecord(
+  tc: Pick<TransferCertificate, "status" | "tcNo" | "session" | "fields" | "cancelledAt">,
+  schoolName: string
+): TcVerifyRecord {
+  return {
+    status: tc.status === "cancelled" ? "cancelled" : "issued",
+    tcNo: tc.tcNo,
+    studentName: tc.fields.studentName,
+    fatherName: tc.fields.fatherName,
+    lastClass: tc.fields.lastClass,
+    session: tc.session,
+    struckOffDate: tc.fields.struckOffDate,
+    issueDate: tc.fields.issueDate,
+    cancelledAt: tc.cancelledAt,
     schoolName,
-    "TRANSFER CERTIFICATE",
-    `TC No.: ${tc.tcNo || "DRAFT"}`,
-    `Scholar No.: ${fields.scholarNo}`,
-    ...(fields.pen ? [`P.E.N.: ${fields.pen}`] : []),
-    `Name: ${fields.studentName}`,
-    `Father: ${fields.fatherName}`,
-    `DOB: ${tcDateText(fields.dob)}`,
-    `Class: ${fields.lastClass}`,
-    `Struck off: ${tcDateText(fields.struckOffDate)}`,
-    `Issued: ${tcDateText(fields.issueDate)}`,
-  ].join("\n");
+  };
+}
+
+export function readTcVerify(data: Record<string, unknown>): TcVerifyRecord {
+  return {
+    status: text(data.status) === "cancelled" ? "cancelled" : "issued",
+    tcNo: text(data.tcNo),
+    studentName: text(data.studentName),
+    fatherName: text(data.fatherName),
+    lastClass: text(data.lastClass),
+    session: text(data.session),
+    struckOffDate: text(data.struckOffDate),
+    issueDate: text(data.issueDate),
+    cancelledAt: text(data.cancelledAt),
+    schoolName: text(data.schoolName),
+  };
 }

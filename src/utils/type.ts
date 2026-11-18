@@ -866,6 +866,11 @@ export type TcStatus = "draft" | "issued" | "cancelled";
 /** What a TC prints; all text and all editable. Dates are "yyyy-MM-dd". */
 export interface TcFields {
   scholarNo: string;
+  /** Book No. and Sr. No. of the paper register, typed by the admin (Sr. No. digits). */
+  bookNo: string;
+  srNo: string;
+  /** TC No. typed by the admin (suggested: the last issued TC No. + 1). */
+  tcNo: string;
   /** Board registration no. (classes IX to XII); printed only when filled. */
   registrationNo: string;
   /** Permanent Education Number (UDISE+), from the admission form. */
@@ -894,9 +899,6 @@ export interface TcFields {
   conduct: string;
   schoolCategory: string;
   issueDate: string;
-  /** Names printed over "Prepared By" / "Checked By" (optional). */
-  preparedBy: string;
-  checkedBy: string;
 }
 
 /** One numbered row of the printed TC (TC_ROWS). */
@@ -927,16 +929,15 @@ export interface TcSchoolDetails {
   showQr: boolean;
   /** Print the principal's signature + school stamp (Admit Card settings). */
   principalSign: boolean;
+  /** Names printed over "Prepared By" / "Checked By" (TC Settings; "" = blank line). */
+  preparedBy: string;
+  checkedBy: string;
 }
 
 /** `settings/transferCertificate`. */
 export interface TcSettings extends TcSchoolDetails {
   /** Default answer of row 20 on a new TC. */
   schoolCategory: string;
-  /** Book No. printed on the TCs issued from now on. */
-  bookNo: string;
-  /** Sr. No. of the last issued TC; the next TC gets this + 1. */
-  lastSerial: number;
 }
 
 export interface TcHistoryEntry {
@@ -977,6 +978,25 @@ export interface TransferCertificate {
   cancelledAt: string;
   cancelledByName: string;
   history: TcHistoryEntry[];
+}
+
+/**
+ * `tcVerify/{tcId}`: what the public verify page shows (no DOB, address or
+ * fees). Written with the TC on issue, revise and cancel.
+ */
+export interface TcVerifyRecord {
+  status: "issued" | "cancelled";
+  tcNo: string;
+  studentName: string;
+  fatherName: string;
+  lastClass: string;
+  session: string;
+  /** "yyyy-MM-dd". */
+  struckOffDate: string;
+  issueDate: string;
+  /** ISO date-time, "" while valid. */
+  cancelledAt: string;
+  schoolName: string;
 }
 
 /** The student a TC is made for. */

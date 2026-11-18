@@ -137,6 +137,33 @@ service cloud.firestore {
       return isAdmin() || teacherCan(p);
     }
 
+    // A Transfer Certificate as it will be after this write (tcVerify rules).
+    function tcAfter(tcId) {
+      return getAfter(/databases/$(database)/documents/transferCertificates/$(tcId)).data;
+    }
+
+    // Ids of the tcNumbers locks of a TC: its Book No. + Sr. No. and its TC No.
+    // ("/" -> "_"; a TC No. has no "_" of its own).
+    function tcSerialLockId(d) {
+      return 'sr_' + d.bookNo + '_' + string(d.srNo);
+    }
+    function tcNoLockId(d) {
+      return 'tc_' + d.tcNo.replace('/', '_');
+    }
+
+    // An issued TC must have a whole Sr. No. above 0, a valid Book No. and
+    // TC No., and both of its locks (tcNumbers) written for it in the same
+    // transaction, so neither number is ever on two TCs.
+    function tcNumberLocked(tcId) {
+      let d = request.resource.data;
+      return d.status != 'issued'
+        || (d.srNo is int && d.srNo > 0
+          && d.bookNo is string && d.bookNo.matches('^[A-Za-z0-9-]{1,10}$')
+          && d.tcNo is string && d.tcNo.matches('^[A-Za-z0-9/-]{1,30}$')
+          && getAfter(/databases/$(database)/documents/tcNumbers/$(tcSerialLockId(d))).data.tcId == tcId
+          && getAfter(/databases/$(database)/documents/tcNumbers/$(tcNoLockId(d))).data.tcId == tcId);
+    }
+
     // ---------- users (teachers, staff, admins) ----------
 
     match /users/{userId} {
@@ -263,30 +290,27 @@ service cloud.firestore {
       allow read: if docId == 'homeBanner' || isStaff();
       allow write: if (docId == 'homeBanner' && can('banner.manage'))
         || (docId != 'homeBanner' && isAdmin());
-      // transferCertificate: issuing a TC (tc.issue) only moves the Sr. No. up by one.
-      allow create: if docId == 'transferCertificate' && can('tc.issue')
-        && request.resource.data.keys().hasOnly(['lastSerial', 'updatedAt'])
-        && request.resource.data.lastSerial == 1;
-      allow update: if docId == 'transferCertificate' && can('tc.issue')
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSerial', 'updatedAt'])
-        && request.resource.data.lastSerial == resource.data.get('lastSerial', 0) + 1;
     }
 
     // ---------- transfer certificates ----------
 
-    // Draft -> issued (Sr. No. from settings/transferCertificate) -> cancelled
-    // (admin). An issued TC is never deleted and keeps its number.
+    // Draft -> issued (Book No. + Sr. No. typed by the admin, locked in
+    // tcNumbers) -> cancelled (admin). An issued TC is never deleted and keeps
+    // its number.
     match /transferCertificates/{tcId} {
       allow read: if can('tc.view') || can('tc.issue');
       allow create: if can('tc.issue')
-        && request.resource.data.status in ['draft', 'issued'];
+        && request.resource.data.status in ['draft', 'issued']
+        && tcNumberLocked(tcId);
       // Draft saved again or issued; an issued TC revised (number kept).
       allow update: if can('tc.issue')
         && ((resource.data.status == 'draft'
-              && request.resource.data.status in ['draft', 'issued'])
+              && request.resource.data.status in ['draft', 'issued']
+              && tcNumberLocked(tcId))
           || (resource.data.status == 'issued'
               && request.resource.data.status == 'issued'
               && request.resource.data.srNo == resource.data.srNo
+              && request.resource.data.bookNo == resource.data.bookNo
               && request.resource.data.tcNo == resource.data.tcNo));
       // Printing an issued TC counts the copies (later ones say DUPLICATE).
       allow update: if (can('tc.view') || can('tc.issue'))
@@ -297,6 +321,39 @@ service cloud.firestore {
         && resource.data.status == 'issued'
         && request.resource.data.status == 'cancelled';
       allow delete: if can('tc.issue') && resource.data.status == 'draft';
+    }
+
+    // Two per issued TC: "sr_<book>_<sr>" and "tc_<TC No. with / as _>". Created
+    // with the TC they belong to and never changed or deleted, so no two TCs
+    // share a number (a cancelled TC keeps its numbers too).
+    match /tcNumbers/{numberId} {
+      allow get: if can('tc.issue');
+      allow list: if false;
+      allow create: if can('tc.issue')
+        && request.resource.data.keys().hasOnly(['tcId', 'tcNo', 'createdAt'])
+        && tcAfter(request.resource.data.tcId).status == 'issued'
+        && numberId in [tcSerialLockId(tcAfter(request.resource.data.tcId)),
+          tcNoLockId(tcAfter(request.resource.data.tcId))]
+        && request.resource.data.tcNo == tcAfter(request.resource.data.tcId).tcNo;
+      allow update, delete: if false;
+    }
+
+    // Public copy of an issued TC for the QR verify page (/verify-tc/<tcId>).
+    // Anyone may read ONE by its id (the random TC id), nobody may list them.
+    // Written together with the TC (issue / revise / cancel) and must match it:
+    // same status, TC No. and student name as the TC after the write.
+    match /tcVerify/{tcId} {
+      allow get: if true;
+      allow list: if false;
+      allow create, update: if can('tc.issue')
+        && request.resource.data.keys().hasOnly(['status', 'tcNo', 'studentName',
+          'fatherName', 'lastClass', 'session', 'struckOffDate', 'issueDate',
+          'cancelledAt', 'schoolName', 'updatedAt'])
+        && request.resource.data.status in ['issued', 'cancelled']
+        && request.resource.data.status == tcAfter(tcId).status
+        && request.resource.data.tcNo == tcAfter(tcId).tcNo
+        && request.resource.data.studentName == tcAfter(tcId).fields.studentName;
+      allow delete: if false;
     }
 
     // siteImages (school photo) + galleryImport: public pages, Settings > Gallery.

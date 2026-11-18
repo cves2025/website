@@ -41,6 +41,7 @@ Class teacher is read from the `isClassTeacher` flag on the user document. Rules
 | `users` | own doc, staff | admin; own doc: only `lastSeenReleaseId`, `updatedAt` |
 | `students` | staff | admin; with `student.photo` only `studentPhoto`, `fatherPhoto`, `motherPhoto` (+ `updatedAt`) |
 | `enrollments`, `rollNumber`, `exams`, `stampSign` | staff | admin; `enrollments` also `tc.issue`, only to mark Left (`isDeleted: true`, `leftReason`, `tcNo`, `leftAt`) |
+| `tcVerify` (public TC verify copy) | anyone, `get` one only (no list) | `tc.issue`, only matching the TC after the write (status, TC No., name), fixed keys; never deleted |
 | `transferCertificates` | `tc.view` / `tc.issue` | `tc.issue`: draft, issue, revise (number kept), delete a draft; `tc.view`: only `printCount`; admin: cancel. Issued TCs are never deleted |
 | `subjects` | staff | `subject.manage` |
 | `examSchedules` | staff | `admitcard.generate` |
@@ -49,7 +50,8 @@ Class teacher is read from the `isClassTeacher` flag on the user document. Rules
 | `holidayCalendar` | staff | `holiday.manage` |
 | `news`, `gallery`, `downloads` | public if `isPublished`, else staff | `news.manage` / `gallery.manage` / `downloads.manage` |
 | `settings/homeBanner` | public | `banner.manage` |
-| `settings/*` (admitCard, idCard, transferCertificate) | staff | admin; `transferCertificate` also `tc.issue`, only `lastSerial` + 1 |
+| `settings/*` (admitCard, idCard, transferCertificate) | staff | admin |
+| `tcNumbers` (TC locks: Book No. + Sr. No., TC No.) | `tc.issue` (get only) | `tc.issue`: create only, with the issued TC it names; never changed or deleted |
 | `panelSettings/siteImages`, `galleryImport` | public | `gallery.manage` |
 | `panelSettings/rolePermissions` | signed in | admin |
 | `panelSettings/*` (exam, suggestedRemarks, enrollmentCounter) | staff | admin |

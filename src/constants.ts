@@ -63,6 +63,10 @@ export const COLLECTION = {
   MARKS_PROGRESS: "marksProgress",
   /** Transfer certificates: one document per TC (draft / issued / cancelled). */
   TRANSFER_CERTIFICATES: "transferCertificates",
+  /** Public copy of an issued TC (few fields) for the QR verify page. */
+  TC_VERIFY: "tcVerify",
+  /** One per used Book No. + Sr. No. (`<book>_<sr>`), so a number is never used twice. */
+  TC_NUMBERS: "tcNumbers",
 };
 
 /**
@@ -612,6 +616,9 @@ export const TC_PATH = "/welcome/student/tc";
 export const TC_EDIT_PATH = "/welcome/student/tc/edit";
 export const TC_SETTINGS_PATH = "/welcome/student/tc/settings";
 
+/** Public page the TC's QR code opens: `/verify-tc/<tcId>` (no login). */
+export const TC_VERIFY_PATH = "/verify-tc";
+
 /** Class filter value of the TC page that lists every TC of the session. */
 export const TC_REGISTER_CLASS = "all";
 
@@ -631,10 +638,15 @@ export const DEFAULT_TC_SETTINGS: TcSettings = {
   note: DEFAULT_TC_NOTE,
   showQr: true,
   principalSign: true,
+  preparedBy: "",
+  checkedBy: "",
   schoolCategory: "Private",
-  bookNo: "1",
-  lastSerial: 0,
 };
+
+/** Book No. of a TC: letters, digits or "-" (it is part of the TC No. and of `tcNumbers` ids). */
+export const TC_BOOK_NO_PATTERN = /^[A-Za-z0-9-]{1,10}$/;
+/** TC No.: letters, digits, "/" or "-" (no "_": the lock id turns "/" into "_"). */
+export const TC_NO_PATTERN = /^[A-Za-z0-9/-]{1,30}$/;
 
 /** The only address line printed under the school name on a TC. */
 export const TC_SCHOOL_ADDRESS = "Mahmoorganj, Varanasi";
@@ -738,6 +750,10 @@ export const TC_ROWS: TcRow[] = [
 ];
 
 /** TC fields typed as dates ("yyyy-MM-dd", printed dd-MM-yyyy). */
+/** Year range of the TC date pickers (years before / after today). */
+export const TC_DATE_YEARS_BACK = 40;
+export const TC_DATE_YEARS_AHEAD = 2;
+
 export const TC_DATE_FIELDS = new Set<keyof TcFields>([
   "dob",
   "admissionDate",

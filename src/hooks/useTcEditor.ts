@@ -18,7 +18,7 @@ const EMPTY: TcEditorData = { student: null, tc: null, fields: null, settings: n
  * Everything the TC editor opens with. `tcId` opens that TC; otherwise the
  * student's draft / issued TC of the session, else a new one from the records.
  */
-export function useTcEditor(enrollmentId: string, tcId: string, preparedBy: string) {
+export function useTcEditor(enrollmentId: string, tcId: string) {
   const { data, setData, loading, error } = useAsyncData<TcEditorData>(
     async () => {
       const [settings, saved] = await Promise.all([loadTcSettings(), tcId ? loadTc(tcId) : null]);
@@ -47,7 +47,7 @@ export function useTcEditor(enrollmentId: string, tcId: string, preparedBy: stri
         const existing = currentTc(await loadStudentTcs(student.studentId, student.session));
         tc = existing && existing.status !== "cancelled" ? existing : null;
       }
-      const fields = tc ? tc.fields : await buildTcPrefill(student, settings, preparedBy);
+      const fields = tc ? tc.fields : await buildTcPrefill(student, settings);
       return { student, tc, fields, settings };
     },
     [enrollmentId, tcId],

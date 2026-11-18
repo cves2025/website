@@ -12,6 +12,7 @@ import AdmissionOpen from './AdmissionOpen'
 import PayFee from './PayFee'
 import Result from './Result'
 import Login from './Login'
+import TcVerify from './TcVerify'
 import Welcome from './Welcome'
 import Dashboard from './admin/Dashboard'
 import AddStudent from './panel/students/AddStudent'
@@ -72,6 +73,7 @@ function Router() {
         <Route path="/facilities/science-lab" element={<ScienceLab />} />
         <Route path="/facilities/sports" element={<Sports />} />
         <Route path="/download/result" element={<Result />} />
+        <Route path="/verify-tc/:tcId" element={<TcVerify />} />
         <Route path="/login" element={<Login />} />
         <Route element={<RequireAccess />}>
         <Route path="/welcome" element={<Welcome />}>
