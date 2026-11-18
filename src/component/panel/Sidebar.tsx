@@ -25,7 +25,7 @@ import {
   FaFilePdf,
   FaPhotoVideo,
 } from "react-icons/fa";
-import schoolLogo from "../../assets/image/schoolLogo.jpg";
+import schoolLogo from "../../assets/image/schoolLogo1.png";
 import { BRAND, MENU, filterMenu, groupOfPath, type MenuItem } from "../../config/navigation";
 import { PERMISSIONS } from "../../permissions";
 
@@ -264,11 +264,21 @@ const hoverTimer = useRef<number | null>(null);
               aria-label="Children's Valley English School logo - go to dashboard"
               className="group -m-1 flex min-w-0 items-center gap-3 rounded-lg p-1 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3763E0]"
             >
-              <img
-                src={schoolLogo}
-                alt="Children's Valley English School logo"
-                className="h-10 w-10 shrink-0 rounded-xl bg-white object-contain p-0.5 shadow-sm ring-1 ring-gray-200 transition-transform group-hover:scale-105"
-              />
+              {/* Logo in a white circle with a turning ring in the school colours (as in the
+                  mobile app); the ring stands still for users who ask for reduced motion. */}
+              <span className="relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-full shadow-sm transition-transform group-hover:scale-105">
+                <span
+                  aria-hidden
+                  className="absolute -inset-1/4 animate-[spin_3.5s_linear_infinite] bg-cves motion-reduce:animate-none"
+                />
+                <span className="relative grid h-[38px] w-[38px] place-items-center rounded-full bg-white">
+                  <img
+                    src={schoolLogo}
+                    alt="Children's Valley English School logo"
+                    className="h-[31px] w-[31px] object-contain"
+                  />
+                </span>
+              </span>
               <div className={`min-w-0 ${isCollapsed ? "md:hidden" : ""}`}>
                 <h2 className="font-bold text-base text-gray-900 truncate leading-tight tracking-tight">
                   CVES Panel
