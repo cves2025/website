@@ -2,8 +2,10 @@ import {
   collectionTotal,
   schoolAttendanceOn,
   sectionsAttendanceOn,
+  tcCountsOf,
   transportPerMonth,
   type AttendanceTotals,
+  type TcCounts,
   type CollectionTotal,
 } from "../utils/dashboardStats";
 import type { SectionOption } from "../component/panel/attendance/attendanceShared";
@@ -65,4 +67,17 @@ export function useMarkedSectionsOn(date: string, enabled: boolean) {
     { initial: null, enabled: enabled && Boolean(date), errorMessage: "Marked sections could not be loaded." }
   );
   return { markedKeys: data, loading, error };
+}
+
+/** TC counts (issued / cancelled / draft) of each of `sessions`, by session. */
+export function useTcCounts(sessions: string[], enabled = true) {
+  const { data, loading, error } = useAsyncData<Record<string, TcCounts>>(
+    async () => {
+      const counts = await Promise.all(sessions.map((session) => tcCountsOf(session)));
+      return Object.fromEntries(sessions.map((session, index) => [session, counts[index]]));
+    },
+    [sessions.join(",")],
+    { initial: {}, enabled: enabled && sessions.length > 0, errorMessage: "TC counts could not be loaded." }
+  );
+  return { counts: data, loading, error };
 }

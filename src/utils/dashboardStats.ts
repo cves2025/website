@@ -148,3 +148,25 @@ export async function transportPerMonth(session: string): Promise<number> {
     return 0;
   }
 }
+
+export interface TcCounts {
+  issued: number;
+  cancelled: number;
+  draft: number;
+}
+
+/** TCs of a session by status (three counts; equality filters need no composite index). */
+export async function tcCountsOf(session: string): Promise<TcCounts> {
+  const countOf = async (status: keyof TcCounts) =>
+    (
+      await getCountFromServer(
+        query(
+          collection(db, COLLECTION.TRANSFER_CERTIFICATES),
+          where("session", "==", session),
+          where("status", "==", status)
+        )
+      )
+    ).data().count;
+  const [issued, cancelled, draft] = await Promise.all([countOf("issued"), countOf("cancelled"), countOf("draft")]);
+  return { issued, cancelled, draft };
+}

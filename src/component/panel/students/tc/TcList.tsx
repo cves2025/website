@@ -1,6 +1,6 @@
 import { useContext, useMemo } from "react";
 import { useForm, useWatch } from "react-hook-form";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { FileText, Search, Settings2 } from "lucide-react";
 
 import {
@@ -79,10 +79,13 @@ function StudentPhoto({ studentId, name }: { studentId: string; name: string }) 
 function TcList() {
   const { can } = useContext(myContext);
   const canIssue = can(PERMISSIONS.TC_ISSUE);
+  // ?session=&class= (e.g. from the dashboard card: class "all" = TC register).
+  const [params] = useSearchParams();
+  const sessionParam = params.get("session") ?? "";
   const filters = useForm<Filters>({
     defaultValues: {
-      session: sessions[0]?.value ?? "",
-      className: "",
+      session: sessions.some((item) => item.value === sessionParam) ? sessionParam : sessions[0]?.value ?? "",
+      className: params.get("class") ?? "",
       section: ADMISSION_SECTIONS[0],
       status: "",
       search: "",

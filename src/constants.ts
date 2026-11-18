@@ -616,6 +616,9 @@ export const TC_PATH = "/welcome/student/tc";
 export const TC_EDIT_PATH = "/welcome/student/tc/edit";
 export const TC_SETTINGS_PATH = "/welcome/student/tc/settings";
 
+/** Sessions shown year-wise on the dashboard TC card (newest first). */
+export const TC_DASHBOARD_SESSIONS = 5;
+
 /** Public page the TC's QR code opens: `/verify-tc/<tcId>` (no login). */
 export const TC_VERIFY_PATH = "/verify-tc";
 
