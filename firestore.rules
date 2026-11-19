@@ -359,6 +359,12 @@ service cloud.firestore {
     // siteImages (school photo) + galleryImport: public pages, Settings > Gallery.
     // rolePermissions: read by every signed-in app when it starts.
     // exam (exam rules), suggestedRemarks, enrollmentCounter...: admin pages.
+    // Unlock PIN hashes: only the server (Admin SDK) reads / writes them.
+    match /pinSecrets/{uid} {
+      allow read, write: if false;
+    }
+
+    // lockSettings (unlock with password / PIN): staff read, admin write.
     match /panelSettings/{docId} {
       allow read: if docId in ['siteImages', 'galleryImport']
         || (docId == 'rolePermissions' && signedIn())

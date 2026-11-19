@@ -54,7 +54,8 @@ Class teacher is read from the `isClassTeacher` flag on the user document. Rules
 | `tcNumbers` (TC locks: Book No. + Sr. No., TC No.) | `tc.issue` (get only) | `tc.issue`: create only, with the issued TC it names; never changed or deleted |
 | `panelSettings/siteImages`, `galleryImport` | public | `gallery.manage` |
 | `panelSettings/rolePermissions` | signed in | admin |
-| `panelSettings/*` (exam, suggestedRemarks, enrollmentCounter) | staff | admin |
+| `panelSettings/*` (exam, suggestedRemarks, enrollmentCounter, lockSettings) | staff | admin |
+| `pinSecrets/{uid}` (unlock PIN hashes) | nobody | nobody (server only) |
 | `feeStructures` | public | admin, never deleted |
 | `feeSettings`, `feeAccounts`, `feePayments`, `feeCounters` | admin | admin. Receipts are only cancelled; the counter only goes up by 1 |
 | anything else | no | no |

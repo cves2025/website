@@ -5,7 +5,8 @@ import {
   FieldPath,
   RegisterOptions,
 } from "react-hook-form";
-import { InputHTMLAttributes } from "react";
+import { InputHTMLAttributes, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 
 const INPUT_CLASS =
   "w-full rounded-md border bg-white px-3 py-2 text-sm text-gray-800 placeholder-gray-400 shadow-sm transition-colors focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-100";
@@ -32,6 +33,7 @@ interface CustomInputProps<T extends FieldValues = FieldValues>
  * Reusable text/number/email/date input built on react-hook-form's Controller.
  * Props: control, name, label, placeholder, type, rules, required, disabled,
  * wrapperClassName (applied to the wrapping div), className (applied to the input).
+ * type="password" gets a show / hide (eye) button, as on the Login page.
  */
 function CustomInput<T extends FieldValues = FieldValues>({
   control,
@@ -47,6 +49,8 @@ function CustomInput<T extends FieldValues = FieldValues>({
   ...rest
 }: CustomInputProps<T>) {
   const isRequired = required || Boolean(rules.required);
+  const isPassword = type === "password";
+  const [shown, setShown] = useState(false);
 
   return (
     <Controller
@@ -66,16 +70,30 @@ function CustomInput<T extends FieldValues = FieldValues>({
                 {isRequired && <span className="ml-0.5 text-red-500">*</span>}
               </label>
             )}
-            <input
-              id={name}
-              type={type}
-              placeholder={placeholder}
-              disabled={disabled}
-              aria-invalid={invalid}
-              className={`${INPUT_CLASS} ${fieldBorder(invalid)} ${className}`}
-              {...field}
-              {...rest}
-            />
+            <div className="relative">
+              <input
+                id={name}
+                type={isPassword && shown ? "text" : type}
+                placeholder={placeholder}
+                disabled={disabled}
+                aria-invalid={invalid}
+                className={`${INPUT_CLASS} ${fieldBorder(invalid)} ${isPassword ? "pr-10" : ""} ${className}`}
+                {...field}
+                {...rest}
+              />
+              {isPassword && (
+                <button
+                  type="button"
+                  onClick={() => setShown((value) => !value)}
+                  tabIndex={-1}
+                  disabled={disabled}
+                  aria-label={shown ? "Hide password" : "Show password"}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-navy disabled:opacity-50"
+                >
+                  {shown ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              )}
+            </div>
             {fieldState.error && (
               <p className="text-xs font-medium text-red-600">
                 {fieldState.error.message}

@@ -1,6 +1,7 @@
 import {
   EmailAuthProvider,
   reauthenticateWithCredential,
+  updatePassword,
 } from "firebase/auth";
 
 import { auth } from "../firebase/config";
@@ -49,5 +50,30 @@ export async function verifyAccountPassword(
       default:
         return "Password could not be verified. Please try again.";
     }
+  }
+}
+
+/**
+ * Changes the signed-in account password: checks `currentPassword` first
+ * (re-authentication, which Firebase also needs before a password change).
+ * @returns a user-facing error message, or `null` when the password was changed.
+ */
+export async function changeAccountPassword(
+  email: string | null | undefined,
+  currentPassword: string,
+  newPassword: string
+): Promise<string | null> {
+  const wrong = await verifyAccountPassword(email, currentPassword);
+  if (wrong) return wrong.replace("Incorrect password", "The current password is wrong");
+  const currentUser = auth.currentUser;
+  if (!currentUser) return "You are not signed in. Please log in again.";
+  try {
+    await updatePassword(currentUser, newPassword);
+    return null;
+  } catch (cause) {
+    const code = (cause as { code?: string })?.code ?? "";
+    return code === "auth/weak-password"
+      ? "The new password is too weak. Use at least 8 characters."
+      : "The password could not be changed. Please try again.";
   }
 }

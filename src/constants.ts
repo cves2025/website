@@ -499,6 +499,24 @@ export const IDLE_LOCK_MAX_ATTEMPTS = 5;
 export const IDLE_ACTIVITY_KEY = "cves:lastActivity";
 export const IDLE_LOCKED_KEY = "cves:lockedUid";
 
+/** Document id inside COLLECTION.PANEL_SETTINGS: unlock with password or PIN (Settings > Lock & PIN). */
+export const LOCK_SETTINGS_DOC = "lockSettings";
+export type UnlockMethod = "password" | "pin";
+export const UNLOCK_METHOD_OPTIONS: { value: UnlockMethod; label: string; hint: string }[] = [
+  { value: "password", label: "Password", hint: "account password" },
+  { value: "pin", label: "PIN", hint: "4 digits, set by the admin" },
+];
+/** Shortest new account password on Settings > Lock & PIN. */
+export const ACCOUNT_PASSWORD_MIN = 8;
+/** Unlock PIN: exactly 4 digits. The server checks it (PIN_PATTERN / easy PINs there too). */
+export const PIN_LENGTH = 4;
+export const PIN_PATTERN = /^\d{4}$/;
+/** PINs refused as too easy (same list as the server). */
+export const WEAK_PINS = [
+  "0000", "1111", "2222", "3333", "4444", "5555", "6666", "7777", "8888", "9999",
+  "1234", "4321", "0123", "3210", "1212", "1122", "6789", "9876", "2580", "1010",
+];
+
 /** Marks entry page; `?session=&exam=&class=&section=` opens that sheet. */
 export const MARKS_PATH = "/welcome/marks";
 
