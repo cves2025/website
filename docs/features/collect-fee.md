@@ -26,6 +26,12 @@ page with `state.focusSearch`, which puts the cursor in the student search.
 `feeAccounts/{session}_{studentId}`, `feePayments/{session}_{serial}`, `feeCounters/{session}`,
 `feeStructures/{session}`, `feeSettings/general` (see FEE_MANAGEMENT.md section 3).
 
+## Mobile app
+
+The app (`../mobile`) has Collect Fee, Receipt (view / share / cancel), Collection Report, Fee Settings
+and the dashboard card. Its `services/feeService.ts`, `utils/feeAccount.ts`, `utils/feeStructure.ts`,
+`utils/feeReport.ts` and `types/fee.ts` mirror the website files: change both together.
+
 ## Change X -> look here
 
 - Rules of what can be ticked / paid first: `feeAccount.ts` (tick + allocation functions).
