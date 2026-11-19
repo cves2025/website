@@ -68,12 +68,14 @@ function Row({
 }) {
   return (
     <div
-      style={{ display: "grid", gridTemplateColumns: "9mm minmax(0,1fr) 4mm 92mm", alignItems: "center", padding: "0.3mm 0", fontSize: 13 }}
+      // Top-aligned, so a long value (many subjects) wraps under its own
+      // first line and the number, label and colon stay on that line.
+      style={{ display: "grid", gridTemplateColumns: "9mm minmax(0,1fr) 4mm 92mm", alignItems: "start", padding: "0.3mm 0", fontSize: 13, lineHeight: 1.3 }}
     >
-      <span style={{ alignSelf: "start", paddingTop: 1 }}>{no}</span>
+      <span>{no}</span>
       <span>{label}</span>
       <span style={{ fontWeight: 700 }}>:</span>
-      <span style={{ fontWeight: 600, textTransform: "none", paddingRight: roomForQr ? "36mm" : 0, overflowWrap: "anywhere" }}>
+      <span style={{ fontWeight: 600, textTransform: "none", paddingRight: roomForQr ? "36mm" : 0, overflowWrap: "break-word" }}>
         {children}
       </span>
     </div>

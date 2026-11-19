@@ -50,6 +50,7 @@ import {
   tcNumberProblem,
   tcSerial,
   tcSerialLockKey,
+  tcSubjectsText,
   tcVerifyRecord,
 } from "./transferCertificate";
 import type {
@@ -260,7 +261,7 @@ export async function buildTcPrefill(
     .map((item) => item.data())
     .filter((item) => item.archived !== true && text(item.name))
     .sort((a, b) => (Number(a.order) || 999) - (Number(b.order) || 999))
-    .map((item) => text(item.name).toUpperCase());
+    .map((item) => ({ name: text(item.name), type: text(item.type) }));
 
   const dob = /^\d{4}-\d{2}-\d{2}$/.test(text(data.dob)) ? text(data.dob) : "";
   const today = todayKey();
@@ -279,7 +280,7 @@ export async function buildTcPrefill(
     lastClass: romanClass(student.className),
     admissionDate,
     admissionClass: romanClass(text(first?.className) || student.className),
-    subjects: [...new Set(subjects)].join(", "),
+    subjects: tcSubjectsText(subjects),
     nccCadet: "N/A",
     struckOffDate: today,
     conduct: "Good",

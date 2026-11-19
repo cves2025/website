@@ -60,7 +60,8 @@ Neither `tc.view` nor `tc.issue` is ON by default for teachers. Both are exclude
 
 1. New TC: `buildTcPrefill` fills the fields from `students` (names in capitals, P.E.N. from `penOfStudent`, DOB + words,
    category, nationality, address + city), the first enrollment (admission class), `subjects` of
-   the class the TC is for (editable), `createdAt` (admission date; imported students have none) and the settings.
+   the class the TC is for (editable; `tcSubjectsText` prints a subject saved once per type only once,
+   e.g. ENGLISH (WRITTEN + ORAL), and a one-type subject as just ENGLISH), `createdAt` (admission date; imported students have none) and the settings.
    `loadTcRecords` counts marked days / present days of the section up to the struck-off date and
    the fee due up to that month (`duesUpTo`). A new TC fills rows 12, 13, 17 and 18 from them if
    they are empty. A teacher cannot read fees, so the page says so.

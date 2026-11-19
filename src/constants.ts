@@ -657,6 +657,9 @@ export const TC_SCHOOL_ADDRESS = "Mahmoorganj, Varanasi";
 /** Colours of the school name on the TC, word by word (the cves gradient colours). */
 export const TC_NAME_COLORS = ["#009746", "#393186", "#e31e25", "#e7087e"];
 
+/** Order of the subject types when one subject has more than one, e.g. ENGLISH (WRITTEN + ORAL). */
+export const TC_SUBJECT_TYPE_ORDER = ["Written", "Oral", "Theory", "Practical", "Scholastic"];
+
 export const TC_STATUS_META: Record<TcStatus | "none", { label: string; className: string }> = {
   none: { label: "Not issued", className: "bg-gray-100 text-gray-600" },
   draft: { label: "Draft", className: "bg-amber-100 text-amber-800" },

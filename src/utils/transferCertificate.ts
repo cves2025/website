@@ -4,7 +4,13 @@
  */
 import { format, isValid, parse } from "date-fns";
 
-import { DEFAULT_TC_SETTINGS, TC_BOOK_NO_PATTERN, TC_NO_PATTERN, TC_VERIFY_PATH } from "../constants";
+import {
+  DEFAULT_TC_SETTINGS,
+  TC_BOOK_NO_PATTERN,
+  TC_NO_PATTERN,
+  TC_SUBJECT_TYPE_ORDER,
+  TC_VERIFY_PATH,
+} from "../constants";
 import type {
   TcFields,
   TcHistoryEntry,
@@ -17,6 +23,39 @@ import type {
 
 const text = (value: unknown): string =>
   typeof value === "string" ? value : typeof value === "number" ? String(value) : "";
+
+/**
+ * Row 9 "Subjects studied" from the class subjects (already sorted). One
+ * subject saved once per type (English Written + English Oral) is printed
+ * once: ENGLISH (WRITTEN + ORAL); a subject with one type is just ENGLISH.
+ * Names are matched without case / extra spaces, so no subject shows twice.
+ */
+export function tcSubjectsText(subjects: { name: string; type: string }[]): string {
+  const groups = new Map<string, { name: string; types: Set<string> }>();
+  subjects.forEach((subject) => {
+    const name = subject.name.trim().replace(/\s+/g, " ");
+    if (!name) return;
+    const key = name.toLowerCase();
+    const group = groups.get(key) ?? { name, types: new Set<string>() };
+    // "Written + Oral" counts as both types.
+    subject.type
+      .split("+")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .forEach((part) => group.types.add(part));
+    groups.set(key, group);
+  });
+  const rank = (type: string) => {
+    const index = TC_SUBJECT_TYPE_ORDER.indexOf(type);
+    return index < 0 ? TC_SUBJECT_TYPE_ORDER.length : index;
+  };
+  return [...groups.values()]
+    .map(({ name, types }) => {
+      const list = [...types].sort((a, b) => rank(a) - rank(b));
+      return (list.length > 1 ? `${name} (${list.join(" + ")})` : name).toUpperCase();
+    })
+    .join(", ");
+}
 
 const TC_FIELD_KEYS: (keyof TcFields)[] = [
   "scholarNo",
