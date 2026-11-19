@@ -9,6 +9,7 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import toast from "react-hot-toast";
 
 import {
+  CVES_BUTTON,
   SECTIONS,
   STUDENT_EXPORT_DEFAULT_COLUMNS,
   STUDENT_EXPORT_GROUPS,
@@ -157,6 +158,7 @@ function StudentExportModal({ isOpen, onClose, initial, allowedClasses, pairs }:
       onSubmit={() => void download()}
       loading={busy}
       submitDisabled={busy || pickedCount === 0}
+      submitClassName={CVES_BUTTON}
       modalClassName="max-w-3xl"
     >
       <div className="flex flex-col gap-5">
