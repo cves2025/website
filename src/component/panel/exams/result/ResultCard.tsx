@@ -306,7 +306,13 @@ function StatementTable({ model }: { model: ResultTableModel }) {
     terms.reduce((count, term) => count + term.exams.length + 2, 0) +
     (showGrand ? 2 : 0);
 
-  const colWidth = (100 - subjectWidth) / valueCols;
+  // Grand Total "Marks Obtained" (e.g. 1234/1500) gets a wider column.
+  const grandMarksScale = showGrand ? 1.5 : 1;
+
+  const colWidth =
+    (100 - subjectWidth) / (valueCols + (grandMarksScale - 1));
+
+  const grandMarksCol = showGrand ? valueCols - 2 : -1;
 
   return (
     <table className="w-full table-fixed border-collapse border border-gray-500 text-[12px]">
@@ -316,7 +322,12 @@ function StatementTable({ model }: { model: ResultTableModel }) {
         {hasTypes && <col style={{ width: `${typeWidth}%` }} />}
 
         {Array.from({ length: valueCols }).map((_, index) => (
-          <col key={index} style={{ width: `${colWidth}%` }} />
+          <col
+            key={index}
+            style={{
+              width: `${index === grandMarksCol ? colWidth * grandMarksScale : colWidth}%`,
+            }}
+          />
         ))}
       </colgroup>
 
@@ -503,7 +514,7 @@ function StatementTable({ model }: { model: ResultTableModel }) {
               <td colSpan={2} className={CELL}>
                 {totalText(
                   termTotals[termIndex],
-                  String(termTotals[termIndex].percentage),
+                  `${termTotals[termIndex].percentage}%`,
                 )}
               </td>
             </Fragment>
@@ -511,7 +522,7 @@ function StatementTable({ model }: { model: ResultTableModel }) {
 
           {showGrand && (
             <td colSpan={2} className={CELL}>
-              {totalText(grandTotals, String(grandTotals.percentage))}
+              {totalText(grandTotals, `${grandTotals.percentage}%`)}
             </td>
           )}
         </tr>

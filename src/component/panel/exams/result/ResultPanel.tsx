@@ -71,91 +71,117 @@ function ResultPanel() {
       />
 
       <div className="mt-4 flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="resultYear" className="font-semibold text-gray-700">
-            Academic Year
-          </Label>
-          <SelectDropdown
-            id="resultYear"
-            value={gen.selectedYear}
-            onValueChange={(value) => {
-              gen.handleYearChange(value);
-              setExamIds([]);
-            }}
-            options={academicYears}
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="resultClass" className="font-semibold text-gray-700">
-            Class
-          </Label>
-          <SelectDropdown
-            id="resultClass"
-            value={gen.selectedClass}
-            onValueChange={gen.handleClassChange}
-            placeholder="Select class"
-            options={gen.allowedClasses.map((className) => ({
-              label: toOrdinalLabel(className),
-              value: className,
-            }))}
-          />
-        </div>
-
-        <SearchableMultiSelect
-          label="Exams"
-          required
-          options={examOptions}
-          values={validExamIds}
-          onChange={setExamIds}
-          placeholder="Select one or more exams"
-          searchPlaceholder="Search exam..."
-          emptyMessage="No exam found for this year and class"
-          maxChips={2}
-        />
-
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="resultSection" className="font-semibold text-gray-700">
-            Section
-          </Label>
-          <SelectDropdown
-            id="resultSection"
-            value={gen.selectedSection}
-            onValueChange={gen.handleSectionChange}
-            disabled={!gen.selectedClass}
-            options={[
-              { label: "All Sections", value: "" },
-              ...SECTIONS.map((section) => ({ label: section, value: section })),
-            ]}
-          />
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-gray-700">
-            <Checkbox
-              checked={gen.allStudents}
-              disabled={!gen.selectedClass}
-              onCheckedChange={(checked) =>
-                gen.handleSelectAllStudents(checked === true)
-              }
+        {/*
+          One row on a laptop. Every label is one 20px line (leading-5), so all
+          the boxes start at the same height; exams and students get more room
+          for their chips.
+        */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.6fr)_minmax(0,0.9fr)_minmax(0,1.8fr)] lg:items-start">
+          <div className="flex flex-col gap-1">
+            <Label
+              htmlFor="resultYear"
+              className="font-semibold leading-5 text-gray-700"
+            >
+              Academic Year
+            </Label>
+            <SelectDropdown
+              id="resultYear"
+              value={gen.selectedYear}
+              onValueChange={(value) => {
+                gen.handleYearChange(value);
+                setExamIds([]);
+              }}
+              options={academicYears}
             />
-            All students of the class
-            {gen.selectedClass ? ` (${gen.visibleStudents.length})` : ""}
-          </label>
+          </div>
 
-          {!gen.allStudents && (
+          <div className="flex flex-col gap-1">
+            <Label
+              htmlFor="resultClass"
+              className="font-semibold leading-5 text-gray-700"
+            >
+              Class
+            </Label>
+            <SelectDropdown
+              id="resultClass"
+              value={gen.selectedClass}
+              onValueChange={gen.handleClassChange}
+              placeholder="Select class"
+              options={gen.allowedClasses.map((className) => ({
+                label: toOrdinalLabel(className),
+                value: className,
+              }))}
+            />
+          </div>
+
+          <SearchableMultiSelect
+            label="Exams"
+            required
+            options={examOptions}
+            values={validExamIds}
+            onChange={setExamIds}
+            placeholder="Select exam(s)"
+            searchPlaceholder="Search exam..."
+            emptyMessage="No exam found for this year and class"
+            maxChips={1}
+          />
+
+          <div className="flex flex-col gap-1">
+            <Label
+              htmlFor="resultSection"
+              className="font-semibold leading-5 text-gray-700"
+            >
+              Section
+            </Label>
+            <SelectDropdown
+              id="resultSection"
+              value={gen.selectedSection}
+              onValueChange={gen.handleSectionChange}
+              disabled={!gen.selectedClass}
+              options={[
+                { label: "All Sections", value: "" },
+                ...SECTIONS.map((section) => ({
+                  label: section,
+                  value: section,
+                })),
+              ]}
+            />
+          </div>
+
+          {/* Students: the "All" checkbox sits on the label line; with it on, the box is locked. */}
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold leading-5 text-gray-700">
+                Students
+              </span>
+              <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold leading-5 text-gray-700">
+                <Checkbox
+                  checked={gen.allStudents}
+                  disabled={!gen.selectedClass}
+                  onCheckedChange={(checked) =>
+                    gen.handleSelectAllStudents(checked === true)
+                  }
+                />
+                All
+                {gen.selectedClass ? ` (${gen.visibleStudents.length})` : ""}
+              </label>
+            </div>
             <SearchableMultiSelect
-              label="Students"
               options={gen.studentOptions}
-              values={gen.selectedEnrollments}
+              values={gen.allStudents ? [] : gen.selectedEnrollments}
               onChange={gen.setSelectedEnrollments}
-              placeholder="Select student(s)"
+              placeholder={
+                gen.allStudents
+                  ? "All students of the class"
+                  : "Select student(s)"
+              }
               searchPlaceholder="Search name, father, enrollment..."
               loading={gen.loadingStudents}
-              disabled={!gen.selectedClass}
+              disabled={!gen.selectedClass || gen.allStudents}
               emptyMessage="No student found"
+              maxChips={1}
             />
-          )}
+          </div>
         </div>
 
         <div className="flex justify-end">
