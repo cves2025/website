@@ -12,7 +12,10 @@ rules: [add-student.md](add-student.md).
 | `src/utils/studentScope.ts` | `allowedClassSections(scope)` (a teacher's pairs), `buildQuerySpecs` (which Firestore queries a filter needs), `specKey` / `rowsFromCache` (answer a narrower filter from rows already read), `pairKey` |
 | `src/utils/studentRemoval.ts` | `wrongEntryBlocker`, `removeWrongEntry` (wrong entry = removed for good) |
 | `src/utils/rollNumbers.ts` | `generateClassRollNumbers` - run after a remove / restore so roll numbers close up |
-| `src/permissions` | `scopedSections`, `PERMISSIONS.STUDENT_CREATE` (= can manage: edit, delete, bin), `STUDENT_FORM_VIEW` (View button) |
+| `src/permissions` | `scopedSections`, `PERMISSIONS.STUDENT_CREATE` (= can manage: edit, delete, bin), `STUDENT_FORM_VIEW` (View button), `STUDENT_EXPORT` (Download Excel) |
+| `src/component/panel/students/StudentExportModal.tsx` | Download Excel modal: session, classes (multi), section, status (Active / Left-TC / Both), file (one sheet / one per class), column groups; remembers columns / status / file in localStorage (`STUDENT_EXPORT_STORAGE_KEY`) |
+| `src/utils/studentExport.ts` | `loadStudentsForExport(filter, pairs)` (enrollments of the user's own pairs, master `students` docs 30 per `in` query, roll numbers; sorted class -> section -> roll -> name), `exportStudentsExcel` (xlsx, every value text except S.No., autofilter) |
+| `src/constants.ts` | `STUDENT_EXPORT_GROUPS` (the columns: Basic, Contact / Address, Other details, Previous school, Health), `STUDENT_EXPORT_DEFAULT_COLUMNS` (Basic), status / layout options |
 
 ## How it works (StudentList.tsx)
 
@@ -36,6 +39,11 @@ rules: [add-student.md](add-student.md).
 - Issuing a Transfer Certificate also removes the student this way (`leftReason: "tc"`, `tcNo`):
   see [transfer-certificate.md](transfer-certificate.md).
 - `updateRow(id, patch | null)` changes / removes a row in the cache and the list (no re-read).
+- **Download Excel** (header button, permission `student.export`: admin always, a teacher only
+  when given on the Permissions page and then only their own class + section pairs). The modal
+  starts from the list's session / class / section. File `Students_<session>_<classes>.xlsx`;
+  no photos. Status "Left / TC" = enrollments with `isDeleted` (TC No. shown when issued).
+  Reads only (staff may read `students` / `enrollments`), no rules change.
 
 ## Change X -> look here
 

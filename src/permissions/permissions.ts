@@ -8,6 +8,8 @@ export const PERMISSIONS = {
   /** Change the student, father and mother photos (mobile app Students page). */
   STUDENT_PHOTO: "student.photo",
   STUDENT_PROMOTE: "student.promote",
+  /** Download Excel of the students (a teacher: only their own classes). */
+  STUDENT_EXPORT: "student.export",
   SUBJECT_MANAGE: "subject.manage",
   TEACHER_CREATE: "teacher.create",
   IDCARD_STUDENT: "idcard.student",

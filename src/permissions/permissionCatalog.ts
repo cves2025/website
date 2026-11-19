@@ -68,6 +68,12 @@ export const TEACHER_PERMISSION_GROUPS: PermissionCatalogGroup[] = [
           "Open and print the admission form of a student of their own classes.",
       },
       {
+        permission: P.STUDENT_EXPORT,
+        label: "Download Student Excel",
+        description:
+          "Download the details of the students of their own classes as an Excel file.",
+      },
+      {
         permission: P.STUDENT_PHOTO,
         label: "Update Student Photos",
         description:
@@ -206,5 +212,6 @@ export const LEGACY_CATALOG_PERMISSIONS: Permission[] =
       p !== P.STUDENT_FORM_VIEW &&
       p !== P.STUDENT_PHOTO &&
       p !== P.TC_VIEW &&
-      p !== P.TC_ISSUE
+      p !== P.TC_ISSUE &&
+      p !== P.STUDENT_EXPORT
   );

@@ -22,7 +22,7 @@ import {
 } from "firebase/firestore";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
-import { Eye, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { Eye, FileSpreadsheet, Pencil, RotateCcw, Trash2 } from "lucide-react";
 
 import {
   ADD_STUDENT_PATH,
@@ -51,6 +51,7 @@ import {
   scopedSections,
 } from "../../../permissions";
 import { removeWrongEntry } from "../../../utils/studentRemoval";
+import StudentExportModal from "./StudentExportModal";
 import Modal from "../../../custom-components/Modal";
 import { Button as UIButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -229,6 +230,9 @@ export default function StudentList() {
   // View / print the admission form; ON for teachers by default.
   const canViewForm = can(PERMISSIONS.STUDENT_FORM_VIEW);
   const showActions = canManage || canViewForm;
+  // Download Excel (admin; a teacher with student.export gets their own classes).
+  const canExport = can(PERMISSIONS.STUDENT_EXPORT);
+  const [exportOpen, setExportOpen] = useState(false);
   const scopeReady = profileReady && user?.accessState === "ok";
 
   /** Class + section pairs the user may see; null = every class (admin). */
@@ -717,9 +721,25 @@ export default function StudentList() {
         }
         descriptionStyle="text-gray-500"
         button={
-          canManage ? (
+          canManage || canExport ? (
             <div className="flex items-center gap-2">
+              {canExport && (
+                // Same Button as "+ Add Student", with md corners.
+                <Button
+                  buttonName={
+                    <>
+                      <FileSpreadsheet className="h-4 w-4" />
+                      Download Excel
+                    </>
+                  }
+                  variant="cves"
+                  size="md"
+                  buttonStyle="rounded-md"
+                  onClick={() => setExportOpen(true)}
+                />
+              )}
               {/* Recycle bin: removed students, with Restore / Wrong entry. */}
+              {canManage && (
               <button
                 type="button"
                 aria-pressed={showBin}
@@ -739,6 +759,8 @@ export default function StudentList() {
                   </span>
                 )}
               </button>
+              )}
+              {canManage && (
               <Button
                 buttonName="+ Add Student"
                 variant="cves"
@@ -746,10 +768,21 @@ export default function StudentList() {
                 buttonStyle="rounded-full"
                 onClick={() => navigate(ADD_STUDENT_PATH)}
               />
+              )}
             </div>
           ) : undefined
         }
       />
+
+      {canExport && (
+        <StudentExportModal
+          isOpen={exportOpen}
+          onClose={() => setExportOpen(false)}
+          initial={{ session: selectedYear, className: selectedClass, section: selectedSection }}
+          allowedClasses={classOptions}
+          pairs={pairs}
+        />
+      )}
 
       {canManage && showBin && (
         <p className="rounded-lg border border-pink-200 bg-pink-50 px-4 py-2 text-sm text-gray-700">

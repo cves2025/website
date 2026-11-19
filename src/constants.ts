@@ -786,3 +786,111 @@ export const TC_SUGGESTIONS: Partial<Record<keyof TcFields, string[]>> = {
   conduct: ["Excellent", "Very Good", "Good", "Satisfactory"],
   schoolCategory: ["Private", "Independent", "Government", "Minority"],
 };
+
+/* ------------------------------------------------- Download Excel (students) */
+
+/** One column of the student Excel: `key` is a field of StudentExportRow, `width` in characters. */
+export interface StudentExportColumn {
+  key: string;
+  label: string;
+  width: number;
+}
+
+export interface StudentExportGroup {
+  key: string;
+  label: string;
+  columns: StudentExportColumn[];
+}
+
+/** Columns offered on Download Excel, in their order in the file. */
+export const STUDENT_EXPORT_GROUPS: StudentExportGroup[] = [
+  {
+    key: "basic",
+    label: "Basic",
+    columns: [
+      { key: "enrollment", label: "Enrollment No.", width: 14 },
+      { key: "rollNo", label: "Roll No.", width: 8 },
+      { key: "studentName", label: "Student Name", width: 26 },
+      { key: "className", label: "Class", width: 8 },
+      { key: "section", label: "Section", width: 8 },
+      { key: "fatherName", label: "Father's Name", width: 24 },
+      { key: "motherName", label: "Mother's Name", width: 24 },
+      { key: "dob", label: "Date of Birth", width: 12 },
+      { key: "gender", label: "Gender", width: 8 },
+      { key: "phone", label: "Mobile", width: 13 },
+      { key: "status", label: "Status", width: 18 },
+    ],
+  },
+  {
+    key: "contact",
+    label: "Contact / Address",
+    columns: [
+      { key: "phone2", label: "Mobile 2", width: 13 },
+      { key: "email", label: "E-mail", width: 26 },
+      { key: "address", label: "Address", width: 34 },
+      { key: "city", label: "City", width: 14 },
+      { key: "state", label: "State", width: 14 },
+      { key: "pin", label: "PIN", width: 8 },
+      { key: "permanentAddress", label: "Permanent Address", width: 34 },
+    ],
+  },
+  {
+    key: "other",
+    label: "Other details",
+    columns: [
+      { key: "category", label: "Category", width: 10 },
+      { key: "nationality", label: "Nationality", width: 12 },
+      { key: "pen", label: "P.E.N.", width: 14 },
+      { key: "fatherOccupation", label: "Father's Occupation", width: 20 },
+      { key: "admissionDate", label: "Admission Date", width: 14 },
+    ],
+  },
+  {
+    key: "previous",
+    label: "Previous school",
+    columns: [
+      { key: "lastSchoolName", label: "Previous School", width: 28 },
+      { key: "lastSchoolAddress", label: "Previous School Address", width: 30 },
+      { key: "passingYear", label: "Passing Year", width: 10 },
+      { key: "previousClass", label: "Previous Class", width: 12 },
+      { key: "previousMarks", label: "Marks (Obtained/Max)", width: 16 },
+      { key: "previousPercentage", label: "Percentage", width: 10 },
+    ],
+  },
+  {
+    key: "health",
+    label: "Health",
+    columns: [
+      { key: "height", label: "Height", width: 8 },
+      { key: "weight", label: "Weight", width: 8 },
+      { key: "bloodGroup", label: "Blood Group", width: 10 },
+      { key: "allergy", label: "Allergy", width: 24 },
+      { key: "disease", label: "Disease", width: 20 },
+    ],
+  },
+];
+
+/** Columns ticked the first time: the Basic group. */
+export const STUDENT_EXPORT_DEFAULT_COLUMNS: Record<string, string[]> = Object.fromEntries(
+  STUDENT_EXPORT_GROUPS.map((group) => [
+    group.key,
+    group.key === "basic" ? group.columns.map((column) => column.key) : [],
+  ])
+);
+
+export const STUDENT_EXPORT_STATUS_OPTIONS = [
+  { value: "active", label: "Active" },
+  { value: "left", label: "Left / TC" },
+  { value: "all", label: "Both" },
+];
+
+export const STUDENT_EXPORT_LAYOUT_OPTIONS = [
+  { value: "single", label: "One sheet" },
+  { value: "perClass", label: "One sheet per class" },
+];
+
+/** localStorage key: the last chosen columns / status / layout (this browser only). */
+export const STUDENT_EXPORT_STORAGE_KEY = "cves.studentExport.v1";
+
+/** Firestore `in` queries take at most 30 values. */
+export const FIRESTORE_IN_LIMIT = 30;
