@@ -2,7 +2,8 @@
  * Staff Attendance (admin): one day of every teacher (and non-teaching staff
  * when the setting allows): status, check-in / out times, distance, the
  * linked phone and the selfie. The admin marks or corrects a day (reason
- * required, logged) and resets a phone; refused check-ins of the day are
+ * required, logged) and resets a phone; refused check-ins (filter: today,
+ * yesterday, last 7 days, months, dates) and the day's admin changes are
  * listed below, so tries to cheat are seen.
  */
 import { useContext, useMemo, useState } from "react";
@@ -10,13 +11,7 @@ import { useForm, useWatch } from "react-hook-form";
 import toast from "react-hot-toast";
 import { Camera, Pencil, Smartphone } from "lucide-react";
 
-import {
-  COLLECTION,
-  CVES_BUTTON,
-  STAFF_MARK_STATUS_OPTIONS,
-  STAFF_REFUSED_LABELS,
-  STAFF_STATUS_META,
-} from "../../../constants";
+import { COLLECTION, CVES_BUTTON, STAFF_MARK_STATUS_OPTIONS, STAFF_STATUS_META } from "../../../constants";
 import CustomSelect from "../../../custom-components/CustomSelect";
 import CustomTextarea from "../../../custom-components/CustomTextarea";
 import DatePicker from "../../../custom-components/DatePicker";
@@ -36,6 +31,7 @@ import { dayOffReason, sessionOfDate, todayKey } from "../../../utils/holidayCal
 import { markStaffAttendance, resetStaffDevice } from "../../../utils/staffAttendanceService";
 import type { StaffAttendanceRecord, StaffAttendanceStatus, StaffCheck, StaffPerson } from "../../../utils/type";
 import { myContext } from "../../context/MyContextProvider";
+import RefusedCheckIns from "./RefusedCheckIns";
 
 type StatusKey = keyof typeof STAFF_STATUS_META;
 
@@ -57,7 +53,9 @@ const hhmm = (check: StaffCheck | null) => {
 function StatusChip({ status }: { status: StatusKey }) {
   const meta = STAFF_STATUS_META[status];
   return (
-    <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${meta.chip}`}>{meta.label}</span>
+    <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${meta.chip}`}>
+      {meta.label}
+    </span>
   );
 }
 
@@ -95,7 +93,6 @@ function StaffAttendanceToday() {
     return result;
   }, [people, day.records]);
 
-  const refused = day.log.filter((entry) => entry.type === "refused");
   const changes = day.log.filter((entry) => entry.type !== "refused");
   const loading = peopleLoading || day.loading;
 
@@ -117,7 +114,10 @@ function StaffAttendanceToday() {
         </div>
         <div className="flex flex-wrap gap-2">
           {(Object.keys(counts) as StatusKey[]).map((key) => (
-            <span key={key} className={`rounded-full border px-3 py-1 text-xs font-semibold ${STAFF_STATUS_META[key].chip}`}>
+            <span
+              key={key}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold ${STAFF_STATUS_META[key].chip}`}
+            >
               {STAFF_STATUS_META[key].label}: {counts[key]}
             </span>
           ))}
@@ -248,52 +248,24 @@ function StaffAttendanceToday() {
         </section>
       )}
 
-      {!loading && (
+      <RefusedCheckIns />
+
+      {!loading && changes.length > 0 && (
         <section className="rounded-lg border border-gray-200 bg-white">
-          <h2 className="border-b border-gray-100 p-4 font-bold text-gray-800">
-            Refused check-ins ({refused.length})
-          </h2>
-          {refused.length === 0 ? (
-            <p className="p-4 text-sm text-gray-500">None on this day.</p>
-          ) : (
-            <ul className="divide-y divide-gray-100">
-              {refused.map((entry) => (
-                <li key={entry.id} className="flex flex-col gap-1 p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-800">
-                      {entry.name}{" "}
-                      <span className="ml-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">
-                        {STAFF_REFUSED_LABELS[entry.code] || entry.code}
-                      </span>
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {entry.message}
-                      {entry.model ? ` · ${entry.model}` : ""}
-                    </p>
-                  </div>
-                  <span className="text-sm text-gray-500">{timeText(entry.at)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-          {changes.length > 0 && (
-            <>
-              <h2 className="border-y border-gray-100 p-4 font-bold text-gray-800">Admin changes ({changes.length})</h2>
-              <ul className="divide-y divide-gray-100">
-                {changes.map((entry) => (
-                  <li key={entry.id} className="flex flex-col gap-1 p-4 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-sm text-gray-700">
-                      <span className="font-semibold">{entry.byName || "Admin"}</span>{" "}
-                      {entry.type === "deviceReset" ? "reset the phone of" : "changed"}{" "}
-                      <span className="font-semibold">{entry.name}</span>
-                      {entry.reason ? `: ${entry.reason}` : ""}
-                    </p>
-                    <span className="text-sm text-gray-500">{timeText(entry.at)}</span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
+          <h2 className="border-b border-gray-100 p-4 font-bold text-gray-800">Admin changes ({changes.length})</h2>
+          <ul className="divide-y divide-gray-100">
+            {changes.map((entry) => (
+              <li key={entry.id} className="flex flex-col gap-1 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-gray-700">
+                  <span className="font-semibold">{entry.byName || "Admin"}</span>{" "}
+                  {entry.type === "deviceReset" ? "reset the phone of" : "changed"}{" "}
+                  <span className="font-semibold">{entry.name}</span>
+                  {entry.reason ? `: ${entry.reason}` : ""}
+                </p>
+                <span className="text-sm text-gray-500">{timeText(entry.at)}</span>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 
@@ -400,7 +372,13 @@ function MarkDialog({
       onSubmit={() => void save()}
     >
       <div className="flex flex-col gap-3">
-        <CustomSelect control={control} name="status" label="Status" placeholder="Select status" options={STAFF_MARK_STATUS_OPTIONS} />
+        <CustomSelect
+          control={control}
+          name="status"
+          label="Status"
+          placeholder="Select status"
+          options={STAFF_MARK_STATUS_OPTIONS}
+        />
         {present && (
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -484,7 +462,15 @@ function SelfieDialog({ record, onClose }: { record: StaffAttendanceRecord; onCl
   ].filter((item) => item.on);
 
   return (
-    <Modal isOpen onClose={onClose} title="Selfie" description={record.name} hideSubmit cancelText="Close" onSubmit={onClose}>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="Selfie"
+      description={record.name}
+      hideSubmit
+      cancelText="Close"
+      onSubmit={onClose}
+    >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {items.map((item) => (
           <figure key={item.label} className="flex flex-col items-center gap-2">

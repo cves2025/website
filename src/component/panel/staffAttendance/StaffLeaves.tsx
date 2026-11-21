@@ -1,7 +1,8 @@
 /**
  * Staff Attendance > Leave (admin): the leave requests of a session
- * (teachers ask in the mobile app), approve / reject (reason), cancel an
- * approved leave (its leave days are removed), add a leave for someone
+ * (teachers ask in the mobile app), approve / reject (reason), cancel a
+ * leave (approved: its leave days are removed; a teacher only asks for it,
+ * "Cancel requests"), keep a leave the teacher asked to cancel, add a leave for someone
  * (approved at once), and every person's balance per leave type.
  * All changes go through the server (`/api/staff-leave/*`).
  */
@@ -30,6 +31,7 @@ import {
   addStaffLeave,
   cancelStaffLeave,
   decideStaffLeave,
+  declineStaffLeaveCancel,
   leaveUsage,
 } from "../../../utils/staffAttendanceService";
 import type { StaffLeave, StaffLeaveType, StaffPerson } from "../../../utils/type";
@@ -45,7 +47,7 @@ const rangeText = (leave: StaffLeave) =>
       : `${dateText(leave.from)} – ${dateText(leave.to)}`;
 const daysText = (days: number) => `${days} ${days === 1 ? "day" : "days"}`;
 
-type Action = { kind: "reject" | "cancel"; leave: StaffLeave } | null;
+type Action = { kind: "reject" | "cancel" | "keep"; leave: StaffLeave } | null;
 
 function StaffLeaves() {
   const filters = useForm<{ session: string; show: string; person: string }>({
@@ -64,9 +66,12 @@ function StaffLeaves() {
 
   const usage = useMemo(() => leaveUsage(leaves), [leaves]);
   const shown = leaves.filter(
-    (leave) => (show === "all" || leave.status === show) && (!personFilter || leave.uid === personFilter)
+    (leave) =>
+      (show === "all" || (show === "cancelRequested" ? leave.cancelRequested : leave.status === show)) &&
+      (!personFilter || leave.uid === personFilter)
   );
   const waiting = leaves.filter((leave) => leave.status === "pending").length;
+  const cancelAsks = leaves.filter((leave) => leave.cancelRequested).length;
   const personOptions = [{ value: "", label: "Everyone" }, ...people.map((item) => ({ value: item.uid, label: item.name }))];
 
   const approve = async (leave: StaffLeave) => {
@@ -112,7 +117,7 @@ function StaffLeaves() {
         <CustomSelect
           control={filters.control}
           name="show"
-          label={`Show${waiting ? ` (${waiting} waiting)` : ""}`}
+          label={`Show${waiting ? ` (${waiting} waiting)` : ""}${cancelAsks ? ` (${cancelAsks} cancel)` : ""}`}
           placeholder={null}
           options={STAFF_LEAVE_FILTER_OPTIONS}
         />
@@ -153,6 +158,11 @@ function StaffLeaves() {
                           {leave.typeName} · {rangeText(leave)} · {daysText(leave.days)}
                         </p>
                         <p className="text-sm text-gray-500">{leave.reason}</p>
+                        {leave.cancelRequested && (
+                          <p className="mt-1 w-fit rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800">
+                            Asks to cancel: {leave.cancelRequestReason}
+                          </p>
+                        )}
                         {(leave.decidedByName || leave.cancelReason) && (
                           <p className="text-xs text-gray-500">
                             {leave.status === "cancelled"
@@ -188,6 +198,15 @@ function StaffLeaves() {
                             className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
                           >
                             Cancel
+                          </button>
+                        )}
+                        {leave.cancelRequested && (
+                          <button
+                            type="button"
+                            onClick={() => setAction({ kind: "keep", leave })}
+                            className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-navy hover:bg-navy-soft"
+                          >
+                            Keep Leave
                           </button>
                         )}
                       </div>
@@ -264,17 +283,21 @@ function StaffLeaves() {
 /** Reject (why) or cancel (why; needed for an approved leave). */
 function ReasonDialog({ action, onClose }: { action: NonNullable<Action>; onClose: (saved: boolean) => void }) {
   const [saving, setSaving] = useState(false);
-  const { control, handleSubmit } = useForm<{ reason: string }>({ defaultValues: { reason: "" } });
-  const reason = useWatch({ control, name: "reason" });
   const { leave, kind } = action;
-  const needsReason = kind === "reject" || leave.status === "approved";
+  // Cancelling what the teacher asked for: their reason is the default.
+  const { control, handleSubmit } = useForm<{ reason: string }>({
+    defaultValues: { reason: kind === "cancel" && leave.cancelRequested ? leave.cancelRequestReason : "" },
+  });
+  const reason = useWatch({ control, name: "reason" });
+  const needsReason = kind !== "cancel" || leave.status === "approved";
 
   const save = handleSubmit(async (data) => {
     setSaving(true);
     try {
       if (kind === "reject") await decideStaffLeave(leave.id, "rejected", data.reason.trim());
+      else if (kind === "keep") await declineStaffLeaveCancel(leave.id, data.reason.trim());
       else await cancelStaffLeave(leave.id, data.reason.trim());
-      toast.success(kind === "reject" ? "Leave rejected." : "Leave cancelled.");
+      toast.success(kind === "reject" ? "Leave rejected." : kind === "keep" ? "Leave kept." : "Leave cancelled.");
       onClose(true);
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : "Could not save.");
@@ -287,11 +310,11 @@ function ReasonDialog({ action, onClose }: { action: NonNullable<Action>; onClos
     <Modal
       isOpen
       onClose={() => !saving && onClose(false)}
-      title={kind === "reject" ? "Reject Leave" : "Cancel Leave"}
+      title={kind === "reject" ? "Reject Leave" : kind === "keep" ? "Keep Leave" : "Cancel Leave"}
       description={`${leave.name} · ${leave.typeName} · ${rangeText(leave)}${
         kind === "cancel" && leave.status === "approved" ? ". Its leave days are removed from attendance." : ""
-      }`}
-      submitText={kind === "reject" ? "Reject" : "Cancel Leave"}
+      }${kind === "keep" ? ". The teacher's cancel request is declined; tell them why." : ""}`}
+      submitText={kind === "reject" ? "Reject" : kind === "keep" ? "Keep Leave" : "Cancel Leave"}
       cancelText="Close"
       submitClassName={CVES_BUTTON}
       loading={saving}

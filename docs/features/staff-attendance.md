@@ -53,8 +53,11 @@ is useless within seconds, and it still needs the GPS, phone and Wi-Fi checks.
   `staffAttendance` (`status: "leave"`, `leaveId`, `leaveType`); a day already checked in is refused.
 - Half-day leave: the day is "Half Day" with `halfDayLeave: true`; the teacher still checks in for
   the other half (the status stays Half Day, leaving early does not change it).
-- Cancel: the teacher a waiting leave; the admin waiting or approved (reason), which removes its
-  leave days again (days the admin changed since are kept). Every decision is logged (`type: "leave"`).
+- Cancel: **only the admin** cancels (waiting or approved; approved = its leave days are removed
+  again, days the admin changed since are kept). A teacher asks for it with a reason
+  (`cancelRequested`, `cancelRequestReason`; admins get a notification); the admin cancels it or
+  keeps it (`/api/staff-leave/cancel-decline`, reason; the teacher is told). "Cancel requests" filter
+  on the website and in the app. Every step is logged (`type: "leave"`).
 
 ## Monthly register (phase 3)
 
@@ -73,6 +76,14 @@ check-ins refused for fake GPS, outside, Wi-Fi, another phone, rooted, emulator,
 and reason in 30 minutes). Teacher: leave approved / rejected / cancelled / added, attendance changed
 by the admin, phone reset. The teacher's app shows the day, the month and the leave live
 (`onSnapshot`), so an admin change on the website shows at once.
+
+## Refused check-ins list
+
+`RefusedCheckIns.tsx` (website) / `RefusedCheckInsCard.tsx` (app): a period dropdown next to the title (Today, Yesterday,
+Last 7 days, This month, Last month, Dates), counts by reason, then the list. Query: `type == "refused"`,
+`date` between, `orderBy(date desc)`, at most `STAFF_LOG_LIMIT` (300). **Index** `staffAttendanceLog (type ASC,
+date DESC)` in `firestore.indexes.dev.json` / `.prod.json` (deploy the indexes). Range: `utils/staffLogRange.ts`
+(mirror: `staffLogRange` in `mobile/src/utils/staffAttendance.ts`).
 
 ## Files
 

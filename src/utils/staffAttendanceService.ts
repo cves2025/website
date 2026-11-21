@@ -10,6 +10,8 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
+  orderBy,
   query,
   serverTimestamp,
   setDoc,
@@ -18,7 +20,7 @@ import {
 } from "firebase/firestore";
 
 import { API_BASE_URL, authHeaders } from "../component/context/api";
-import { COLLECTION, STAFF_ATTENDANCE_SETTINGS_DOC } from "../constants";
+import { COLLECTION, STAFF_ATTENDANCE_SETTINGS_DOC, STAFF_LOG_LIMIT } from "../constants";
 import { db } from "../firebase/config";
 import type {
   StaffAttendanceRecord,
@@ -185,7 +187,29 @@ export async function loadStaffMonth(month: string): Promise<Record<string, Reco
 /** The log of a date (refused tries and admin changes), newest first. */
 export async function loadStaffLog(date: string): Promise<StaffLogEntry[]> {
   const snap = await getDocs(query(collection(db, COLLECTION.STAFF_ATTENDANCE_LOG), where("date", "==", date)));
-  return snap.docs
+  return toLogEntries(snap.docs);
+}
+
+/**
+ * Refused check-ins between two dates, newest first. Index: staffAttendanceLog
+ * (type ASC, date DESC) in firestore.indexes.dev.json / .prod.json.
+ */
+export async function loadRefusedLog(from: string, to: string): Promise<StaffLogEntry[]> {
+  const snap = await getDocs(
+    query(
+      collection(db, COLLECTION.STAFF_ATTENDANCE_LOG),
+      where("type", "==", "refused"),
+      where("date", ">=", from),
+      where("date", "<=", to),
+      orderBy("date", "desc"),
+      limit(STAFF_LOG_LIMIT)
+    )
+  );
+  return toLogEntries(snap.docs);
+}
+
+function toLogEntries(docs: { id: string; data: () => DocumentData }[]): StaffLogEntry[] {
+  return docs
     .map((item): StaffLogEntry => {
       const data = item.data();
       return {
@@ -246,6 +270,8 @@ function toLeave(id: string, data: DocumentData): StaffLeave {
     decidedByName: text(data.decidedByName),
     decisionNote: text(data.decisionNote),
     cancelReason: text(data.cancelReason),
+    cancelRequested: data.cancelRequested === true,
+    cancelRequestReason: text(data.cancelRequestReason),
     createdAt: millis(data.createdAt),
   };
 }
@@ -313,6 +339,10 @@ export const decideStaffLeave = (id: string, decision: "approved" | "rejected", 
   fetchServer("/api/staff-leave/decide", { id, decision, note });
 
 export const cancelStaffLeave = (id: string, reason: string) => fetchServer("/api/staff-leave/cancel", { id, reason });
+
+/** Keeps a leave the teacher asked to cancel (the teacher is told why). */
+export const declineStaffLeaveCancel = (id: string, note: string) =>
+  fetchServer("/api/staff-leave/cancel-decline", { id, note });
 
 export interface OfficeQr {
   token: string;

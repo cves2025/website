@@ -5,6 +5,7 @@ import {
   loadStaffDay,
   loadStaffDevices,
   loadStaffLeaves,
+  loadRefusedLog,
   loadStaffLog,
   loadStaffMonth,
   loadStaffSelfie,
@@ -12,7 +13,7 @@ import {
   loadOfficeQr,
   type OfficeQr,
 } from "../utils/staffAttendanceService";
-import type { StaffLeave, StaffPerson } from "../utils/type";
+import type { StaffLeave, StaffLogEntry, StaffPerson } from "../utils/type";
 import { useAsyncData } from "./useAsyncData";
 import { useTeachers } from "./useTeachers";
 
@@ -136,4 +137,14 @@ export function useOfficeQr(enabled: boolean) {
 
   const secondsLeft = qr ? Math.max(Math.ceil((qr.expiresAt - now) / 1000), 0) : 0;
   return { qr, error, secondsLeft };
+}
+
+/** Refused check-ins between two dates (admin), newest first. */
+export function useRefusedLog(from: string, to: string) {
+  const { data, loading, error, reload } = useAsyncData(() => loadRefusedLog(from, to), [from, to], {
+    initial: [] as StaffLogEntry[],
+    enabled: Boolean(from && to),
+    errorMessage: "Refused check-ins could not be loaded.",
+  });
+  return { entries: data, loading, error, reload };
 }

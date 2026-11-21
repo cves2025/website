@@ -984,6 +984,7 @@ export const STAFF_LEAVE_STATUS_META = {
 /** Leave list filter. */
 export const STAFF_LEAVE_FILTER_OPTIONS = [
   { value: "pending", label: "Waiting" },
+  { value: "cancelRequested", label: "Cancel requests" },
   { value: "approved", label: "Approved" },
   { value: "all", label: "All" },
 ];
@@ -1004,3 +1005,18 @@ export const OFFICE_QR_PATH = "/staff-qr";
 
 /** How many notifications the bell lists (newest first). */
 export const NOTIFICATIONS_SHOWN = 30;
+
+/** Periods of the refused check-ins list (Staff Attendance). */
+export const STAFF_LOG_PERIODS = [
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "week", label: "Last 7 days" },
+  { value: "month", label: "This month" },
+  { value: "lastMonth", label: "Last month" },
+  { value: "custom", label: "Dates" },
+] as const;
+
+export type StaffLogPeriod = (typeof STAFF_LOG_PERIODS)[number]["value"];
+
+/** Most refused check-ins read for one period (newest first). */
+export const STAFF_LOG_LIMIT = 300;

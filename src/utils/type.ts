@@ -1087,6 +1087,9 @@ export interface StaffLeave {
   decidedByName: string;
   decisionNote: string;
   cancelReason: string;
+  /** The teacher asked the admin to cancel it (only the admin cancels). */
+  cancelRequested: boolean;
+  cancelRequestReason: string;
   /** ms */
   createdAt: number | null;
 }
