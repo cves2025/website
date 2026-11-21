@@ -416,14 +416,61 @@ export interface Holiday {
   to: string;
   /** Classes on holiday; empty = the whole school. */
   classes: string[];
+  /** false = a holiday of the teachers only (stored only when false). */
+  students: boolean;
 }
 
-/** The `holidayCalendar/{session}` document. */
+/** Dates ("yyyy-MM-dd", inclusive). */
+export interface DateRange {
+  from: string;
+  to: string;
+}
+
+/** Days of a holiday the teachers come, with their times ("HH:mm"). */
+export interface StaffDuty extends DateRange {
+  lateAfter: string;
+  /** "" = no half day by time. */
+  halfDayAfter: string;
+  /** "" = no early-leave rule. */
+  earlyLeaveBefore: string;
+}
+
+/**
+ * The teachers' part of one holiday (key = the holiday id), with its own
+ * name and dates (a copy, so nothing outside `staff` decides the teachers'
+ * days).
+ */
+export interface StaffHolidayPart extends DateRange {
+  name: string;
+  /** true = the teachers are off too (whole school / teachers only); false = they come. */
+  off: boolean;
+  /**
+   * Days the teachers come with these times: when off, the days they are
+   * called; when not off, the days with another time than the usual one.
+   */
+  duties: StaffDuty[];
+}
+
+/**
+ * The teachers' part of the calendar (field `staff`). Only the admin writes
+ * it (firestore.rules), so a teacher with holiday.manage cannot give
+ * themselves days off or another time.
+ */
+export interface StaffCalendarPart {
+  holidays: Record<string, StaffHolidayPart>;
+}
+
+/** Who a holiday is for. */
+export type HolidayAudience = "everyone" | "students" | "staff";
+
+/** The `holidayCalendar/{session}` document (students and teachers). */
 export interface HolidayCalendar {
   session: string;
-  /** Weekdays that are always off (0 = Sunday ... 6 = Saturday). */
+  /** Weekdays off for everyone (0 = Sunday ... 6 = Saturday); only the admin changes it. */
   weeklyOff: number[];
   holidays: Holiday[];
+  /** null = no holiday has a teachers' part: the teachers come on every holiday. */
+  staff: StaffCalendarPart | null;
 }
 
 /* ------------------------------------------------------------------ fees -- */

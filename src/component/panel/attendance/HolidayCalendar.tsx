@@ -3,94 +3,88 @@ import toast from "react-hot-toast";
 import { format } from "date-fns";
 import { Pencil, Trash2 } from "lucide-react";
 
+import Button from "../../../custom-components/Button";
 import PageHeader from "../../../custom-components/PageHeader";
 import SelectDropdown from "../../../custom-components/SelectDropdown";
-import DatePicker from "../../../custom-components/DatePicker";
 import CircleCheckbox from "../../../custom-components/CircleCheckbox";
 import Loader from "../../../custom-components/Loader";
 import Modal from "../../../custom-components/Modal";
+import Tooltip from "../../../custom-components/Tooltip";
 import { myContext } from "../../context/MyContextProvider";
-import { CLASSES, COLLECTION, CVES_BUTTON } from "../../../constants";
+import { CVES_BUTTON } from "../../../constants";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import useHolidayCalendar from "../../../hooks/useHolidayCalendar";
 import { saveHolidayCalendar } from "../../../utils/attendanceService";
+import { notifyStaffHoliday } from "../../../utils/staffAttendanceService";
 import {
   WEEKDAY_LABELS,
+  datesBetween,
   fromDateKey,
-  sessionDateRange,
+  holidayAudience,
   sortHolidays,
+  staffDutyTimesText,
+  staffPartOf,
+  staffSummary,
+  studentsSummary,
+  withStaffPart,
 } from "../../../utils/holidayCalendar";
-import type { Holiday, HolidayCalendar as Calendar } from "../../../utils/type";
-import { inputClass, labelClass } from "./attendanceShared";
+import type {
+  DateRange,
+  Holiday,
+  HolidayCalendar as Calendar,
+  StaffHolidayPart,
+} from "../../../utils/type";
+import HolidayFormModal from "./HolidayFormModal";
+import { labelClass } from "./attendanceShared";
 
 const sessions = generateAcademicYears();
 
-interface HolidayForm {
-  id: string;
-  name: string;
-  from: string;
-  to: string;
-  allClasses: boolean;
-  classes: string[];
-}
+const dateLabel = (key: string) => format(fromDateKey(key), "d MMM yyyy");
+const rangeLabel = (range: DateRange) =>
+  range.from === range.to
+    ? dateLabel(range.from)
+    : `${dateLabel(range.from)} – ${dateLabel(range.to)}`;
+const shortRange = (range: DateRange) =>
+  range.from === range.to
+    ? format(fromDateKey(range.from), "d MMM")
+    : `${format(fromDateKey(range.from), "d MMM")} – ${format(fromDateKey(range.to), "d MMM")}`;
 
-const emptyForm = (): HolidayForm => ({
-  id: "",
-  name: "",
-  from: "",
-  to: "",
-  allClasses: true,
-  classes: [],
-});
+const PILL =
+  "inline-block rounded-full border px-2 py-0.5 text-xs font-semibold";
+const PILL_OFF = `${PILL} border-amber-200 bg-amber-50 text-amber-800`;
+const PILL_OPEN = `${PILL} border-green-200 bg-green-50 text-green-700`;
 
-interface FormErrors {
-  name?: string;
-  from?: string;
-}
-
-const ERROR_BORDER =
-  "border-red-400 focus:border-red-500 focus:ring-red-500/40 focus-visible:border-red-500 focus-visible:ring-red-500/40";
-const ERROR_TEXT = "mt-1 text-xs font-medium text-red-600";
-
-const dateLabel =(key: string) => format(fromDateKey(key), "d MMM yyyy");
-
-const rangeLabel = (holiday: Holiday) =>
-  holiday.from === holiday.to
-    ? dateLabel(holiday.from)
-    : `${dateLabel(holiday.from)} – ${dateLabel(holiday.to)}`;
+/** What the form shows: closed, a new holiday, or one being edited. */
+type FormState = { open: false } | { open: true; holiday: Holiday | null };
 
 /**
- * Weekly off days and holidays of a session (admin only). A holiday can be
- * for the whole school or for some classes only (e.g. winter vacation of the
- * small classes). Attendance cannot be marked on these days and the report
- * does not count them.
+ * Weekly off and holidays of a session: one calendar of students and
+ * teachers. A holiday is for the whole school, the students only or the
+ * teachers & staff only; the admin adds the days the teachers come (called
+ * during a holiday, or another time than the usual one) with their times, so
+ * nobody is marked late by the usual time. The table shows for every holiday
+ * what the students and the teachers have, and the teachers' times.
  *
- * `staff`: the same page for the staff calendar (Staff Attendance > Staff
- * Holidays, staffHolidays/{session}): no class choice; teachers cannot check
- * in on these days.
+ * The weekly off and the teachers' part (field `staff`) only the admin
+ * changes (firestore.rules); a teacher with holiday.manage adds the
+ * students' holidays. The teachers are told by push + bell
+ * (POST /api/staff-holidays/notify).
  */
-function HolidayCalendar({ staff = false }: { staff?: boolean }) {
+function HolidayCalendar() {
   const { user } = useContext(myContext);
-  const collectionName = staff ? COLLECTION.STAFF_HOLIDAYS : COLLECTION.HOLIDAY_CALENDAR;
+  const isAdmin = user?.role === "admin";
   const [session, setSession] = useState(sessions[0]?.value ?? "");
-  const { calendar, setCalendar, loading, error } = useHolidayCalendar(session, collectionName);
-  const [form, setForm] = useState<HolidayForm>(emptyForm);
+  const { calendar, setCalendar, loading, error } = useHolidayCalendar(session);
   const [saving, setSaving] = useState(false);
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [form, setForm] = useState<FormState>({ open: false });
   const [holidayToDelete, setHolidayToDelete] = useState<Holiday | null>(null);
-  const range = sessionDateRange(session);
-
-  const resetForm = () => {
-    setForm(emptyForm());
-    setErrors({});
-  };
 
   const persist = async (next: Calendar, message: string) => {
     if (!user) return false;
     setSaving(true);
     try {
-      await saveHolidayCalendar(next, user.uid, collectionName);
+      await saveHolidayCalendar(next, user.uid, { withStaff: isAdmin });
       setCalendar({ ...next, holidays: sortHolidays(next.holidays) });
       toast.success(message);
       return true;
@@ -103,97 +97,100 @@ function HolidayCalendar({ staff = false }: { staff?: boolean }) {
     }
   };
 
-  const toggleWeeklyOff = (day: number) => {
+  /** Push + bell to the teachers; a failure does not undo the save. */
+  const tellTeachers = (body: Parameters<typeof notifyStaffHoliday>[0]) => {
+    notifyStaffHoliday(body).catch((cause) => {
+      console.error("Staff holiday notify failed:", cause);
+      // "Failed to fetch" = the server is not running / not reachable.
+      const reason =
+        cause instanceof TypeError
+          ? "the server could not be reached"
+          : cause instanceof Error
+            ? cause.message
+            : "unknown error";
+      toast.error(`Saved, but the teachers could not be notified (${reason}).`);
+    });
+  };
+
+  const toggleWeeklyOff = async (day: number) => {
     const weeklyOff = calendar.weeklyOff.includes(day)
       ? calendar.weeklyOff.filter((value) => value !== day)
       : [...calendar.weeklyOff, day];
-    void persist({ ...calendar, weeklyOff }, "Weekly off updated.");
+    if (await persist({ ...calendar, weeklyOff }, "Weekly off updated.")) {
+      tellTeachers({ session, weeklyOff: true });
+    }
   };
 
-  const handleSubmit = async () => {
-    const name = form.name.trim();
-    const to = form.to || form.from;
-    const nextErrors: FormErrors = {
-      name: name ? undefined : "Holiday name is required.",
-      from: form.from ? undefined : "From date is required.",
-    };
-    setErrors(nextErrors);
-    if (nextErrors.name || nextErrors.from) {
-      // Focus the first field with an error.
-      document
-        .getElementById(nextErrors.name ? "holidayName" : "holidayFrom")
-        ?.focus();
-      return;
-    }
-    if (to < form.from) {
-      toast.error("The end date cannot be before the start date.");
-      return;
-    }
-    if (form.from < range.from || to > range.to) {
-      toast.error(`Dates must be inside session ${session}.`);
-      return;
-    }
-    if (!form.allClasses && form.classes.length === 0) {
-      toast.error("Select the classes on holiday.");
-      return;
-    }
-    const holiday: Holiday = {
-      id: form.id || `${Date.now()}`,
-      name,
-      from: form.from,
-      to,
-      classes: form.allClasses
-        ? []
-        : CLASSES.filter((className) => form.classes.includes(className)),
-    };
-    const holidays = form.id
-      ? calendar.holidays.map((item) => (item.id === form.id ? holiday : item))
+  const saveHoliday = async (
+    holiday: Holiday,
+    part: StaffHolidayPart | null,
+  ) => {
+    const exists = calendar.holidays.some((item) => item.id === holiday.id);
+    const holidays = exists
+      ? calendar.holidays.map((item) =>
+          item.id === holiday.id ? holiday : item,
+        )
       : [...calendar.holidays, holiday];
+    const before = staffPartOf(calendar, holiday.id);
+    const next: Calendar = {
+      ...calendar,
+      holidays,
+      staff: isAdmin
+        ? withStaffPart(calendar, holiday.id, part)
+        : calendar.staff,
+    };
     const ok = await persist(
-      { ...calendar, holidays },
-      form.id ? "Holiday updated." : "Holiday added."
+      next,
+      exists ? "Holiday updated." : "Holiday added.",
     );
-    if (ok) resetForm();
-  };
-
-  const handleEdit = (holiday: Holiday) => {
-    setErrors({});
-    setForm({
-      id: holiday.id,
-      name: holiday.name,
-      from: holiday.from,
-      to: holiday.to,
-      allClasses: holiday.classes.length === 0,
-      classes: holiday.classes,
-    });
+    if (!ok) return;
+    setForm({ open: false });
+    if (
+      isAdmin &&
+      (before || part) &&
+      JSON.stringify(before) !== JSON.stringify(part)
+    ) {
+      tellTeachers({ session, holidayId: holiday.id, name: holiday.name });
+    }
   };
 
   const handleConfirmDelete = async () => {
     const holiday = holidayToDelete;
     if (!holiday) return;
+    const part = staffPartOf(calendar, holiday.id);
     const ok = await persist(
       {
         ...calendar,
         holidays: calendar.holidays.filter((item) => item.id !== holiday.id),
+        staff: part
+          ? withStaffPart(calendar, holiday.id, null)
+          : calendar.staff,
       },
-      "Holiday deleted."
+      "Holiday deleted.",
     );
     if (!ok) return;
-    if (form.id === holiday.id) resetForm();
+    if (part)
+      tellTeachers({ session, holidayId: holiday.id, name: holiday.name });
     setHolidayToDelete(null);
   };
 
   return (
     <div className="flex flex-col gap-2">
       <PageHeader
-        title={staff ? "Staff Holidays" : "Holiday Calendar"}
+        title="Holiday Calendar"
         titleStyle="text-primaryBlue"
-        description={
-          staff
-            ? "Weekly off days and holidays of the staff. Teachers cannot check in on these days."
-            : "Weekly off days and holidays of the session. Attendance is not taken on these days."
-        }
+        description="Weekly off and holidays of the session for students and teachers & staff. Attendance is not taken on the days off."
         descriptionStyle="text-gray-500"
+        button={
+          <Button
+            buttonName="+ Add Holiday"
+            variant="cves"
+            size="md"
+            buttonStyle="rounded-full"
+            disabled={saving || loading || Boolean(error)}
+            onClick={() => setForm({ open: true, holiday: null })}
+          />
+        }
       />
 
       <div className="rounded-lg border border-gray-200 bg-white p-4 sm:max-w-xs">
@@ -205,7 +202,7 @@ function HolidayCalendar({ staff = false }: { staff?: boolean }) {
           value={session}
           onValueChange={(value) => {
             setSession(value);
-            resetForm();
+            setForm({ open: false });
           }}
           options={sessions}
         />
@@ -222,7 +219,9 @@ function HolidayCalendar({ staff = false }: { staff?: boolean }) {
           <section className="rounded-lg border border-gray-200 bg-white p-4">
             <h2 className="mb-1 font-bold text-gray-800">Weekly off</h2>
             <p className="mb-3 text-sm text-gray-500">
-              School is closed on these days every week.
+              The whole school (students and teachers &amp; staff) is closed on
+              these days every week.
+              {!isAdmin && " Only the admin changes it."}
             </p>
             <div className="flex flex-wrap gap-x-6 gap-y-3">
               {WEEKDAY_LABELS.map((label, day) => (
@@ -231,134 +230,10 @@ function HolidayCalendar({ staff = false }: { staff?: boolean }) {
                   id={`weeklyOff-${day}`}
                   label={label}
                   checked={calendar.weeklyOff.includes(day)}
-                  disabled={saving}
-                  onCheckedChange={() => toggleWeeklyOff(day)}
+                  disabled={saving || !isAdmin}
+                  onCheckedChange={() => void toggleWeeklyOff(day)}
                 />
               ))}
-            </div>
-          </section>
-
-          <section className="rounded-lg border border-gray-200 bg-white p-4">
-            <h2 className="mb-3 font-bold text-gray-800">
-              {form.id ? "Edit holiday" : "Add holiday"}
-            </h2>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div>
-                <label htmlFor="holidayName" className={labelClass}>
-                  Name <span className="ml-0.5 text-red-500">*</span>
-                </label>
-                <input
-                  id="holidayName"
-                  className={`${inputClass} ${errors.name ? ERROR_BORDER : ""}`}
-                  placeholder="e.g. Diwali, Winter Vacation"
-                  value={form.name}
-                  aria-invalid={Boolean(errors.name)}
-                  onChange={(event) => {
-                    setForm({ ...form, name: event.target.value });
-                    if (errors.name) setErrors({ ...errors, name: undefined });
-                  }}
-                />
-                {errors.name && <p className={ERROR_TEXT}>{errors.name}</p>}
-              </div>
-              <div>
-                <label htmlFor="holidayFrom" className={labelClass}>
-                  From <span className="ml-0.5 text-red-500">*</span>
-                </label>
-                <DatePicker
-                  id="holidayFrom"
-                  min={range.from}
-                  max={range.to}
-                  value={form.from}
-                  aria-invalid={Boolean(errors.from)}
-                  className={errors.from ? ERROR_BORDER : ""}
-                  onChange={(from) => {
-                    setForm({
-                      ...form,
-                      from,
-                      to: form.to && form.to < from ? "" : form.to,
-                    });
-                    if (errors.from) setErrors({ ...errors, from: undefined });
-                  }}
-                />
-                {errors.from && <p className={ERROR_TEXT}>{errors.from}</p>}
-              </div>
-              <div>
-                <label htmlFor="holidayTo" className={labelClass}>
-                  To <span className="font-normal text-gray-400">(optional)</span>
-                </label>
-                <DatePicker
-                  id="holidayTo"
-                  placeholder="Same as From"
-                  min={form.from || range.from}
-                  max={range.to}
-                  value={form.to}
-                  onChange={(to) => setForm({ ...form, to })}
-                />
-              </div>
-            </div>
-
-            {!staff && (
-            <div className="mt-4 flex flex-wrap gap-x-6 gap-y-3">
-              <CircleCheckbox
-                id="holidayWholeSchool"
-                label="Whole school"
-                checked={form.allClasses}
-                onCheckedChange={(checked) =>
-                  setForm({ ...form, allClasses: checked })
-                }
-              />
-              <CircleCheckbox
-                id="holidaySpecificClasses"
-                label="Specific classes"
-                checked={!form.allClasses}
-                onCheckedChange={(checked) =>
-                  setForm({ ...form, allClasses: !checked })
-                }
-              />
-            </div>
-            )}
-            {!staff && !form.allClasses && (
-              <div className="mt-3 rounded-md border border-gray-200 p-3">
-                <p className={labelClass}>Classes on holiday</p>
-                <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-                  {CLASSES.map((className) => (
-                    <CircleCheckbox
-                      key={className}
-                      id={`holidayClass-${className}`}
-                      label={toOrdinalLabel(className)}
-                      checked={form.classes.includes(className)}
-                      onCheckedChange={(checked) =>
-                        setForm({
-                          ...form,
-                          classes: checked
-                            ? [...form.classes, className]
-                            : form.classes.filter((item) => item !== className),
-                        })
-                      }
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="mt-4 flex gap-2">
-              <button
-                type="button"
-                disabled={saving}
-                onClick={handleSubmit}
-                className={`rounded-md px-5 py-2 text-sm font-semibold text-white disabled:opacity-50 disabled:hover:brightness-100 ${CVES_BUTTON}`}
-              >
-                {form.id ? "Update Holiday" : "Add Holiday"}
-              </button>
-              {form.id && (
-                <button
-                  type="button"
-                  onClick={() => resetForm()}
-                  className="rounded-md border border-gray-300 px-5 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-              )}
             </div>
           </section>
 
@@ -371,52 +246,143 @@ function HolidayCalendar({ staff = false }: { staff?: boolean }) {
                 No holidays added yet.
               </p>
             ) : (
-              <ul className="divide-y divide-gray-100">
-                {calendar.holidays.map((holiday) => (
-                  <li
-                    key={holiday.id}
-                    className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div>
-                      <p className="font-semibold text-gray-800">
-                        {holiday.name}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {rangeLabel(holiday)}
-                        {staff ? "" : " · "}
-                        {staff ? "" : holiday.classes.length === 0
-                          ? "Whole school"
-                          : `Classes ${holiday.classes.map(toOrdinalLabel).join(", ")}`}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        disabled={saving}
-                        onClick={() => handleEdit(holiday)}
-                        title="Edit holiday"
-                        aria-label={`Edit ${holiday.name}`}
-                        className="rounded-full p-2 text-primaryBlue transition-colors hover:bg-blue-50 disabled:opacity-50"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        disabled={saving}
-                        onClick={() => setHolidayToDelete(holiday)}
-                        title="Delete holiday"
-                        aria-label={`Delete ${holiday.name}`}
-                        className="rounded-full p-2 text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[860px] text-left text-sm">
+                  <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600">
+                    <tr>
+                      <th className="px-4 py-3">Holiday</th>
+                      <th className="px-4 py-3">Dates</th>
+                      <th className="px-4 py-3">Students</th>
+                      <th className="px-4 py-3">Teachers &amp; staff</th>
+                      <th className="px-4 py-3">
+                        Days teachers come &amp; time
+                      </th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {calendar.holidays.map((holiday) => {
+                      const part = staffPartOf(calendar, holiday.id);
+                      const audience = holidayAudience(holiday, part);
+                      const locked = !isAdmin && part !== null;
+                      const dayCount = datesBetween(
+                        holiday.from,
+                        holiday.to,
+                      ).length;
+                      return (
+                        <tr key={holiday.id} className="align-top">
+                          <td className="px-4 py-3 font-semibold text-gray-800">
+                            {holiday.name}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-gray-700">
+                            {rangeLabel(holiday)}
+                            <span className="block text-xs text-gray-500">
+                              {dayCount} {dayCount === 1 ? "day" : "days"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={
+                                audience === "staff" ? PILL_OPEN : PILL_OFF
+                              }
+                            >
+                              {studentsSummary(holiday, toOrdinalLabel)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={
+                                audience === "students" ? PILL_OPEN : PILL_OFF
+                              }
+                            >
+                              {staffSummary(holiday, part)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-700">
+                            {part && part.duties.length > 0 ? (
+                              <ul className="flex flex-col gap-1">
+                                {part.duties.map((duty) => (
+                                  <li key={duty.from}>
+                                    <span className="font-medium text-gray-800">
+                                      {shortRange(duty)}:
+                                    </span>{" "}
+                                    {staffDutyTimesText(duty)}
+                                  </li>
+                                ))}
+                                {audience === "students" && (
+                                  <li className="text-xs text-gray-500">
+                                    Other days: the usual time
+                                  </li>
+                                )}
+                              </ul>
+                            ) : audience === "students" ? (
+                              "Usual time"
+                            ) : (
+                              <span className="text-gray-400">Not called</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex justify-end gap-1">
+                              <Tooltip
+                                content={
+                                  locked
+                                    ? "Only the admin changes holidays of the teachers"
+                                    : "Edit holiday"
+                                }
+                              >
+                                <button
+                                  type="button"
+                                  disabled={saving || locked}
+                                  onClick={() =>
+                                    setForm({ open: true, holiday })
+                                  }
+                                  aria-label={`Edit ${holiday.name}`}
+                                  className="rounded-full p-2 text-primaryBlue transition-colors hover:bg-gray-100 disabled:opacity-40"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </button>
+                              </Tooltip>
+                              <Tooltip
+                                content={
+                                  locked
+                                    ? "Only the admin changes holidays of the teachers"
+                                    : "Delete holiday"
+                                }
+                              >
+                                <button
+                                  type="button"
+                                  disabled={saving || locked}
+                                  onClick={() => setHolidayToDelete(holiday)}
+                                  aria-label={`Delete ${holiday.name}`}
+                                  className="rounded-full p-2 text-red-600 transition-colors hover:bg-red-50 disabled:opacity-40"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </Tooltip>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </section>
         </>
+      )}
+
+      {form.open && (
+        <HolidayFormModal
+          key={form.holiday?.id ?? "new"}
+          holiday={form.holiday}
+          part={form.holiday ? staffPartOf(calendar, form.holiday.id) : null}
+          session={session}
+          isAdmin={isAdmin}
+          saving={saving}
+          onClose={() => setForm({ open: false })}
+          onSave={(holiday, part) => void saveHoliday(holiday, part)}
+        />
       )}
 
       <Modal

@@ -10,13 +10,13 @@ import { useForm, useWatch } from "react-hook-form";
 import { format } from "date-fns";
 import { FileSpreadsheet } from "lucide-react";
 
-import { COLLECTION, STAFF_REGISTER_CODES } from "../../../constants";
+import { STAFF_REGISTER_CODES } from "../../../constants";
 import Button from "../../../custom-components/Button";
 import CustomSelect from "../../../custom-components/CustomSelect";
 import Loader from "../../../custom-components/Loader";
 import PageHeader from "../../../custom-components/PageHeader";
 import Tooltip from "../../../custom-components/Tooltip";
-import useHolidayCalendar from "../../../hooks/useHolidayCalendar";
+import { useStaffCalendar } from "../../../hooks/useHolidayCalendar";
 import { useStaffAttendanceSettings, useStaffMonth, useStaffPeople } from "../../../hooks/useStaffAttendance";
 import { datesOfMonth, fromDateKey, sessionMonths, sessionOfDate, todayKey } from "../../../utils/holidayCalendar";
 import { registerDays, summarizeRegister } from "../../../utils/staffRegister";
@@ -45,7 +45,7 @@ function StaffRegister() {
   const { settings, loading: settingsLoading } = useStaffAttendanceSettings();
   const { people, loading: peopleLoading, error: peopleError } = useStaffPeople(settings.includeStaff);
   const { records, loading, error } = useStaffMonth(month);
-  const { calendar, loading: calendarLoading } = useHolidayCalendar(sessionOfDate(`${month}-01`), COLLECTION.STAFF_HOLIDAYS);
+  const { calendar, loading: calendarLoading } = useStaffCalendar(sessionOfDate(`${month}-01`));
 
   const rows = useMemo<RegisterRow[]>(
     () =>

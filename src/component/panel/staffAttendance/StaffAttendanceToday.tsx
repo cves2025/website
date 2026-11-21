@@ -11,7 +11,7 @@ import { useForm, useWatch } from "react-hook-form";
 import toast from "react-hot-toast";
 import { Camera, Pencil, Smartphone } from "lucide-react";
 
-import { COLLECTION, CVES_BUTTON, STAFF_MARK_STATUS_OPTIONS, STAFF_STATUS_META } from "../../../constants";
+import { CVES_BUTTON, STAFF_MARK_STATUS_OPTIONS, STAFF_STATUS_META } from "../../../constants";
 import CustomSelect from "../../../custom-components/CustomSelect";
 import CustomTextarea from "../../../custom-components/CustomTextarea";
 import DatePicker from "../../../custom-components/DatePicker";
@@ -20,14 +20,20 @@ import Modal from "../../../custom-components/Modal";
 import PageHeader from "../../../custom-components/PageHeader";
 import TimePicker from "../../../custom-components/TimePicker";
 import Tooltip from "../../../custom-components/Tooltip";
-import useHolidayCalendar from "../../../hooks/useHolidayCalendar";
+import { useStaffCalendar } from "../../../hooks/useHolidayCalendar";
 import {
   useStaffAttendanceSettings,
   useStaffDay,
   useStaffPeople,
   useStaffSelfie,
 } from "../../../hooks/useStaffAttendance";
-import { dayOffReason, sessionOfDate, todayKey } from "../../../utils/holidayCalendar";
+import {
+  dayOffReason,
+  sessionOfDate,
+  staffDutyOn,
+  staffDutyTimesText,
+  todayKey,
+} from "../../../utils/holidayCalendar";
 import { markStaffAttendance, resetStaffDevice } from "../../../utils/staffAttendanceService";
 import type { StaffAttendanceRecord, StaffAttendanceStatus, StaffCheck, StaffPerson } from "../../../utils/type";
 import { myContext } from "../../context/MyContextProvider";
@@ -78,8 +84,9 @@ function StaffAttendanceToday() {
   const { settings } = useStaffAttendanceSettings();
   const { people, loading: peopleLoading, error: peopleError } = useStaffPeople(settings.includeStaff);
   const day = useStaffDay(date);
-  const { calendar } = useHolidayCalendar(sessionOfDate(date), COLLECTION.STAFF_HOLIDAYS);
+  const { calendar, fullCalendar } = useStaffCalendar(sessionOfDate(date));
   const dayOff = dayOffReason(calendar, date, "");
+  const duty = dayOff ? null : staffDutyOn(fullCalendar, date);
 
   const [marking, setMarking] = useState<StaffPerson | null>(null);
   const [resetting, setResetting] = useState<StaffPerson | null>(null);
@@ -127,6 +134,11 @@ function StaffAttendanceToday() {
       {dayOff && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-800">
           Staff holiday: {dayOff}. Check-in is closed on this day.
+        </div>
+      )}
+      {duty && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-800">
+          Teachers called ({duty.name}): {staffDutyTimesText(duty)}. These times are used today instead of the settings.
         </div>
       )}
       {!settings.location && !loading && (

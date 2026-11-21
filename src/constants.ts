@@ -40,8 +40,6 @@ export const COLLECTION = {
   HOLIDAY_CALENDAR: "holidayCalendar",
   /** Staff attendance settings, one document: STAFF_ATTENDANCE_SETTINGS_DOC (admin). */
   STAFF_ATTENDANCE_SETTINGS: "staffAttendanceSettings",
-  /** Staff holiday calendar of a session, same shape as HOLIDAY_CALENDAR. */
-  STAFF_HOLIDAYS: "staffHolidays",
   /** One person's day, id = {date}_{uid}. Written only by the server. */
   STAFF_ATTENDANCE: "staffAttendance",
   /** Refused check-ins, admin edits, phone resets. Written only by the server. */
@@ -1017,6 +1015,9 @@ export const STAFF_LOG_PERIODS = [
 ] as const;
 
 export type StaffLogPeriod = (typeof STAFF_LOG_PERIODS)[number]["value"];
+
+/** Late after (HH:mm) offered first when teachers are called during a holiday. */
+export const STAFF_DUTY_LATE_AFTER = "09:00";
 
 /** Most refused check-ins read for one period (newest first). */
 export const STAFF_LOG_LIMIT = 300;

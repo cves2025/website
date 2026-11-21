@@ -259,9 +259,18 @@ service cloud.firestore {
       allow write: if can('attendance.mark');
     }
 
+    // One calendar of students and teachers. The weekly off (everyone's) and
+    // the teachers' part (field `staff`: their days off, the days they come
+    // and their times) only the admin changes, so a teacher with
+    // holiday.manage cannot give themselves days off or a later time.
     match /holidayCalendar/{session} {
       allow read: if isStaff();
-      allow write: if can('holiday.manage');
+      allow create: if isAdmin() || (teacherCan('holiday.manage')
+        && !('staff' in request.resource.data) && !('weeklyOff' in request.resource.data));
+      allow update: if isAdmin() || (teacherCan('holiday.manage')
+        && request.resource.data.get('staff', null) == resource.data.get('staff', null)
+        && request.resource.data.get('weeklyOff', null) == resource.data.get('weeklyOff', null));
+      allow delete: if isAdmin();
     }
 
     // ---------- website content (public pages) ----------
@@ -382,12 +391,6 @@ service cloud.firestore {
     // get what they need from the server, not the school's Wi-Fi list.
     match /staffAttendanceSettings/{docId} {
       allow read, write: if isAdmin();
-    }
-
-    // Staff holiday calendar, one document per session (like holidayCalendar).
-    match /staffHolidays/{year} {
-      allow read: if isStaff();
-      allow write: if isAdmin();
     }
 
     // One person's day: the admin, and a teacher their own days.

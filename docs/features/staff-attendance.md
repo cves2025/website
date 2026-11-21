@@ -2,7 +2,9 @@
 
 Admin pages: `/welcome/staff-attendance` (one day), `/welcome/staff-attendance/register` (month),
 `/welcome/staff-attendance/leaves`,
-`/welcome/staff-attendance/holidays`, `/welcome/staff-attendance/settings`; the office screen `/staff-qr`. All need `STAFF_ATTENDANCE_MANAGE` (`staffAttendance.manage`),
+`/welcome/staff-attendance/settings`; the office screen `/staff-qr`. The teachers' days off are in the
+one Holiday Calendar (`/welcome/attendance/holidays`, see Holidays below; the old
+`/welcome/staff-attendance/holidays` link goes there). All need `STAFF_ATTENDANCE_MANAGE` (`staffAttendance.manage`),
 which a teacher can never get. Teachers check in / out **only from the mobile app**
 (`../mobile`, My Attendance).
 
@@ -16,7 +18,7 @@ Goal: a teacher cannot cheat. The app collects, the **server decides** and is th
 |---|---|
 | A teacher (`users.role == "teacher"`, active) | `NOT_STAFF` |
 | School location saved | `NOT_SET_UP` |
-| Not a staff holiday / weekly off (`staffHolidays/{session}`) | `HOLIDAY` |
+| Not a teachers' day off / weekly off (field `staff` of `holidayCalendar/{session}`) | `HOLIDAY` |
 | Not an emulator, not rooted (expo-device) | `EMULATOR`, `ROOTED` (logged) |
 | GPS not mocked (Android / iOS flag), accuracy <= 100 m | `MOCK_LOCATION` (logged), `WEAK_GPS` |
 | Inside the radius around the school point (haversine) | `OUTSIDE` (logged) |
@@ -28,7 +30,38 @@ Goal: a teacher cannot cheat. The app collects, the **server decides** and is th
 
 The time is the server's, in India time; status at check-in: after `lateAfter` = Late, after
 `halfDayAfter` = Half Day; a check-out before `earlyLeaveBefore` makes Present / Late a Half Day.
+On a day the teachers come during a holiday (a duty row), that day's three times from the calendar
+replace the settings (`dutyOn` + `timesOn`); `GET /today` returns them as `rules.duty`.
+
 The app also asks for the phone's fingerprint / screen lock before it sends (phone owner).
+
+## Holidays: one calendar with the students
+
+`holidayCalendar/{session}` holds both (page `component/panel/attendance/HolidayCalendar.tsx` +
+`HolidayFormModal.tsx`, app `features/holidays`). The **weekly off is everyone's** and only the
+admin changes it.
+
+A holiday is for one of three (`holidayAudience`):
+
+| Who is on holiday | Students | Teachers & staff | Days the teachers come (rows: dates + Late after / Half Day after / Leaving before) |
+|---|---|---|---|
+| Whole school | holiday (all classes) | off | optional: the days they are called (e.g. copy checking) |
+| Students only | holiday (all or some classes) | come, usual time | optional: the days with another time (09:00 instead of 07:15) |
+| Teachers & staff only (`students: false`) | school open | off | - |
+
+- `weeklyOff`, `holidays[]` (`{ id, name, from, to, classes, students }`): the students' side
+  (`holidayOn` skips `students: false`).
+- Field `staff` (only the admin writes it, firestore.rules; a teacher with `holiday.manage` saves
+  only `holidays` with merge and cannot edit / delete a holiday that has a teachers' part):
+  `{ holidays: { <holidayId>: { name, from, to, off, duties: [{ from, to, lateAfter, halfDayAfter, earlyLeaveBefore }] } } }`.
+  A teachers' day off = inside an `off` part and not in its duties; a duty day uses its times.
+  No part = the teachers come at the usual time (old student holidays: edit them to Whole school).
+- The modal shows "What will happen" in plain words; the table: Holiday, Dates (days), Students,
+  Teachers & staff, Days teachers come & time. Saved / deleted / weekly off changed: push + bell to
+  the teachers (`POST /api/staff-holidays/notify`, text made by the server from the saved calendar).
+- Teachers' view: `staffCalendarOf` (days off as holidays, split around the duty days),
+  `staffHolidayOn`, `staffDutyOn`; hook `useStaffCalendar(session)` (register, day view; app My
+  Attendance / day screen). Server mirror: `loadStaffCalendar`, `holidayIn`, `dutyOn`.
 
 ## Office QR
 
@@ -96,11 +129,14 @@ date DESC)` in `firestore.indexes.dev.json` / `.prod.json` (deploy the indexes).
 | `src/component/panel/staffAttendance/StaffRegister.tsx` | Register: month, legend, grid (sticky name, tooltip with times / holiday / leave type), totals, Download Excel |
 | `src/utils/staffRegister.ts`, `src/utils/staffRegisterExcel.ts` | `registerDays`, `summarizeRegister`; `exportStaffRegisterExcel` (xlsx) |
 | `src/component/panel/staffAttendance/StaffLeaves.tsx` | Leave: session / status / person filters, requests (Approve, Reject + reason, Cancel + reason), Add Leave for someone, balance table per type |
-| `src/component/panel/attendance/HolidayCalendar.tsx` with `staff` | Staff Holidays: the students' holiday page on `staffHolidays/{session}` (no class choice) |
+| `src/component/panel/attendance/HolidayCalendar.tsx` | The one Holiday Calendar: weekly off (admin), table of holidays (students / teachers & staff / days teachers come & time), edit / delete; notifies the teachers |
+| `src/component/panel/attendance/HolidayFormModal.tsx` | Add / edit modal (RHF, Save off until dirty): who is on holiday, classes, rows of days teachers come with times, "What will happen" |
+| `src/utils/holidayCalendar.ts` | `holidayOn` (students), `staffCalendarOf`, `staffDutyOn`, `staffHolidayOn`, `staffPartOf`, `withStaffPart`, `holidayAudience`, `studentsSummary`, `staffSummary`, `staffDutyTimesText` |
+| `../server/router/staffHolidayHandler.js` | `POST /api/staff-holidays/notify` (admin): push + bell to the teachers (and staff when included) |
 | `src/utils/staffAttendanceService.ts` | Settings load / save (with `leaveTypes`, `leaveTypeId`), day records, log, phones, selfie, `loadStaffLeaves`, `leaveUsage`; server calls `markStaffAttendance`, `resetStaffDevice`, `addStaffLeave`, `decideStaffLeave`, `cancelStaffLeave`, `loadStaffMonth` (date range of a month), `loadOfficeQr` |
 | `src/hooks/useStaffAttendance.ts` | `useStaffAttendanceSettings`, `useStaffDay(date)`, `useStaffPeople(includeStaff)`, `useStaffSelfie`, `useStaffLeaves(session)`, `useStaffMonth(month)`, `useOfficeQr` (reloads when the code changes) |
-| `src/utils/attendanceService.ts` / `src/hooks/useHolidayCalendar.ts` | `loadHolidayCalendar` / `saveHolidayCalendar` / `useHolidayCalendar` take a collection (students' or staff) |
-| `src/constants.ts` | `COLLECTION.STAFF_*`, `STAFF_ATTENDANCE_SETTINGS_DOC`, `STAFF_RADIUS_OPTIONS`, `STAFF_STATUS_META`, `STAFF_MARK_STATUS_OPTIONS`, `STAFF_REFUSED_LABELS`, `STAFF_LATE_TO_HALF_DAY_OPTIONS`, `STAFF_LEAVE_STATUS_META`, `STAFF_LEAVE_FILTER_OPTIONS`, `STAFF_REGISTER_CODES` |
+| `src/utils/attendanceService.ts` / `src/hooks/useHolidayCalendar.ts` | `loadHolidayCalendar` (with `staff`), `saveHolidayCalendar(calendar, uid, { withStaff })` (admin: whole document; others: merge without `staff`); `useHolidayCalendar`, `useStaffCalendar` |
+| `src/constants.ts` | `COLLECTION.STAFF_*`, `STAFF_ATTENDANCE_SETTINGS_DOC`, `STAFF_RADIUS_OPTIONS`, `STAFF_STATUS_META`, `STAFF_MARK_STATUS_OPTIONS`, `STAFF_REFUSED_LABELS`, `STAFF_LATE_TO_HALF_DAY_OPTIONS`, `STAFF_LEAVE_STATUS_META`, `STAFF_LEAVE_FILTER_OPTIONS`, `STAFF_REGISTER_CODES`, `STAFF_DUTY_LATE_AFTER` |
 | `src/utils/type.ts` | `StaffAttendanceSettings`, `StaffAttendanceRecord`, `StaffCheck`, `StaffLogEntry`, `StaffDevice`, `StaffPerson`, `StaffLeaveType`, `StaffLeave` |
 
 ## Data
@@ -108,7 +144,7 @@ date DESC)` in `firestore.indexes.dev.json` / `.prod.json` (deploy the indexes).
 | Collection | What | Who writes |
 |---|---|---|
 | `staffAttendanceSettings/general` | settings above; `wifiNetworks: [{ bssid, name }]` | admin (client) |
-| `staffHolidays/{session}` | `{ session, weeklyOff, holidays }` like `holidayCalendar` | admin (client) |
+| `holidayCalendar/{session}` field `staff` | teachers' part of each holiday: off or not, days they come with times (see Holidays) | admin (client) |
 | `staffAttendance/{date}_{uid}` | `uid, name, personType, date, status, checkIn, checkOut, earlyLeave, manual, manualReason, manualByName` | server only |
 | `staffAttendanceLog/{auto}` | `type: refused / edit / deviceReset`, code, message, reason, before / after, by | server only |
 | `staffDevices/{uid}` | `deviceId, model, os, boundAt` | server only |

@@ -47,7 +47,7 @@ Class teacher is read from the `isClassTeacher` flag on the user document. Rules
 | `examSchedules` | staff | `admitcard.generate` |
 | `marks`, `marksProgress`, `examSheets`, `attendance` | staff | `marks.enter` |
 | `dailyAttendance` | staff | `attendance.mark` |
-| `holidayCalendar` | staff | `holiday.manage` |
+| `holidayCalendar` | staff | `holiday.manage` (the holidays); `weeklyOff` and the field `staff` (teachers' days off / times) only the admin |
 | `news`, `gallery`, `downloads` | public if `isPublished`, else staff | `news.manage` / `gallery.manage` / `downloads.manage` |
 | `settings/homeBanner` | public | `banner.manage` |
 | `settings/*` (admitCard, idCard, transferCertificate) | staff | admin |
@@ -57,7 +57,6 @@ Class teacher is read from the `isClassTeacher` flag on the user document. Rules
 | `panelSettings/*` (exam, suggestedRemarks, enrollmentCounter, lockSettings) | staff | admin |
 | `pinSecrets/{uid}` (unlock PIN hashes) | nobody | nobody (server only) |
 | `staffAttendanceSettings` | admin | admin |
-| `staffHolidays` | staff | admin |
 | `staffAttendance` | admin; a teacher their own days | nobody (server only, see staff-attendance.md) |
 | `staffDevices` | admin; a teacher their own | nobody (server only) |
 | `staffAttendanceLog`, `staffSelfies` | admin | nobody (server only) |

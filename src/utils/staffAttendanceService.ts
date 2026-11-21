@@ -298,6 +298,17 @@ export function leaveUsage(leaves: StaffLeave[]): Record<string, Record<string, 
 
 const callStaffApi = (path: string, body: unknown) => fetchServer(`/api/staff-attendance/${path}`, body);
 
+/**
+ * Tells the teachers (push + bell) about a change of their part of the
+ * Holiday Calendar (admin): one holiday, or their weekly off.
+ */
+export const notifyStaffHoliday = (body: {
+  session: string;
+  holidayId?: string;
+  name?: string;
+  weeklyOff?: boolean;
+}) => fetchServer("/api/staff-holidays/notify", body);
+
 async function fetchServer(path: string, body: unknown): Promise<void> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "POST",

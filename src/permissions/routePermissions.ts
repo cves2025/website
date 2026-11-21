@@ -57,7 +57,6 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   "/welcome/staff-attendance": P.STAFF_ATTENDANCE_MANAGE,
   "/welcome/staff-attendance/register": P.STAFF_ATTENDANCE_MANAGE,
   "/welcome/staff-attendance/leaves": P.STAFF_ATTENDANCE_MANAGE,
-  "/welcome/staff-attendance/holidays": P.STAFF_ATTENDANCE_MANAGE,
   "/welcome/staff-attendance/settings": P.STAFF_ATTENDANCE_MANAGE,
 };
 

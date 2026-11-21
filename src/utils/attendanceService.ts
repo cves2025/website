@@ -33,13 +33,18 @@ import {
 import type {
   AttendanceStatus,
   DailyAttendanceDoc,
+  DateRange,
   Holiday,
   HolidayCalendar,
+  StaffCalendarPart,
+  StaffDuty,
+  StaffHolidayPart,
 } from "./type";
 
 const STATUSES = new Set<string>(["P", "A", "L"]);
 
-const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+const text = (value: unknown) =>
+  typeof value === "string" ? value.trim() : "";
 
 /* --------------------------------------------------------- daily docs -- */
 
@@ -50,7 +55,7 @@ export const dailyAttendanceDocId = (
   session: string,
   className: string,
   section: string,
-  date: string
+  date: string,
 ) => `${sectionPrefix(session, className, section)}${date}`;
 
 function toDailyAttendance(data: DocumentData): DailyAttendanceDoc {
@@ -79,26 +84,31 @@ export async function loadDailyAttendance(
   session: string,
   className: string,
   section: string,
-  date: string
+  date: string,
 ): Promise<DailyAttendanceDoc | null> {
   const snapshot = await getDoc(
     doc(
       db,
       COLLECTION.DAILY_ATTENDANCE,
-      dailyAttendanceDocId(session, className, section, date)
-    )
+      dailyAttendanceDocId(session, className, section, date),
+    ),
   );
   return snapshot.exists() ? toDailyAttendance(snapshot.data()) : null;
 }
 
 export async function saveDailyAttendance(
-  value: Omit<DailyAttendanceDoc, "updatedAt">
+  value: Omit<DailyAttendanceDoc, "updatedAt">,
 ): Promise<void> {
   await setDoc(
     doc(
       db,
       COLLECTION.DAILY_ATTENDANCE,
-      dailyAttendanceDocId(value.session, value.className, value.section, value.date)
+      dailyAttendanceDocId(
+        value.session,
+        value.className,
+        value.section,
+        value.date,
+      ),
     ),
     {
       ...value,
@@ -106,7 +116,7 @@ export async function saveDailyAttendance(
       // queries (sum) instead of reading every section's document.
       ...attendanceCounts(value.records),
       updatedAt: serverTimestamp(),
-    }
+    },
   );
 }
 
@@ -126,15 +136,15 @@ async function rangeSnapshot(
   className: string,
   section: string,
   from: string,
-  to: string
+  to: string,
 ) {
   const prefix = sectionPrefix(session, className, section);
   return getDocs(
     query(
       collection(db, COLLECTION.DAILY_ATTENDANCE),
       where(documentId(), ">=", `${prefix}${from}`),
-      where(documentId(), "<=", `${prefix}${to}`)
-    )
+      where(documentId(), "<=", `${prefix}${to}`),
+    ),
   );
 }
 
@@ -144,7 +154,7 @@ export async function loadAttendanceRange(
   className: string,
   section: string,
   from: string,
-  to: string
+  to: string,
 ): Promise<Map<string, DailyAttendanceDoc>> {
   const snapshot = await rangeSnapshot(session, className, section, from, to);
   const byDate = new Map<string, DailyAttendanceDoc>();
@@ -157,10 +167,13 @@ export async function loadAttendanceRange(
 
 /** Every section marked on a date (used by the dashboard). */
 export async function loadAttendanceOnDate(
-  date: string
+  date: string,
 ): Promise<DailyAttendanceDoc[]> {
   const snapshot = await getDocs(
-    query(collection(db, COLLECTION.DAILY_ATTENDANCE), where("date", "==", date))
+    query(
+      collection(db, COLLECTION.DAILY_ATTENDANCE),
+      where("date", "==", date),
+    ),
   );
   return snapshot.docs.map((item) => toDailyAttendance(item.data()));
 }
@@ -173,19 +186,27 @@ export async function fetchStudentDailyAttendanceRefs(
   session: string,
   className: string,
   section: string,
-  studentId: string
+  studentId: string,
 ): Promise<DocumentReference[]> {
   const { from, to } = sessionDateRange(session);
   const snapshot = await rangeSnapshot(session, className, section, from, to);
   return snapshot.docs
     .filter((item) => {
       const records = item.data().records;
-      return Boolean(records && typeof records === "object" && studentId in records);
+      return Boolean(
+        records && typeof records === "object" && studentId in records,
+      );
     })
     .map((item) => item.ref);
 }
 
 /* --------------------------------------------------- holiday calendar -- */
+
+const isDay = (value: unknown): value is number =>
+  Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 6;
+
+const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
+const TIME = /^\d{2}:\d{2}$/;
 
 function toHoliday(value: unknown): Holiday | null {
   if (!value || typeof value !== "object") return null;
@@ -202,38 +223,112 @@ function toHoliday(value: unknown): Holiday | null {
     classes: Array.isArray(data.classes)
       ? data.classes.map(text).filter(Boolean)
       : [],
+    students: data.students !== false,
   };
 }
 
-/** Students' calendar (holidayCalendar), or the staff calendar with COLLECTION.STAFF_HOLIDAYS. */
+function toRange(value: unknown): DateRange | null {
+  if (!(value && typeof value === "object")) return null;
+  const data = value as Record<string, unknown>;
+  const from = text(data.from);
+  const to = text(data.to) || from;
+  if (!DATE_KEY.test(from) || !DATE_KEY.test(to)) return null;
+  return { from, to: to < from ? from : to };
+}
+
+const toTime = (value: unknown) => (TIME.test(text(value)) ? text(value) : "");
+
+function toDuty(value: unknown): StaffDuty | null {
+  const range = toRange(value);
+  if (!range) return null;
+  const data = value as Record<string, unknown>;
+  const lateAfter = toTime(data.lateAfter);
+  if (!lateAfter) return null;
+  return {
+    ...range,
+    lateAfter,
+    halfDayAfter: toTime(data.halfDayAfter),
+    earlyLeaveBefore: toTime(data.earlyLeaveBefore),
+  };
+}
+
+function toStaffPart(value: unknown): StaffHolidayPart | null {
+  const range = toRange(value);
+  if (!range) return null;
+  const data = value as Record<string, unknown>;
+  const duties = (Array.isArray(data.duties) ? data.duties : [])
+    .map(toDuty)
+    .filter((duty): duty is StaffDuty => duty !== null)
+    .sort((a, b) => a.from.localeCompare(b.from));
+  const off = data.off === true;
+  if (!off && duties.length === 0) return null;
+  return { ...range, name: text(data.name) || "Holiday", off, duties };
+}
+
+function toStaffCalendar(value: unknown): StaffCalendarPart | null {
+  if (!(value && typeof value === "object")) return null;
+  const data = value as Record<string, unknown>;
+  const holidays: Record<string, StaffHolidayPart> = {};
+  const saved =
+    data.holidays && typeof data.holidays === "object"
+      ? (data.holidays as Record<string, unknown>)
+      : {};
+  Object.entries(saved).forEach(([id, item]) => {
+    const part = toStaffPart(item);
+    if (part) holidays[id] = part;
+  });
+  return { holidays };
+}
+
+/** The calendar of a session (students' holidays + the teachers' part `staff`). */
 export async function loadHolidayCalendar(
   session: string,
-  collectionName: string = COLLECTION.HOLIDAY_CALENDAR
 ): Promise<HolidayCalendar> {
-  const snapshot = await getDoc(doc(db, collectionName, session));
+  const snapshot = await getDoc(doc(db, COLLECTION.HOLIDAY_CALENDAR, session));
   if (!snapshot.exists()) return emptyHolidayCalendar(session);
   const data = snapshot.data();
   const weeklyOff = Array.isArray(data.weeklyOff)
-    ? data.weeklyOff.filter(
-        (day): day is number => Number.isInteger(day) && day >= 0 && day <= 6
-      )
+    ? data.weeklyOff.filter(isDay)
     : DEFAULT_WEEKLY_OFF;
   const holidays = Array.isArray(data.holidays)
     ? data.holidays.map(toHoliday).filter((h): h is Holiday => h !== null)
     : [];
-  return { session, weeklyOff, holidays: sortHolidays(holidays) };
+  return {
+    session,
+    weeklyOff,
+    holidays: sortHolidays(holidays),
+    staff: toStaffCalendar(data.staff),
+  };
 }
 
+const holidayToSave = ({ students, ...holiday }: Holiday) =>
+  students === false ? { ...holiday, students: false } : holiday;
+
+/**
+ * Saves the calendar of a session. `withStaff` (admin only,
+ * firestore.rules): the whole document with the weekly off and the teachers'
+ * part; otherwise only the holidays (merge: the weekly off and the field
+ * `staff` stay as the admin saved them).
+ */
 export async function saveHolidayCalendar(
   calendar: HolidayCalendar,
   updatedBy: string,
-  collectionName: string = COLLECTION.HOLIDAY_CALENDAR
+  { withStaff }: { withStaff: boolean },
 ): Promise<void> {
-  await setDoc(doc(db, collectionName, calendar.session), {
+  const ref = doc(db, COLLECTION.HOLIDAY_CALENDAR, calendar.session);
+  const base = {
     session: calendar.session,
-    weeklyOff: [...new Set(calendar.weeklyOff)].sort(),
-    holidays: sortHolidays(calendar.holidays),
+    holidays: sortHolidays(calendar.holidays).map(holidayToSave),
     updatedAt: serverTimestamp(),
     updatedBy,
+  };
+  if (!withStaff) {
+    await setDoc(ref, base, { merge: true });
+    return;
+  }
+  await setDoc(ref, {
+    ...base,
+    weeklyOff: [...new Set(calendar.weeklyOff)].sort(),
+    staff: calendar.staff ? { holidays: calendar.staff.holidays } : null,
   });
 }

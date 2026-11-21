@@ -1,15 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { COLLECTION } from "../constants";
 import { loadHolidayCalendar } from "../utils/attendanceService";
-import { emptyHolidayCalendar } from "../utils/holidayCalendar";
+import { emptyHolidayCalendar, staffCalendarOf } from "../utils/holidayCalendar";
 import type { HolidayCalendar } from "../utils/type";
 
 /**
  * The holiday calendar of a session (Sunday off + no holidays when unsaved):
- * the students' one, or the staff one with COLLECTION.STAFF_HOLIDAYS.
+ * students' holidays and the teachers' part (staffCalendarOf for the teachers' view).
  */
-export function useHolidayCalendar(session: string, collectionName: string = COLLECTION.HOLIDAY_CALENDAR) {
+export function useHolidayCalendar(session: string) {
   const [calendar, setCalendar] = useState<HolidayCalendar>(() =>
     emptyHolidayCalendar(session)
   );
@@ -24,7 +23,7 @@ export function useHolidayCalendar(session: string, collectionName: string = COL
     setError(null);
     setCalendar(emptyHolidayCalendar(session));
 
-    loadHolidayCalendar(session, collectionName)
+    loadHolidayCalendar(session)
       .then((data) => {
         if (!cancelled) setCalendar(data);
       })
@@ -39,11 +38,21 @@ export function useHolidayCalendar(session: string, collectionName: string = COL
     return () => {
       cancelled = true;
     };
-  }, [session, collectionName, version]);
+  }, [session, version]);
 
   const reload = useCallback(() => setVersion((value) => value + 1), []);
 
   return { calendar, setCalendar, loading, error, reload };
+}
+
+/**
+ * The teachers' calendar of a session (staffCalendarOf: their weekly off and
+ * days off) and the whole calendar (for staffDutyOn).
+ */
+export function useStaffCalendar(session: string) {
+  const { calendar, loading, error, reload } = useHolidayCalendar(session);
+  const staffCalendar = useMemo(() => staffCalendarOf(calendar), [calendar]);
+  return { calendar: staffCalendar, fullCalendar: calendar, loading, error, reload };
 }
 
 export default useHolidayCalendar;

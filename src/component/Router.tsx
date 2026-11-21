@@ -104,7 +104,8 @@ function Router() {
           <Route path="staff-attendance" element={<StaffAttendanceToday />} />
           <Route path="staff-attendance/register" element={<StaffRegister />} />
           <Route path="staff-attendance/leaves" element={<StaffLeaves />} />
-          <Route path="staff-attendance/holidays" element={<HolidayCalendar staff />} />
+          {/* One Holiday Calendar for students and teachers now. */}
+          <Route path="staff-attendance/holidays" element={<Navigate to="/welcome/attendance/holidays" replace />} />
           <Route path="staff-attendance/settings" element={<StaffAttendanceSettings />} />
           <Route path="settings" element={<Settings />} />
           <Route path="settings/permissions" element={<Permissions />} />
