@@ -11,6 +11,7 @@ import { IndianRupee, Lock } from "lucide-react";
 import { DASHBOARD_GRADIENT, FEE_COLLECT_PATH, IDLE_LOCKED_KEY } from "../constants";
 import { useIdleLock } from "../hooks/useIdleLock";
 import IdleLockScreen from "./IdleLockScreen";
+import NotificationBell from "./NotificationBell";
 import Tooltip from "../custom-components/Tooltip";
 import { PERMISSIONS } from "../permissions";
 
@@ -153,11 +154,14 @@ function Welcome() {
             </button>
             </Tooltip>
           )}
-          {/* Go to Website: for everyone. */}
-          <Tooltip
-            content="Open the school website"
+          {/* Notifications (leave, staff attendance): for everyone. */}
+          <NotificationBell
+            uid={user.uid}
+            onBanner={onDashboard}
             className={`${can(PERMISSIONS.FEE_MANAGE) || user.role === "admin" ? "" : "ml-auto "}shrink-0`}
-          >
+          />
+          {/* Go to Website: for everyone. */}
+          <Tooltip content="Open the school website" className="shrink-0">
           <Link
               to="/"
               className={`flex shrink-0 items-center gap-2 rounded-full px-3 text-sm font-bold text-white shadow-sm transition-colors sm:px-4 ${

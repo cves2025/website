@@ -7,10 +7,11 @@
 import { useContext, useEffect, useState } from "react";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import toast from "react-hot-toast";
-import { LocateFixed, Plus, Trash2 } from "lucide-react";
+import { ExternalLink, LocateFixed, Plus, Trash2 } from "lucide-react";
 
 import {
   CVES_BUTTON,
+  OFFICE_QR_PATH,
   STAFF_LATE_TO_HALF_DAY_OPTIONS,
   STAFF_RADIUS_OPTIONS,
 } from "../../../constants";
@@ -177,7 +178,7 @@ function StaffAttendanceSettings() {
       radiusM: Number(data.radiusM) || 150,
       wifiCheck: data.wifiCheck === ON,
       wifiNetworks,
-      qrCheck: false,
+      qrCheck: data.qrCheck === ON,
       checkOut: data.checkOut === ON,
       lateAfter: data.lateAfter,
       halfDayAfter: data.halfDayAfter,
@@ -206,18 +207,20 @@ function StaffAttendanceSettings() {
     }
   };
 
+  // CustomToggle is w-full; the wrapper keeps it on the right of the text.
   const renderToggle = (name: keyof SettingsForm, label: string) => (
-    <CustomToggle
-      control={control}
-      name={name}
-      activeValue={ON}
-      inactiveValue={OFF}
-      activeLabel="ON"
-      inactiveLabel="OFF"
-      ariaLabel={label}
-      onChange={toggle(name)}
-      wrapperClassName="w-auto shrink-0"
-    />
+    <div className="shrink-0">
+      <CustomToggle
+        control={control}
+        name={name}
+        activeValue={ON}
+        inactiveValue={OFF}
+        activeLabel="ON"
+        inactiveLabel="OFF"
+        ariaLabel={label}
+        onChange={toggle(name)}
+      />
+    </div>
   );
 
   return (
@@ -314,20 +317,20 @@ function StaffAttendanceSettings() {
               <div>
                 <h2 className="mb-1 font-bold text-gray-800">QR code check</h2>
                 <p className="text-sm text-gray-500">
-                  Coming later: a QR code that changes every few seconds on an office screen, scanned at check-in.
+                  When ON, teachers must also scan the QR on the office screen at check-in / check-out. It changes
+                  every 20 seconds, so a photo of it sent to someone stops working at once. Keep the Office QR page
+                  open on a computer or tablet in the office (signed in as admin).
                 </p>
+                <a
+                  href={OFFICE_QR_PATH}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-navy underline"
+                >
+                  <ExternalLink className="h-4 w-4" /> Open the Office QR page
+                </a>
               </div>
-              <CustomToggle
-                control={control}
-                name="qrCheck"
-                activeValue={ON}
-                inactiveValue={OFF}
-                activeLabel="ON"
-                inactiveLabel="Coming soon"
-                ariaLabel="QR code check"
-                disabled
-                wrapperClassName="w-auto shrink-0"
-              />
+              {renderToggle("qrCheck", "QR code check")}
             </div>
           </section>
 

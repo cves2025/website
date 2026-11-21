@@ -1154,3 +1154,16 @@ export interface StaffPerson {
   employeeId: string;
   photo: string;
 }
+
+/** One notification of the bell (notifications/{uid}/items). */
+export interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  kind: string;
+  /** Page to open on the website ("" = none). */
+  webLink: string;
+  read: boolean;
+  /** ms */
+  createdAt: number | null;
+}

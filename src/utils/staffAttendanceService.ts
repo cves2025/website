@@ -163,6 +163,25 @@ export async function loadStaffDay(date: string): Promise<Record<string, StaffAt
   return records;
 }
 
+/** Every record of a month ("yyyy-MM"): records[uid][date]. */
+export async function loadStaffMonth(month: string): Promise<Record<string, Record<string, StaffAttendanceRecord>>> {
+  const snap = await getDocs(
+    query(
+      collection(db, COLLECTION.STAFF_ATTENDANCE),
+      where("date", ">=", `${month}-01`),
+      where("date", "<=", `${month}-31`)
+    )
+  );
+  const records: Record<string, Record<string, StaffAttendanceRecord>> = {};
+  snap.docs.forEach((item) => {
+    const record = toStaffRecord(item.id, item.data());
+    if (!record.uid) return;
+    records[record.uid] = records[record.uid] ?? {};
+    records[record.uid][record.date] = record;
+  });
+  return records;
+}
+
 /** The log of a date (refused tries and admin changes), newest first. */
 export async function loadStaffLog(date: string): Promise<StaffLogEntry[]> {
   const snap = await getDocs(query(collection(db, COLLECTION.STAFF_ATTENDANCE_LOG), where("date", "==", date)));
@@ -294,6 +313,26 @@ export const decideStaffLeave = (id: string, decision: "approved" | "rejected", 
   fetchServer("/api/staff-leave/decide", { id, decision, note });
 
 export const cancelStaffLeave = (id: string, reason: string) => fetchServer("/api/staff-leave/cancel", { id, reason });
+
+export interface OfficeQr {
+  token: string;
+  /** When it stops being shown (ms, this computer's clock). */
+  expiresAt: number;
+  slotMs: number;
+}
+
+/** The current office QR from the server (admin). Times are moved to this computer's clock. */
+export async function loadOfficeQr(): Promise<OfficeQr> {
+  const response = await fetch(`${API_BASE_URL}/api/staff-attendance/qr`, {
+    method: "GET",
+    headers: await authHeaders(),
+    credentials: "include",
+  });
+  const body = (await response.json().catch(() => ({}))) as Partial<OfficeQr> & { error?: string; serverTime?: number };
+  if (!response.ok || !body.token || !body.expiresAt) throw new Error(body.error || "The QR could not be loaded.");
+  const offset = body.serverTime ? Date.now() - body.serverTime : 0;
+  return { token: body.token, expiresAt: body.expiresAt + offset, slotMs: body.slotMs ?? 20000 };
+}
 
 /** Unlinks a teacher's phone; the next check-in links the new one. */
 export const resetStaffDevice = (uid: string, reason: string) => callStaffApi("reset-device", { uid, reason });

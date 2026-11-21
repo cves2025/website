@@ -419,6 +419,25 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ---------- notifications (bell of the app and the website) ----------
+    // Written by the server (staff attendance / leave). A user reads their
+    // own and may only mark them read.
+    match /notifications/{uid}/items/{itemId} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+        && request.resource.data.read == true;
+      allow create, delete: if false;
+    }
+
+    // Phones for push messages: only the server.
+    match /pushTokens/{uid} {
+      allow read, write: if false;
+    }
+    match /pushTokenOwners/{key} {
+      allow read, write: if false;
+    }
+
     // ---------- fee module (admin only) ----------
 
     // Read by the public Pay Fee page; changed on Fees > Fee Structure.

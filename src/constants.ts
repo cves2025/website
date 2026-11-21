@@ -987,3 +987,20 @@ export const STAFF_LEAVE_FILTER_OPTIONS = [
   { value: "approved", label: "Approved" },
   { value: "all", label: "All" },
 ];
+
+/** Codes of the monthly staff register (cell colours on the page). */
+export const STAFF_REGISTER_CODES = {
+  P: { label: "Present", cell: "bg-green-50 text-green-700" },
+  L: { label: "Late", cell: "bg-amber-50 text-amber-800" },
+  HD: { label: "Half Day", cell: "bg-orange-50 text-orange-700" },
+  A: { label: "Absent", cell: "bg-red-50 text-red-700" },
+  LV: { label: "Leave", cell: "bg-navy-soft text-navy" },
+  H: { label: "Holiday / off", cell: "bg-gray-100 text-gray-400" },
+  "": { label: "", cell: "" },
+} as const;
+
+/** Full-screen page of the office QR (staff check-in), outside the panel so the idle lock does not cover it. */
+export const OFFICE_QR_PATH = "/staff-qr";
+
+/** How many notifications the bell lists (newest first). */
+export const NOTIFICATIONS_SHOWN = 30;

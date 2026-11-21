@@ -5,6 +5,9 @@ admin's panel locks: a full-screen, blurred lock screen that cannot be closed un
 entered again. Teachers are not locked (yet); later the same lock can guard sensitive actions
 (e.g. fee changes).
 
+The Office QR page (`/staff-qr`, staff attendance) is outside `/welcome` on purpose, so it is never
+locked; going back to the panel from it uses the normal lock.
+
 ## Files
 
 | File | What it does |

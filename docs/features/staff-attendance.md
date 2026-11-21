@@ -1,7 +1,8 @@
 # Staff attendance (teachers check in from the app)
 
-Admin pages: `/welcome/staff-attendance` (one day), `/welcome/staff-attendance/leaves`,
-`/welcome/staff-attendance/holidays`, `/welcome/staff-attendance/settings`. All need `STAFF_ATTENDANCE_MANAGE` (`staffAttendance.manage`),
+Admin pages: `/welcome/staff-attendance` (one day), `/welcome/staff-attendance/register` (month),
+`/welcome/staff-attendance/leaves`,
+`/welcome/staff-attendance/holidays`, `/welcome/staff-attendance/settings`; the office screen `/staff-qr`. All need `STAFF_ATTENDANCE_MANAGE` (`staffAttendance.manage`),
 which a teacher can never get. Teachers check in / out **only from the mobile app**
 (`../mobile`, My Attendance).
 
@@ -20,6 +21,7 @@ Goal: a teacher cannot cheat. The app collects, the **server decides** and is th
 | GPS not mocked (Android / iOS flag), accuracy <= 100 m | `MOCK_LOCATION` (logged), `WEAK_GPS` |
 | Inside the radius around the school point (haversine) | `OUTSIDE` (logged) |
 | School Wi-Fi (BSSID) when the Wi-Fi check is ON | `WIFI` (logged) |
+| The office QR when the QR check is ON (signed token of now or the 20 s before) | `QR` (logged) |
 | Selfie (JPEG data URL) when ON | `SELFIE` |
 | The phone linked to the teacher (`staffDevices/{uid}`, linked on the first check-in) | `DEVICE` (logged) |
 | Once a day; check-out after check-in; check-out ON | `ALREADY_IN`, `NOT_IN`, `ALREADY_OUT`, `NO_CHECK_OUT` |
@@ -27,6 +29,15 @@ Goal: a teacher cannot cheat. The app collects, the **server decides** and is th
 The time is the server's, in India time; status at check-in: after `lateAfter` = Late, after
 `halfDayAfter` = Half Day; a check-out before `earlyLeaveBefore` makes Present / Late a Half Day.
 The app also asks for the phone's fingerprint / screen lock before it sends (phone owner).
+
+## Office QR
+
+`/staff-qr` (`OfficeQr.tsx`, admin; **outside** `/welcome`, so no sidebar and no idle lock): keep it open
+on an office computer / tablet. Every 20 s it asks `GET /api/staff-attendance/qr` (admin) for the
+token `CVES-QR:{slot}.{signature}` (HMAC of environment + 20-second slot, key made from the server's
+`PIN_PEPPER`; nothing stored). The app scans it at check-in / out when `qrCheck` is ON (Attendance
+Settings, website or app); the server takes the code of now or of the slot before. A forwarded photo
+is useless within seconds, and it still needs the GPS, phone and Wi-Fi checks.
 
 ## Leave (phase 2)
 
@@ -45,18 +56,40 @@ The app also asks for the phone's fingerprint / screen lock before it sends (pho
 - Cancel: the teacher a waiting leave; the admin waiting or approved (reason), which removes its
   leave days again (days the admin changed since are kept). Every decision is logged (`type: "leave"`).
 
+## Monthly register (phase 3)
+
+`utils/staffRegister.ts` (mirror: `mobile/src/utils/staffRegister.ts`): per day P / L / HD / A / LV / H.
+A record wins (also on a holiday); a past working day without a record is **A**; today and later
+without a record are empty. Totals: working days, present, late, half day, leave, absent, "X lates =
+1 half day" (`lateToHalfDay`), no check-out, days worked = P + L + HD / 2 - late half days / 2.
+Download Excel: sheet "Register" (codes + totals, legend) and "Times" (in - out per day).
+
+## Notifications
+
+`../server/services/notify.js` saves `notifications/{uid}/items` (the bell: website header
+`NotificationBell.tsx` + app Notifications screen, both live) and pushes to the user's phones (FCM,
+`pushTokens/{uid}`, registered by the app). Admins: leave request / cancelled by the teacher, and
+check-ins refused for fake GPS, outside, Wi-Fi, another phone, rooted, emulator, QR (one per teacher
+and reason in 30 minutes). Teacher: leave approved / rejected / cancelled / added, attendance changed
+by the admin, phone reset. The teacher's app shows the day, the month and the leave live
+(`onSnapshot`), so an admin change on the website shows at once.
+
 ## Files
 
 | File | What it does |
 |---|---|
 | `src/component/panel/staffAttendance/StaffAttendanceToday.tsx` | Day view: date, counts, every teacher (+ staff when allowed) with status, in / out, distance, phone; Mark (status, times, reason; `MarkDialog`), Reset phone (`ResetDialog`), selfie (`SelfieDialog`); refused check-ins and admin changes of the day |
 | `src/component/panel/staffAttendance/StaffAttendanceSettings.tsx` | Settings (react-hook-form; Save after a change + password): location (lat / lng, this computer's location, Maps link), radius, Wi-Fi check + routers, QR (coming soon, disabled), check-out, Late / Half Day / leaving-early times, lates per half day, selfie, non-teaching staff |
+| `src/component/NotificationBell.tsx`, `src/hooks/useNotifications.ts`, `src/utils/notificationService.ts` | Header bell: live list, unread count, open the page (`webLink`), mark read / all read |
+| `src/component/panel/staffAttendance/OfficeQr.tsx` | Office QR page (`OFFICE_QR_PATH`): big QR, countdown bar, full screen, warning when the QR check is OFF |
+| `src/component/panel/staffAttendance/StaffRegister.tsx` | Register: month, legend, grid (sticky name, tooltip with times / holiday / leave type), totals, Download Excel |
+| `src/utils/staffRegister.ts`, `src/utils/staffRegisterExcel.ts` | `registerDays`, `summarizeRegister`; `exportStaffRegisterExcel` (xlsx) |
 | `src/component/panel/staffAttendance/StaffLeaves.tsx` | Leave: session / status / person filters, requests (Approve, Reject + reason, Cancel + reason), Add Leave for someone, balance table per type |
 | `src/component/panel/attendance/HolidayCalendar.tsx` with `staff` | Staff Holidays: the students' holiday page on `staffHolidays/{session}` (no class choice) |
-| `src/utils/staffAttendanceService.ts` | Settings load / save (with `leaveTypes`, `leaveTypeId`), day records, log, phones, selfie, `loadStaffLeaves`, `leaveUsage`; server calls `markStaffAttendance`, `resetStaffDevice`, `addStaffLeave`, `decideStaffLeave`, `cancelStaffLeave` |
-| `src/hooks/useStaffAttendance.ts` | `useStaffAttendanceSettings`, `useStaffDay(date)`, `useStaffPeople(includeStaff)`, `useStaffSelfie`, `useStaffLeaves(session)` |
+| `src/utils/staffAttendanceService.ts` | Settings load / save (with `leaveTypes`, `leaveTypeId`), day records, log, phones, selfie, `loadStaffLeaves`, `leaveUsage`; server calls `markStaffAttendance`, `resetStaffDevice`, `addStaffLeave`, `decideStaffLeave`, `cancelStaffLeave`, `loadStaffMonth` (date range of a month), `loadOfficeQr` |
+| `src/hooks/useStaffAttendance.ts` | `useStaffAttendanceSettings`, `useStaffDay(date)`, `useStaffPeople(includeStaff)`, `useStaffSelfie`, `useStaffLeaves(session)`, `useStaffMonth(month)`, `useOfficeQr` (reloads when the code changes) |
 | `src/utils/attendanceService.ts` / `src/hooks/useHolidayCalendar.ts` | `loadHolidayCalendar` / `saveHolidayCalendar` / `useHolidayCalendar` take a collection (students' or staff) |
-| `src/constants.ts` | `COLLECTION.STAFF_*`, `STAFF_ATTENDANCE_SETTINGS_DOC`, `STAFF_RADIUS_OPTIONS`, `STAFF_STATUS_META`, `STAFF_MARK_STATUS_OPTIONS`, `STAFF_REFUSED_LABELS`, `STAFF_LATE_TO_HALF_DAY_OPTIONS`, `STAFF_LEAVE_STATUS_META`, `STAFF_LEAVE_FILTER_OPTIONS` |
+| `src/constants.ts` | `COLLECTION.STAFF_*`, `STAFF_ATTENDANCE_SETTINGS_DOC`, `STAFF_RADIUS_OPTIONS`, `STAFF_STATUS_META`, `STAFF_MARK_STATUS_OPTIONS`, `STAFF_REFUSED_LABELS`, `STAFF_LATE_TO_HALF_DAY_OPTIONS`, `STAFF_LEAVE_STATUS_META`, `STAFF_LEAVE_FILTER_OPTIONS`, `STAFF_REGISTER_CODES` |
 | `src/utils/type.ts` | `StaffAttendanceSettings`, `StaffAttendanceRecord`, `StaffCheck`, `StaffLogEntry`, `StaffDevice`, `StaffPerson`, `StaffLeaveType`, `StaffLeave` |
 
 ## Data
@@ -78,8 +111,8 @@ Non-teaching staff have no login: when `includeStaff` is ON they are listed and 
 
 Phase 1: settings, staff holidays, check-in / out, day view, manual marks, phone reset.
 Phase 2: leave (types, quota per session, request / approve / cancel, balance).
-Next: month register + Excel + "X late = 1 half day" (`lateToHalfDay` is saved already), QR check
-(`qrCheck`, kept OFF).
+Phase 3: month register + Excel + "X late = 1 half day"; the teacher's month summary in the app.
+QR check: Office QR page + scan in the app (`qrCheck`, admin ON / OFF).
 
 ## Change X -> look here
 

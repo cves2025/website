@@ -75,6 +75,7 @@ export const MENU: MenuItem[] = [
     accent: BRAND.pink,
     subLinks: [
       { label: "Staff Attendance", path: "/welcome/staff-attendance", end: true },
+      { label: "Staff Register", path: "/welcome/staff-attendance/register" },
       { label: "Leave", path: "/welcome/staff-attendance/leaves" },
       { label: "Staff Holidays", path: "/welcome/staff-attendance/holidays" },
       { label: "Attendance Settings", path: "/welcome/staff-attendance/settings" },

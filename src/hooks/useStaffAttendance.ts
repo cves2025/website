@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   DEFAULT_STAFF_ATTENDANCE_SETTINGS,
@@ -6,8 +6,11 @@ import {
   loadStaffDevices,
   loadStaffLeaves,
   loadStaffLog,
+  loadStaffMonth,
   loadStaffSelfie,
   loadStaffSettings,
+  loadOfficeQr,
+  type OfficeQr,
 } from "../utils/staffAttendanceService";
 import type { StaffLeave, StaffPerson } from "../utils/type";
 import { useAsyncData } from "./useAsyncData";
@@ -83,4 +86,54 @@ export function useStaffLeaves(session: string) {
     errorMessage: "Leave requests could not be loaded.",
   });
   return { leaves: data, loading, error, reload };
+}
+
+/** Every record of a month ("yyyy-MM"), by uid and date (admin). */
+export function useStaffMonth(month: string) {
+  const { data, loading, error, reload } = useAsyncData(() => loadStaffMonth(month), [month], {
+    initial: {} as Awaited<ReturnType<typeof loadStaffMonth>>,
+    enabled: Boolean(month),
+    errorMessage: "The month's attendance could not be loaded.",
+  });
+  return { records: data, loading, error, reload };
+}
+
+/**
+ * The office QR, refreshed just after it changes (every 20 s); a failed
+ * load is tried again after a few seconds. `secondsLeft` ticks for the bar.
+ */
+export function useOfficeQr(enabled: boolean) {
+  const [qr, setQr] = useState<OfficeQr | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!enabled) return;
+    let timer: ReturnType<typeof setTimeout>;
+    let stopped = false;
+    const load = () => {
+      loadOfficeQr()
+        .then((next) => {
+          if (stopped) return;
+          setQr(next);
+          setError(null);
+          timer = setTimeout(load, Math.max(next.expiresAt - Date.now(), 0) + 300);
+        })
+        .catch((cause: unknown) => {
+          if (stopped) return;
+          setError(cause instanceof Error ? cause.message : "The QR could not be loaded.");
+          timer = setTimeout(load, 5000);
+        });
+    };
+    load();
+    const tick = setInterval(() => setNow(Date.now()), 500);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      clearInterval(tick);
+    };
+  }, [enabled]);
+
+  const secondsLeft = qr ? Math.max(Math.ceil((qr.expiresAt - now) / 1000), 0) : 0;
+  return { qr, error, secondsLeft };
 }
