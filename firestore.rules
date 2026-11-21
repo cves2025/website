@@ -413,6 +413,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Leave requests (server only): the admin, and a teacher their own.
+    match /staffLeaves/{leaveId} {
+      allow read: if isAdmin() || (isTeacher() && resource.data.uid == request.auth.uid);
+      allow write: if false;
+    }
+
     // ---------- fee module (admin only) ----------
 
     // Read by the public Pay Fee page; changed on Fees > Fee Structure.

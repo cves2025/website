@@ -61,6 +61,7 @@ Class teacher is read from the `isClassTeacher` flag on the user document. Rules
 | `staffAttendance` | admin; a teacher their own days | nobody (server only, see staff-attendance.md) |
 | `staffDevices` | admin; a teacher their own | nobody (server only) |
 | `staffAttendanceLog`, `staffSelfies` | admin | nobody (server only) |
+| `staffLeaves` | admin; a teacher their own | nobody (server only) |
 | `feeStructures` | public | admin, never deleted |
 | `feeSettings`, `feeAccounts`, `feePayments`, `feeCounters` | admin | admin. Receipts are only cancelled; the counter only goes up by 1 |
 | anything else | no | no |

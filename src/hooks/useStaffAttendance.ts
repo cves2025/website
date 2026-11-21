@@ -4,11 +4,12 @@ import {
   DEFAULT_STAFF_ATTENDANCE_SETTINGS,
   loadStaffDay,
   loadStaffDevices,
+  loadStaffLeaves,
   loadStaffLog,
   loadStaffSelfie,
   loadStaffSettings,
 } from "../utils/staffAttendanceService";
-import type { StaffPerson } from "../utils/type";
+import type { StaffLeave, StaffPerson } from "../utils/type";
 import { useAsyncData } from "./useAsyncData";
 import { useTeachers } from "./useTeachers";
 
@@ -72,4 +73,14 @@ export function useStaffSelfie(recordId: string, action: "in" | "out", enabled: 
     errorMessage: "The selfie could not be loaded.",
   });
   return { image: data, loading, error };
+}
+
+/** Every leave of a session (admin). */
+export function useStaffLeaves(session: string) {
+  const { data, loading, error, reload } = useAsyncData(() => loadStaffLeaves(session), [session], {
+    initial: [] as StaffLeave[],
+    enabled: Boolean(session),
+    errorMessage: "Leave requests could not be loaded.",
+  });
+  return { leaves: data, loading, error, reload };
 }

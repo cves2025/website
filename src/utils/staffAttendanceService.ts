@@ -26,6 +26,8 @@ import type {
   StaffAttendanceStatus,
   StaffCheck,
   StaffDevice,
+  StaffLeave,
+  StaffLeaveType,
   StaffLogEntry,
 } from "./type";
 
@@ -53,7 +55,27 @@ export const DEFAULT_STAFF_ATTENDANCE_SETTINGS: StaffAttendanceSettings = {
   lateToHalfDay: 0,
   selfie: false,
   includeStaff: false,
+  leaveTypes: [],
 };
+
+const toLeaveTypes = (value: unknown): StaffLeaveType[] =>
+  Array.isArray(value)
+    ? value
+        .map((item: DocumentData) => ({
+          id: text(item?.id),
+          name: text(item?.name),
+          quota: num(item?.quota) && item.quota > 0 ? item.quota : 0,
+        }))
+        .filter((item) => item.id && item.name)
+    : [];
+
+/** An id for a new leave type from its name ("Casual Leave" -> "casual-leave"), unique in `taken`. */
+export function leaveTypeId(name: string, taken: string[]): string {
+  const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "leave";
+  let id = base;
+  for (let index = 2; taken.includes(id); index += 1) id = `${base}-${index}`;
+  return id;
+}
 
 /* ----------------------------------------------------------- settings -- */
 
@@ -82,6 +104,7 @@ export function toStaffSettings(data: DocumentData | undefined): StaffAttendance
     lateToHalfDay: num(data.lateToHalfDay) ?? 0,
     selfie: data.selfie === true,
     includeStaff: data.includeStaff === true,
+    leaveTypes: toLeaveTypes(data.leaveTypes),
   };
 }
 
@@ -125,6 +148,7 @@ export function toStaffRecord(id: string, data: DocumentData): StaffAttendanceRe
     manual: data.manual === true,
     manualReason: text(data.manualReason),
     manualByName: text(data.manualByName),
+    leaveType: text(data.leaveType),
   };
 }
 
@@ -181,10 +205,56 @@ export async function loadStaffSelfie(recordId: string, action: "in" | "out"): P
   return image.startsWith("data:image/jpeg;base64,") ? image : "";
 }
 
+/* -------------------------------------------------------------- leave -- */
+
+const LEAVE_STATUSES = new Set(["pending", "approved", "rejected", "cancelled"]);
+
+function toLeave(id: string, data: DocumentData): StaffLeave {
+  return {
+    id,
+    uid: text(data.uid),
+    name: text(data.name),
+    typeId: text(data.typeId),
+    typeName: text(data.typeName),
+    session: text(data.session),
+    from: text(data.from),
+    to: text(data.to),
+    halfDay: data.halfDay === true,
+    days: num(data.days) ?? 0,
+    reason: text(data.reason),
+    status: (LEAVE_STATUSES.has(data.status) ? data.status : "pending") as StaffLeave["status"],
+    byAdmin: data.byAdmin === true,
+    decidedByName: text(data.decidedByName),
+    decisionNote: text(data.decisionNote),
+    cancelReason: text(data.cancelReason),
+    createdAt: millis(data.createdAt),
+  };
+}
+
+/** Every leave of a session, newest first (admin). */
+export async function loadStaffLeaves(session: string): Promise<StaffLeave[]> {
+  const snap = await getDocs(query(collection(db, COLLECTION.STAFF_LEAVES), where("session", "==", session)));
+  return snap.docs.map((item) => toLeave(item.id, item.data())).sort((a, b) => b.from.localeCompare(a.from));
+}
+
+/** Days used per person and type (approved + waiting): used[uid][typeId]. */
+export function leaveUsage(leaves: StaffLeave[]): Record<string, Record<string, number>> {
+  const used: Record<string, Record<string, number>> = {};
+  leaves
+    .filter((leave) => leave.status === "pending" || leave.status === "approved")
+    .forEach((leave) => {
+      used[leave.uid] = used[leave.uid] ?? {};
+      used[leave.uid][leave.typeId] = (used[leave.uid][leave.typeId] ?? 0) + leave.days;
+    });
+  return used;
+}
+
 /* ------------------------------------------------------ server calls -- */
 
-async function callStaffApi(path: string, body: unknown): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/staff-attendance/${path}`, {
+const callStaffApi = (path: string, body: unknown) => fetchServer(`/api/staff-attendance/${path}`, body);
+
+async function fetchServer(path: string, body: unknown): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "POST",
     headers: await authHeaders(),
     credentials: "include",
@@ -206,6 +276,24 @@ export interface StaffMarkInput {
 
 /** The admin marks or corrects one person's day (logged with the reason). */
 export const markStaffAttendance = (input: StaffMarkInput) => callStaffApi("mark", input);
+
+export interface StaffLeaveInput {
+  uid: string;
+  typeId: string;
+  from: string;
+  to: string;
+  halfDay: boolean;
+  reason: string;
+}
+
+/** The admin adds a leave for a person (approved at once). */
+export const addStaffLeave = (input: StaffLeaveInput) =>
+  fetchServer("/api/staff-leave/request", input);
+
+export const decideStaffLeave = (id: string, decision: "approved" | "rejected", note: string) =>
+  fetchServer("/api/staff-leave/decide", { id, decision, note });
+
+export const cancelStaffLeave = (id: string, reason: string) => fetchServer("/api/staff-leave/cancel", { id, reason });
 
 /** Unlinks a teacher's phone; the next check-in links the new one. */
 export const resetStaffDevice = (uid: string, reason: string) => callStaffApi("reset-device", { uid, reason });

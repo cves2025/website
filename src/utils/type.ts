@@ -1055,6 +1055,40 @@ export interface StaffAttendanceSettings {
   selfie: boolean;
   /** Non-teaching staff are in the lists (marked by the admin; they have no login). */
   includeStaff: boolean;
+  /** Leave types and their days per session (0 = no limit). */
+  leaveTypes: StaffLeaveType[];
+}
+
+export interface StaffLeaveType {
+  id: string;
+  name: string;
+  /** Days per session; 0 = no limit. */
+  quota: number;
+}
+
+export type StaffLeaveStatus = "pending" | "approved" | "rejected" | "cancelled";
+
+/** One leave request (staffLeaves/{id}; written by the server). */
+export interface StaffLeave {
+  id: string;
+  uid: string;
+  name: string;
+  typeId: string;
+  typeName: string;
+  session: string;
+  from: string;
+  to: string;
+  halfDay: boolean;
+  /** Working days (0.5 for a half day). */
+  days: number;
+  reason: string;
+  status: StaffLeaveStatus;
+  byAdmin: boolean;
+  decidedByName: string;
+  decisionNote: string;
+  cancelReason: string;
+  /** ms */
+  createdAt: number | null;
 }
 
 /** One check-in or check-out. */
@@ -1082,6 +1116,8 @@ export interface StaffAttendanceRecord {
   manual: boolean;
   manualReason: string;
   manualByName: string;
+  /** The leave type when this day is a leave ("" otherwise). */
+  leaveType: string;
 }
 
 /** A refused try, an admin change or a phone reset (staffAttendanceLog). */

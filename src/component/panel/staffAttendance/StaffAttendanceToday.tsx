@@ -176,6 +176,7 @@ function StaffAttendanceToday() {
                       </td>
                       <td className="px-4 py-3">
                         <StatusChip status={record?.status ?? "none"} />
+                        {record?.leaveType && <p className="mt-1 text-xs text-navy">{record.leaveType}</p>}
                         {record?.earlyLeave && <p className="mt-1 text-xs text-orange-700">Left early</p>}
                         {record?.manual && (
                           <Tooltip content={record.manualReason || "Marked by the admin"}>

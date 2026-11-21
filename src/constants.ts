@@ -50,6 +50,8 @@ export const COLLECTION = {
   STAFF_DEVICES: "staffDevices",
   /** Check-in / out selfies, id = {date}_{uid}_{in|out}. Server only. */
   STAFF_SELFIES: "staffSelfies",
+  /** Leave requests of teachers / staff. Server only. */
+  STAFF_LEAVES: "staffLeaves",
   ROLL_NUMBER: "rollNumber",
   /** School news shown on the Home page, managed from Settings > News. */
   NEWS: "news",
@@ -970,3 +972,18 @@ export const STAFF_REFUSED_LABELS: Record<string, string> = {
   ROOTED: "Rooted phone",
   EMULATOR: "Emulator",
 };
+
+/** Label and colours of a leave request status. */
+export const STAFF_LEAVE_STATUS_META = {
+  pending: { label: "Waiting", chip: "bg-amber-50 text-amber-800 border-amber-200" },
+  approved: { label: "Approved", chip: "bg-green-50 text-green-700 border-green-200" },
+  rejected: { label: "Rejected", chip: "bg-red-50 text-red-700 border-red-200" },
+  cancelled: { label: "Cancelled", chip: "bg-gray-50 text-gray-600 border-gray-200" },
+} as const;
+
+/** Leave list filter. */
+export const STAFF_LEAVE_FILTER_OPTIONS = [
+  { value: "pending", label: "Waiting" },
+  { value: "approved", label: "Approved" },
+  { value: "all", label: "All" },
+];

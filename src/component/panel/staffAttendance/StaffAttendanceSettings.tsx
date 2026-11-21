@@ -2,7 +2,7 @@
  * Staff Attendance > Attendance Settings (admin): the school point and
  * radius, Wi-Fi check, check-out, time rules, selfie, non-teaching staff.
  * The mobile app's check-in and the server read these (the server checks
- * every rule again). Save is ON only after a change and asks for the password.
+ * every rule again). Leave types (days per session) are set here too. Save is ON only after a change and asks for the password.
  */
 import { useContext, useEffect, useState } from "react";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
@@ -23,7 +23,7 @@ import TimePicker from "../../../custom-components/TimePicker";
 import Tooltip from "../../../custom-components/Tooltip";
 import { useStaffAttendanceSettings } from "../../../hooks/useStaffAttendance";
 import { usePasswordConfirm } from "../../../hooks/usePasswordConfirm";
-import { isBssid, saveStaffSettings } from "../../../utils/staffAttendanceService";
+import { isBssid, leaveTypeId, saveStaffSettings } from "../../../utils/staffAttendanceService";
 import type { StaffAttendanceSettings as Settings } from "../../../utils/type";
 import { myContext } from "../../context/MyContextProvider";
 
@@ -44,6 +44,8 @@ interface SettingsForm {
   lateToHalfDay: string;
   selfie: string;
   includeStaff: string;
+  /** id "" = a new type (its id is made from the name on save). */
+  leaveTypes: { id: string; name: string; quota: string }[];
 }
 
 const onOff = (value: boolean) => (value ? ON : OFF);
@@ -62,6 +64,7 @@ const toForm = (settings: Settings): SettingsForm => ({
   lateToHalfDay: String(settings.lateToHalfDay),
   selfie: onOff(settings.selfie),
   includeStaff: onOff(settings.includeStaff),
+  leaveTypes: settings.leaveTypes.map((item) => ({ id: item.id, name: item.name, quota: item.quota ? String(item.quota) : "" })),
 });
 
 const toMinutes = (value: string) => {
@@ -88,6 +91,7 @@ function StaffAttendanceSettings() {
     formState: { isDirty },
   } = form;
   const networks = useFieldArray({ control, name: "wifiNetworks" });
+  const leaveTypes = useFieldArray({ control, name: "leaveTypes" });
   const values = useWatch({ control });
 
   useEffect(() => {
@@ -146,6 +150,28 @@ function StaffAttendanceSettings() {
       toast.error("Add the school Wi-Fi, or switch the Wi-Fi check off.");
       return;
     }
+    const typeRows = data.leaveTypes
+      .map((item) => ({ ...item, name: item.name.trim(), quota: item.quota.trim() }))
+      .filter((item) => item.name || item.quota);
+    if (typeRows.some((item) => !item.name)) {
+      toast.error("Every leave type needs a name.");
+      return;
+    }
+    if (typeRows.some((item) => item.quota && !(Number(item.quota) >= 0 && Number(item.quota) <= 365))) {
+      toast.error("Days per session must be a number from 0 to 365 (empty = no limit).");
+      return;
+    }
+    const names = typeRows.map((item) => item.name.toLowerCase());
+    if (new Set(names).size !== names.length) {
+      toast.error("Two leave types have the same name.");
+      return;
+    }
+    const taken = typeRows.map((item) => item.id).filter(Boolean);
+    const leaveTypeList = typeRows.map((item) => {
+      const id = item.id || leaveTypeId(item.name, taken);
+      taken.push(id);
+      return { id, name: item.name, quota: Number(item.quota) || 0 };
+    });
     const next: Settings = {
       location: hasPoint ? { lat, lng } : null,
       radiusM: Number(data.radiusM) || 150,
@@ -159,6 +185,7 @@ function StaffAttendanceSettings() {
       lateToHalfDay: Number(data.lateToHalfDay) || 0,
       selfie: data.selfie === ON,
       includeStaff: data.includeStaff === ON,
+      leaveTypes: leaveTypeList,
     };
     const confirmed = await confirmPassword({
       title: "Save Attendance Settings",
@@ -352,6 +379,45 @@ function StaffAttendanceSettings() {
                 </p>
               </div>
               {renderToggle("includeStaff", "Non-teaching staff")}
+            </div>
+          </section>
+
+          <section className={sectionClass}>
+            <h2 className="mb-1 font-bold text-gray-800">Leave types</h2>
+            <p className="mb-3 text-sm text-gray-500">
+              Teachers ask for these in the app; the days are counted per session (April to March). Leave empty for
+              no limit (e.g. Unpaid). Removing a type keeps its old leaves.
+            </p>
+            <div className="flex flex-col gap-2">
+              {leaveTypes.fields.map((field, index) => (
+                <div key={field.id} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_200px_auto] sm:items-end">
+                  <CustomInput control={control} name={`leaveTypes.${index}.name`} label="Name" placeholder="e.g. Casual Leave" />
+                  <CustomInput
+                    control={control}
+                    name={`leaveTypes.${index}.quota`}
+                    label="Days per session"
+                    placeholder="No limit"
+                    inputMode="decimal"
+                  />
+                  <Tooltip content="Remove this leave type">
+                    <button
+                      type="button"
+                      onClick={() => leaveTypes.remove(index)}
+                      aria-label="Remove this leave type"
+                      className="flex h-10 w-10 items-center justify-center rounded-full text-red-600 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </Tooltip>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => leaveTypes.append({ id: "", name: "", quota: "" })}
+                className="flex w-fit items-center gap-2 rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-navy hover:bg-navy-soft"
+              >
+                <Plus className="h-4 w-4" /> Add leave type
+              </button>
             </div>
           </section>
 
