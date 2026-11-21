@@ -25,3 +25,6 @@ dist-ssr
 
 # Firebase CLI cache
 .firebase/
+
+# Deploy guard: what was last deployed from this laptop
+.deploy-state.json

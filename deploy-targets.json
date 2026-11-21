@@ -1,0 +1,26 @@
+{
+  "site-dev": {
+    "label": "Website dev (Firebase Hosting)",
+    "npm": "deploy:dev",
+    "command": "npm run build:dev && firebase deploy --only hosting:dev",
+    "files": ["src", "public", "index.html", "package.json", "package-lock.json", "vite.config.ts", "tsconfig.json", "tsconfig.node.json", "tailwind.config.js", "postcss.config.js", "components.json", ".env", ".env.staging", "firebase.json"]
+  },
+  "site-prod": {
+    "label": "Website prod (www.cves.in)",
+    "npm": "deploy",
+    "command": "npm run version:bump && npm run build && gh-pages -d dist",
+    "files": ["src", "public", "index.html", "package.json", "package-lock.json", "vite.config.ts", "tsconfig.json", "tsconfig.node.json", "tailwind.config.js", "postcss.config.js", "components.json", ".env", ".env.production"]
+  },
+  "rules-dev": {
+    "label": "Firestore + Storage rules, indexes (dev)",
+    "npm": "deploy:rules:dev",
+    "command": "firebase deploy --only \"firestore:(default),storage\"",
+    "files": ["firestore.rules", "storage.rules", "firestore.indexes.dev.json", "firebase.json"]
+  },
+  "rules-prod": {
+    "label": "Firestore + Storage rules, indexes (prod)",
+    "npm": "deploy:rules:prod",
+    "command": "firebase deploy --config firebase.prod.json --project prod --only firestore,storage",
+    "files": ["firestore.rules", "storage.rules", "firestore.indexes.prod.json", "firebase.prod.json"]
+  }
+}

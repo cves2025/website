@@ -54,3 +54,25 @@ Still to do:
 10. Then delete the `prod` database in `schoolproject-284dc` (and its entry in `firebase.json`),
    the bucket `gs://cves-migration-temp`, the local auth export file, and (once nothing links
    to it) `school-project-prod-photos`. Keep the dev bucket: dev still uses it.
+
+## Deploy guard (do not deploy the same thing twice)
+
+Every deploy / build command goes through `scripts/deploy-guard.mjs` (same file in website,
+server and mobile; targets in each repo's `deploy-targets.json`):
+
+| Command | Target |
+|---|---|
+| `npm run deploy:dev` / `npm run deploy` | website dev (Firebase Hosting) / prod (GitHub Pages, version bump first) |
+| `npm run deploy:rules:dev` / `:prod` | Firestore + Storage rules and indexes |
+| `npm run deploy` in `server/` | Cloud Run (one service for dev + prod) |
+| `npm run build:dev` / `:prod` in `mobile/` | APK |
+| `npm run deploy:status` (any repo) | table of all targets: last run, changed since, what to run |
+
+- Nothing changed since the last successful run: it asks "Deploy again anyway? (y/N)" (Enter = no).
+  `npm run deploy:dev -- --yes` skips the question.
+- Something changed: it lists the changed files, then deploys.
+- A target's files are hashed (version bumps of package.json / app.json do not count); the last
+  run is in `.deploy-state.json` on this laptop (git-ignored), written only after success.
+- Deployed by hand (not through npm)? `node scripts/deploy-guard.mjs mark <target>` records the
+  files as they are now.
+- Running `firebase deploy` / `gcloud` directly skips the guard and records nothing.

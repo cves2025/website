@@ -10,12 +10,12 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "version:bump": "node scripts/bump-version.mjs",
-    "predeploy": "npm run version:bump && npm run build",
-    "deploy": "gh-pages -d dist",
+    "deploy": "node scripts/deploy-guard.mjs site-prod",
     "build:dev": "tsc && vite build --mode staging",
-    "deploy:dev": "npm run build:dev && firebase deploy --only hosting:dev",
-    "deploy:rules:dev": "firebase deploy --only \"firestore:(default),storage\"",
-    "deploy:rules:prod": "firebase deploy --config firebase.prod.json --project prod --only firestore,storage"
+    "deploy:dev": "node scripts/deploy-guard.mjs site-dev",
+    "deploy:rules:dev": "node scripts/deploy-guard.mjs rules-dev",
+    "deploy:rules:prod": "node scripts/deploy-guard.mjs rules-prod",
+    "deploy:status": "node scripts/deploy-guard.mjs status --all"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.4.1",
