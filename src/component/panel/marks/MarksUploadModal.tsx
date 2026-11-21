@@ -7,7 +7,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { CLASSES } from "../../../constants";
+import { CLASSES, TABLE_HEAD_CLASS } from "../../../constants";
 import { useExamRules } from "../../../hooks/useExamRules";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
 import { formatMarks } from "../../../utils/marks";
@@ -688,7 +688,7 @@ function MarksUploadModal({ isOpen, onClose, exams }: MarksUploadModalProps) {
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full min-w-[860px] text-sm">
                   <thead>
-                    <tr className="bg-gray-800 text-left text-white">
+                    <tr className={TABLE_HEAD_CLASS}>
                       <th className="px-3 py-2">Row</th>
                       <th className="px-3 py-2">Enrollment</th>
                       <th className="px-3 py-2">Student</th>

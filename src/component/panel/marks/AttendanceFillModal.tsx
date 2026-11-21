@@ -17,6 +17,7 @@ import {
 } from "../../../utils/holidayCalendar";
 import { saveExamAttendance } from "../../../utils/marksService";
 import type { ExamDoc } from "../../../utils/type";
+import { TABLE_HEAD_CLASS } from "../../../constants";
 
 export interface AttendanceFillStudent {
   studentUid: string;
@@ -261,7 +262,7 @@ function AttendanceFillModal({
 
             <div className="max-h-[45vh] overflow-y-auto rounded-md border border-gray-200">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-gray-50 text-gray-600">
+                <thead className={`sticky top-0 ${TABLE_HEAD_CLASS}`}>
                   <tr>
                     <th className="px-3 py-2 text-left">Student</th>
                     <th className="px-3 py-2 text-center">Section</th>

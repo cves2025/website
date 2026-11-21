@@ -45,6 +45,7 @@ All in `src/custom-components`. Forms use react-hook-form; a screen without a fo
 | Dropdown (every one, searchable too) | `CustomSelect` (RHF); `SelectDropdown` only where it is already used without a form |
 | Text / number / date input | `CustomInput` (RHF); `DatePicker`, `TimePicker` |
 | Textarea | `CustomTextarea` |
+| Table header (every screen table, same everywhere) | Plain table: `TABLE_HEAD_CLASS` on <thead> / header <tr>; shadcn Table: `TABLE_HEAD_ROW_CLASS` on the header <TableRow> + `TABLE_HEAD_CELL_CLASS` on each <TableHead> (navy, small bold white caps; day grids keep their sizes but `bg-navy text-white`). **Never** restyle the client print templates (Admit Card, Result, marksheets) |
 | Switch / toggle | `CustomToggle` (RHF; empty `activeLabel` / `inactiveLabel` in tables) |
 | Checkbox | `CircleCheckbox`; groups `CustomCheckboxGroup` |
 | Radio | `CustomRadioGroup` / `RadioOptions` |

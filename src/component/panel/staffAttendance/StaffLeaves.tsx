@@ -16,6 +16,7 @@ import {
   CVES_BUTTON,
   STAFF_LEAVE_FILTER_OPTIONS,
   STAFF_LEAVE_STATUS_META,
+  TABLE_HEAD_CLASS,
 } from "../../../constants";
 import CircleCheckbox from "../../../custom-components/CircleCheckbox";
 import CustomSelect from "../../../custom-components/CustomSelect";
@@ -221,7 +222,7 @@ function StaffLeaves() {
             <section className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
               <h2 className="border-b border-gray-100 p-4 font-bold text-gray-800">Balance of {session}</h2>
               <table className="w-full min-w-[560px] text-sm">
-                <thead className="bg-navy text-left text-xs uppercase tracking-wide text-white">
+                <thead className={TABLE_HEAD_CLASS}>
                   <tr>
                     <th className="px-4 py-3">Name</th>
                     {settings.leaveTypes.map((type) => (

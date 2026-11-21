@@ -36,7 +36,11 @@ import type {
   ClassStudentsDeleteMode,
 } from "../../../utils/type";
 import { Spinner } from "../../../custom-components/Loader";
-import { CVES_BUTTON } from "../../../constants";
+import {
+  CVES_BUTTON,
+  TABLE_HEAD_ROW_CLASS,
+  TABLE_HEAD_CELL_CLASS,
+} from "../../../constants";
 
 const academicYears = generateAcademicYears();
 
@@ -273,15 +277,15 @@ function AllClassLists() {
             <div className="overflow-hidden rounded-lg border border-gray-200">
               <Table className="min-w-[720px]">
                 <TableHeader>
-                  <TableRow className="bg-gray-50 hover:bg-gray-50">
-                    <TableHead className="font-bold text-gray-700">Sr. No.</TableHead>
-                    <TableHead className="font-bold text-gray-700">
+                  <TableRow className={TABLE_HEAD_ROW_CLASS}>
+                    <TableHead className={TABLE_HEAD_CELL_CLASS}>Sr. No.</TableHead>
+                    <TableHead className={TABLE_HEAD_CELL_CLASS}>
                       Class Name
                     </TableHead>
-                    <TableHead className="font-bold text-gray-700">
+                    <TableHead className={TABLE_HEAD_CELL_CLASS}>
                       Total Students
                     </TableHead>
-                    <TableHead className="text-center font-bold text-gray-700">
+                    <TableHead className={`text-center ${TABLE_HEAD_CELL_CLASS}`}>
                       Actions
                     </TableHead>
                   </TableRow>

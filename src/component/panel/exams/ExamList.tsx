@@ -12,7 +12,13 @@ import {
 } from "firebase/firestore";
 import toast from "react-hot-toast";
 import { Archive, ArchiveRestore, Pencil } from "lucide-react";
-import { CLASSES, COLLECTION, CVES_BUTTON } from "../../../constants";
+import {
+  CLASSES,
+  COLLECTION,
+  CVES_BUTTON,
+  TABLE_HEAD_ROW_CLASS,
+  TABLE_HEAD_CELL_CLASS,
+} from "../../../constants";
 import { db } from "../../../firebase/config";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
@@ -250,19 +256,19 @@ function ExamList() {
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
           <Table className="min-w-[1000px]">
             <TableHeader>
-              <TableRow className="bg-gray-50 hover:bg-gray-50">
-                <TableHead className="font-bold text-gray-700">Exam Name</TableHead>
-                <TableHead className="font-bold text-gray-700">Category</TableHead>
-                <TableHead className="font-bold text-gray-700">Max Marks</TableHead>
-                <TableHead className="font-bold text-gray-700">
+              <TableRow className={TABLE_HEAD_ROW_CLASS}>
+                <TableHead className={TABLE_HEAD_CELL_CLASS}>Exam Name</TableHead>
+                <TableHead className={TABLE_HEAD_CELL_CLASS}>Category</TableHead>
+                <TableHead className={TABLE_HEAD_CELL_CLASS}>Max Marks</TableHead>
+                <TableHead className={TABLE_HEAD_CELL_CLASS}>
                   Marks Breakup
                 </TableHead>
-                <TableHead className="font-bold text-gray-700">
+                <TableHead className={TABLE_HEAD_CELL_CLASS}>
                   Applicable Classes
                 </TableHead>
-                <TableHead className="font-bold text-gray-700">Sequence</TableHead>
-                <TableHead className="font-bold text-gray-700">Status</TableHead>
-                <TableHead className="text-center font-bold text-gray-700">
+                <TableHead className={TABLE_HEAD_CELL_CLASS}>Sequence</TableHead>
+                <TableHead className={TABLE_HEAD_CELL_CLASS}>Status</TableHead>
+                <TableHead className={`text-center ${TABLE_HEAD_CELL_CLASS}`}>
                   Actions
                 </TableHead>
               </TableRow>

@@ -15,7 +15,7 @@ import {
   StudentImportError,
   StudentImportResult,
 } from "../../utils/studentImport";
-import { COLLECTION } from "../../constants";
+import { COLLECTION, TABLE_HEAD_CLASS } from "../../constants";
 import { db } from "../../firebase/config";
 import { generateClassRollNumbers } from "../../utils/rollNumbers";
 import {
@@ -327,7 +327,7 @@ function BulkStudentImport({ onImported }: BulkStudentImportProps) {
           </div>
           <table className="w-full text-sm min-w-[720px]">
             <thead>
-              <tr className="bg-gray-100 text-gray-700 text-left">
+              <tr className={TABLE_HEAD_CLASS}>
                 <th className="px-4 py-2">Enrollment</th>
                 <th className="px-4 py-2">Name</th>
                 <th className="px-4 py-2">Class</th>

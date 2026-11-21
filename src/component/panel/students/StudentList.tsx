@@ -30,6 +30,8 @@ import {
   CLASSES,
   COLLECTION,
   SECTIONS,
+  TABLE_HEAD_ROW_CLASS,
+  TABLE_HEAD_CELL_CLASS,
 } from "../../../constants";
 
 import { db } from "../../../firebase/config";
@@ -678,7 +680,7 @@ export default function StudentList() {
 
   const sortableHeader = (label: string, field: SortField) => (
     <TableHead
-      className="cursor-pointer select-none font-bold text-gray-700"
+      className={`cursor-pointer select-none ${TABLE_HEAD_CELL_CLASS}`}
       onClick={() => handleSort(field)}
       title={`Sort by ${label}`}
     >
@@ -886,11 +888,11 @@ export default function StudentList() {
           className="min-w-[1000px]"
           containerClassName="max-h-[calc(100dvh-8rem)]"
         >
-          <TableHeader className="sticky top-0 z-10 bg-gray-50 shadow-[0_1px_0_theme(colors.gray.200)]">
-            <TableRow className="bg-gray-50 hover:bg-gray-50">
-              <TableHead className="font-bold text-gray-700">Sr. No.</TableHead>
+          <TableHeader className="sticky top-0 z-10 bg-navy">
+            <TableRow className={TABLE_HEAD_ROW_CLASS}>
+              <TableHead className={TABLE_HEAD_CELL_CLASS}>Sr. No.</TableHead>
 
-              <TableHead className="font-bold text-gray-700">Photo</TableHead>
+              <TableHead className={TABLE_HEAD_CELL_CLASS}>Photo</TableHead>
 
               {sortableHeader("Enrollment", "enrollment")}
 
@@ -905,7 +907,7 @@ export default function StudentList() {
               {sortableHeader("Phone", "phone")}
 
               {showActions && (
-                <TableHead className="text-center font-bold text-gray-700">
+                <TableHead className={`text-center ${TABLE_HEAD_CELL_CLASS}`}>
                   Actions
                 </TableHead>
               )}

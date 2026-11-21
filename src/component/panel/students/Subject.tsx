@@ -23,7 +23,13 @@ import CustomToggle from "../../../custom-components/CustomToggle";
 import SearchableMultiSelect, {
   SearchableOption,
 } from "../../../custom-components/SearchableMultiSelect";
-import { CLASSES, COLLECTION, CVES_BUTTON } from "../../../constants";
+import {
+  CLASSES,
+  COLLECTION,
+  CVES_BUTTON,
+  TABLE_HEAD_ROW_CLASS,
+  TABLE_HEAD_CELL_CLASS,
+} from "../../../constants";
 import { db } from "../../../firebase/config";
 import { isSubjectInUse } from "../../../utils/marksService";
 import PageHeader from "../../../custom-components/PageHeader";
@@ -792,17 +798,17 @@ function Subject() {
         ) : (
           <Table className="min-w-[640px]">
             <TableHeader>
-              <TableRow className="bg-gray-50 hover:bg-gray-50">
-                <TableHead className="font-bold text-gray-700">#</TableHead>
-                <TableHead className="font-bold text-gray-700">
+              <TableRow className={TABLE_HEAD_ROW_CLASS}>
+                <TableHead className={TABLE_HEAD_CELL_CLASS}>#</TableHead>
+                <TableHead className={TABLE_HEAD_CELL_CLASS}>
                   Subject Name
                 </TableHead>
-                <TableHead className="font-bold text-gray-700">Type</TableHead>
-                <TableHead className="font-bold text-gray-700">Order</TableHead>
-                <TableHead className="font-bold text-gray-700">
+                <TableHead className={TABLE_HEAD_CELL_CLASS}>Type</TableHead>
+                <TableHead className={TABLE_HEAD_CELL_CLASS}>Order</TableHead>
+                <TableHead className={TABLE_HEAD_CELL_CLASS}>
                   Report Card Order
                 </TableHead>
-                <TableHead className="text-center font-bold text-gray-700">
+                <TableHead className={`text-center ${TABLE_HEAD_CELL_CLASS}`}>
                   Actions
                 </TableHead>
               </TableRow>

@@ -11,7 +11,12 @@ import { useForm, useWatch } from "react-hook-form";
 import toast from "react-hot-toast";
 import { Camera, Pencil, Smartphone } from "lucide-react";
 
-import { CVES_BUTTON, STAFF_MARK_STATUS_OPTIONS, STAFF_STATUS_META } from "../../../constants";
+import {
+  CVES_BUTTON,
+  STAFF_MARK_STATUS_OPTIONS,
+  STAFF_STATUS_META,
+  TABLE_HEAD_CLASS,
+} from "../../../constants";
 import CustomSelect from "../../../custom-components/CustomSelect";
 import CustomTextarea from "../../../custom-components/CustomTextarea";
 import DatePicker from "../../../custom-components/DatePicker";
@@ -154,7 +159,7 @@ function StaffAttendanceToday() {
       ) : (
         <section className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
           <table className="w-full min-w-[760px] text-sm">
-            <thead className="bg-navy text-left text-xs uppercase tracking-wide text-white">
+            <thead className={TABLE_HEAD_CLASS}>
               <tr>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Status</th>

@@ -21,6 +21,7 @@ import {
   FEE_COLLECT_PATH,
   SECTIONS,
   SESSION_MONTH_OPTIONS,
+  TABLE_HEAD_CLASS,
 } from "../../../constants";
 import {
   generateAcademicYears,
@@ -359,7 +360,7 @@ function DuesReport() {
               </p>
             ) : (
               <table className="w-full min-w-[820px] text-sm print:min-w-0 print:text-xs">
-                <thead className="bg-gray-50 text-left text-gray-600">
+                <thead className={TABLE_HEAD_CLASS}>
                   <tr>
                     <th className="px-3 py-2 font-semibold">#</th>
                     <th className="px-3 py-2 font-semibold">Class</th>

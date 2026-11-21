@@ -34,6 +34,7 @@ import {
   TEACHER_DESIGNATIONS,
   TEACHER_JOB_ROLES,
   TEACHER_STATUS,
+  TABLE_HEAD_CLASS,
 } from "../../../constants";
 import Button from "../../../custom-components/Button";
 import CustomButton from "../../../custom-components/CustomButton";
@@ -1318,7 +1319,7 @@ function AddTeacher() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
           <table className="w-full text-sm min-w-[1300px]">
             <thead>
-              <tr className="bg-gray-100 text-gray-700 text-left">
+              <tr className={TABLE_HEAD_CLASS}>
                 <th className="px-4 py-3">Sr. No.</th>
                 <th className="px-4 py-3">Photo</th>
                 <th className="px-4 py-3">Name</th>

@@ -1021,3 +1021,16 @@ export const STAFF_DUTY_LATE_AFTER = "09:00";
 
 /** Most refused check-ins read for one period (newest first). */
 export const STAFF_LOG_LIMIT = 300;
+
+/* ------------------------------------------------------------ tables -- */
+// One header style on every screen table (docs/DESIGN_SYSTEM.md). Not for the
+// client's print templates (admit card, result, marksheets).
+
+/** <thead> (or the header <tr>) of a table: navy, small bold white caps. */
+export const TABLE_HEAD_CLASS = "bg-navy text-left text-xs font-semibold uppercase tracking-wide text-white";
+
+/** The header <TableRow> of the shadcn Table (keeps navy on hover). */
+export const TABLE_HEAD_ROW_CLASS = "bg-navy hover:bg-navy";
+
+/** A <TableHead> cell of the shadcn Table. */
+export const TABLE_HEAD_CELL_CLASS = "text-xs font-semibold uppercase tracking-wide text-white";

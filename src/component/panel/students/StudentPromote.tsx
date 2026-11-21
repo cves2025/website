@@ -3,7 +3,12 @@ import { Timestamp } from "firebase/firestore";
 import toast from "react-hot-toast";
 import { Undo2 } from "lucide-react";
 
-import { CLASSES, SECTIONS } from "../../../constants";
+import {
+  CLASSES,
+  SECTIONS,
+  TABLE_HEAD_ROW_CLASS,
+  TABLE_HEAD_CELL_CLASS,
+} from "../../../constants";
 import {
   generateAcademicYears,
   nextAcademicYear,
@@ -723,15 +728,15 @@ function StudentPromote() {
               className="min-w-[860px]"
               containerClassName="max-h-[calc(100dvh-12rem)]"
             >
-              <TableHeader className="sticky top-0 z-10 bg-gray-50 shadow-[0_1px_0_theme(colors.gray.200)]">
-                <TableRow className="bg-gray-50 hover:bg-gray-50">
-                  <TableHead className="font-bold text-gray-700">Sr. No.</TableHead>
-                  <TableHead className="font-bold text-gray-700">Enrollment</TableHead>
-                  <TableHead className="font-bold text-gray-700">Name</TableHead>
-                  <TableHead className="font-bold text-gray-700">Section</TableHead>
-                  <TableHead className="font-bold text-gray-700">Result</TableHead>
-                  <TableHead className="font-bold text-gray-700">New Class</TableHead>
-                  <TableHead className="font-bold text-gray-700">New Section</TableHead>
+              <TableHeader className="sticky top-0 z-10 bg-navy">
+                <TableRow className={TABLE_HEAD_ROW_CLASS}>
+                  <TableHead className={TABLE_HEAD_CELL_CLASS}>Sr. No.</TableHead>
+                  <TableHead className={TABLE_HEAD_CELL_CLASS}>Enrollment</TableHead>
+                  <TableHead className={TABLE_HEAD_CELL_CLASS}>Name</TableHead>
+                  <TableHead className={TABLE_HEAD_CELL_CLASS}>Section</TableHead>
+                  <TableHead className={TABLE_HEAD_CELL_CLASS}>Result</TableHead>
+                  <TableHead className={TABLE_HEAD_CELL_CLASS}>New Class</TableHead>
+                  <TableHead className={TABLE_HEAD_CELL_CLASS}>New Section</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -842,15 +847,15 @@ function StudentPromote() {
 
           <div className="overflow-hidden rounded-lg border border-gray-200">
             <Table className="min-w-[860px]">
-              <TableHeader className="bg-gray-50">
-                <TableRow className="bg-gray-50 hover:bg-gray-50">
-                  <TableHead className="font-bold text-gray-700">Enrollment</TableHead>
-                  <TableHead className="font-bold text-gray-700">Name</TableHead>
-                  <TableHead className="font-bold text-gray-700">From</TableHead>
-                  <TableHead className="font-bold text-gray-700">Result</TableHead>
-                  <TableHead className="font-bold text-gray-700">Moved To</TableHead>
-                  <TableHead className="font-bold text-gray-700">By / Date</TableHead>
-                  <TableHead className="text-center font-bold text-gray-700">Undo</TableHead>
+              <TableHeader className="bg-navy">
+                <TableRow className={TABLE_HEAD_ROW_CLASS}>
+                  <TableHead className={TABLE_HEAD_CELL_CLASS}>Enrollment</TableHead>
+                  <TableHead className={TABLE_HEAD_CELL_CLASS}>Name</TableHead>
+                  <TableHead className={TABLE_HEAD_CELL_CLASS}>From</TableHead>
+                  <TableHead className={TABLE_HEAD_CELL_CLASS}>Result</TableHead>
+                  <TableHead className={TABLE_HEAD_CELL_CLASS}>Moved To</TableHead>
+                  <TableHead className={TABLE_HEAD_CELL_CLASS}>By / Date</TableHead>
+                  <TableHead className={`text-center ${TABLE_HEAD_CELL_CLASS}`}>Undo</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

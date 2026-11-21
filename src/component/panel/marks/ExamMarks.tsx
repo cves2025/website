@@ -1331,16 +1331,16 @@ function ExamMarks() {
                 containerClassName="max-h-[65vh]"
               >
                 <TableHeader className="sticky top-0 z-40 [&_tr]:border-b-0">
-                  <TableRow className="bg-primaryBlue text-left hover:bg-primaryBlue">
+                  <TableRow className="bg-navy text-left hover:bg-navy">
                     <TableHead
-                      className="sticky left-0 z-30 h-auto w-[48px] min-w-[48px] bg-primaryBlue px-3 py-3 font-semibold text-white"
+                      className="sticky left-0 z-30 h-auto w-[48px] min-w-[48px] bg-navy px-3 py-3 font-semibold text-white"
                       rowSpan={2}
                     >
                       #
                     </TableHead>
 
                     <TableHead
-                      className="sticky left-[48px] z-30 h-auto bg-primaryBlue px-3 py-3 font-semibold text-white shadow-[inset_-1px_0_0_rgba(255,255,255,0.2)]"
+                      className="sticky left-[48px] z-30 h-auto bg-navy px-3 py-3 font-semibold text-white shadow-[inset_-1px_0_0_rgba(255,255,255,0.2)]"
                       rowSpan={2}
                     >
                       Student Name
@@ -1404,7 +1404,7 @@ function ExamMarks() {
                     )}
                   </TableRow>
 
-                  <TableRow className="bg-indigo-900 hover:bg-indigo-900">
+                  <TableRow className="bg-navy-light hover:bg-navy-light">
                     {visibleColumns.map((column) =>
                       column.isGrade ? (
                         <TableHead

@@ -12,6 +12,7 @@ import {
   TC_REGISTER_CLASS,
   TC_SETTINGS_PATH,
   TC_STATUS_META,
+  TABLE_HEAD_CLASS,
 } from "../../../../constants";
 import CustomInput from "../../../../custom-components/CustomInput";
 import CustomSelect from "../../../../custom-components/CustomSelect";
@@ -185,7 +186,7 @@ function TcList() {
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-sm">
-              <thead className="bg-navy text-left text-xs uppercase tracking-wide text-white">
+              <thead className={TABLE_HEAD_CLASS}>
                 <tr>
                   <th className="px-4 py-3">{isRegister ? "Sr. No." : "Roll"}</th>
                   <th className="px-4 py-3">Scholar No.</th>

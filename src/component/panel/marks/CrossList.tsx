@@ -1189,10 +1189,10 @@ function CrossListBlock({
         containerClassName="isolate max-h-[75vh] print:max-h-none print:overflow-visible"
       >
         <TableHeader className="sticky top-0 z-30 print:static">
-          <TableRow className="bg-primaryBlue text-white hover:bg-primaryBlue">
+          <TableRow className="bg-navy text-white hover:bg-navy">
             <TableHead
               rowSpan={headerRows}
-              className="sticky left-0 z-20 w-16 bg-primaryBlue px-2 py-2.5 text-center h-auto font-semibold text-white print:static print:left-auto print:z-auto"
+              className="sticky left-0 z-20 w-16 bg-navy px-2 py-2.5 text-center h-auto font-semibold text-white print:static print:left-auto print:z-auto"
             >
               Roll No
             </TableHead>
@@ -1204,7 +1204,7 @@ function CrossListBlock({
             </TableHead>
             <TableHead
               rowSpan={headerRows}
-              className="sticky left-16 z-20 w-44 bg-primaryBlue px-2 py-2.5 text-left h-auto font-semibold text-white print:static print:left-auto print:z-auto"
+              className="sticky left-16 z-20 w-44 bg-navy px-2 py-2.5 text-left h-auto font-semibold text-white print:static print:left-auto print:z-auto"
             >
               Student Name
             </TableHead>
@@ -1242,7 +1242,7 @@ function CrossListBlock({
             )}
           </TableRow>
           {headerRows > 1 && (
-            <TableRow className="bg-indigo-900 text-white hover:bg-indigo-900">
+            <TableRow className="bg-navy-light text-white hover:bg-navy-light">
               {groups
                 .filter((group) => group.parts.length > 1)
                 .flatMap((group) =>

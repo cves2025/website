@@ -3,7 +3,7 @@ import { Printer, XCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import Loader from "../../../custom-components/Loader";
-import { FEE_RECEIPT_PATH } from "../../../constants";
+import { FEE_RECEIPT_PATH, TABLE_HEAD_CLASS } from "../../../constants";
 import { formatRupees } from "../../../utils/feeStructure";
 import { fromDateKey } from "../../../utils/holidayCalendar";
 import type { FeePayment, PaymentMode } from "../../../utils/type";
@@ -50,7 +50,7 @@ function PaymentHistory({ payments, loading, error, onCancel }: PaymentHistoryPr
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-sm">
-            <thead className="bg-gray-50 text-left text-gray-600">
+            <thead className={TABLE_HEAD_CLASS}>
               <tr>
                 <th className="px-3 py-2 font-semibold">Receipt</th>
                 <th className="px-3 py-2 font-semibold">Date</th>

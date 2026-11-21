@@ -306,11 +306,11 @@ function AttendanceReport() {
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-xs sm:text-sm">
               <thead>
-                <tr className="bg-gray-50 text-gray-600">
-                  <th className="sticky left-0 z-10 bg-gray-50 px-2 py-2 text-left">
+                <tr className="bg-navy text-white">
+                  <th className="sticky left-0 z-10 bg-navy px-2 py-2 text-left">
                     Roll
                   </th>
-                  <th className="sticky left-10 z-10 min-w-[10rem] bg-gray-50 px-2 py-2 text-left">
+                  <th className="sticky left-10 z-10 min-w-[10rem] bg-navy px-2 py-2 text-left">
                     Student
                   </th>
                   {showDays &&
@@ -326,9 +326,9 @@ function AttendanceReport() {
                         </div>
                       </th>
                     ))}
-                  <th className="px-2 py-2 text-center text-green-700">P</th>
-                  <th className="px-2 py-2 text-center text-red-700">A</th>
-                  <th className="px-2 py-2 text-center text-amber-700">L</th>
+                  <th className="px-2 py-2 text-center text-green-300">P</th>
+                  <th className="px-2 py-2 text-center text-red-300">A</th>
+                  <th className="px-2 py-2 text-center text-amber-300">L</th>
                   <th className="px-2 py-2 text-center">%</th>
                 </tr>
               </thead>

@@ -11,7 +11,7 @@ import Loader from "../../../custom-components/Loader";
 import Modal from "../../../custom-components/Modal";
 import Tooltip from "../../../custom-components/Tooltip";
 import { myContext } from "../../context/MyContextProvider";
-import { CVES_BUTTON } from "../../../constants";
+import { CVES_BUTTON, TABLE_HEAD_CLASS } from "../../../constants";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import useHolidayCalendar from "../../../hooks/useHolidayCalendar";
@@ -248,7 +248,7 @@ function HolidayCalendar() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[860px] text-left text-sm">
-                  <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600">
+                  <thead className={TABLE_HEAD_CLASS}>
                     <tr>
                       <th className="px-4 py-3">Holiday</th>
                       <th className="px-4 py-3">Dates</th>

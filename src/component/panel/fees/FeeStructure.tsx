@@ -12,6 +12,7 @@ import {
   CLASSES,
   EMPTY_CLASS_FEE,
   SESSION_MONTH_OPTIONS,
+  TABLE_HEAD_CLASS,
 } from "../../../constants";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import {
@@ -194,7 +195,7 @@ function FeeStructure() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[520px] text-sm">
-                <thead className="bg-gray-50 text-left text-gray-600">
+                <thead className={TABLE_HEAD_CLASS}>
                   <tr>
                     <th className="px-4 py-2 font-semibold">Class</th>
                     <th className="px-4 py-2 font-semibold">Admission Fee (₹)</th>

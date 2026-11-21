@@ -12,6 +12,7 @@ import {
   FEE_RECEIPT_PATH,
   PAYMENT_MODES,
   PAYMENT_MODE_OPTIONS,
+  TABLE_HEAD_CLASS,
 } from "../../../constants";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import { formatRupees } from "../../../utils/feeStructure";
@@ -174,7 +175,7 @@ function CollectionReport() {
               <p className="p-6 text-center text-sm text-gray-500">No fee received in this period.</p>
             ) : (
               <table className="w-full min-w-[760px] text-sm print:min-w-0 print:text-xs">
-                <thead className="bg-gray-50 text-left text-gray-600">
+                <thead className={TABLE_HEAD_CLASS}>
                   <tr>
                     <th className="px-3 py-2 font-semibold">Receipt No.</th>
                     <th className="px-3 py-2 font-semibold">Date</th>
