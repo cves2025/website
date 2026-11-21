@@ -10,7 +10,7 @@ import CircleCheckbox from "../../../custom-components/CircleCheckbox";
 import Loader from "../../../custom-components/Loader";
 import Modal from "../../../custom-components/Modal";
 import { myContext } from "../../context/MyContextProvider";
-import { CLASSES, CVES_BUTTON } from "../../../constants";
+import { CLASSES, COLLECTION, CVES_BUTTON } from "../../../constants";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import useHolidayCalendar from "../../../hooks/useHolidayCalendar";
@@ -65,11 +65,16 @@ const rangeLabel = (holiday: Holiday) =>
  * for the whole school or for some classes only (e.g. winter vacation of the
  * small classes). Attendance cannot be marked on these days and the report
  * does not count them.
+ *
+ * `staff`: the same page for the staff calendar (Staff Attendance > Staff
+ * Holidays, staffHolidays/{session}): no class choice; teachers cannot check
+ * in on these days.
  */
-function HolidayCalendar() {
+function HolidayCalendar({ staff = false }: { staff?: boolean }) {
   const { user } = useContext(myContext);
+  const collectionName = staff ? COLLECTION.STAFF_HOLIDAYS : COLLECTION.HOLIDAY_CALENDAR;
   const [session, setSession] = useState(sessions[0]?.value ?? "");
-  const { calendar, setCalendar, loading, error } = useHolidayCalendar(session);
+  const { calendar, setCalendar, loading, error } = useHolidayCalendar(session, collectionName);
   const [form, setForm] = useState<HolidayForm>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -85,7 +90,7 @@ function HolidayCalendar() {
     if (!user) return false;
     setSaving(true);
     try {
-      await saveHolidayCalendar(next, user.uid);
+      await saveHolidayCalendar(next, user.uid, collectionName);
       setCalendar({ ...next, holidays: sortHolidays(next.holidays) });
       toast.success(message);
       return true;
@@ -181,9 +186,13 @@ function HolidayCalendar() {
   return (
     <div className="flex flex-col gap-2">
       <PageHeader
-        title="Holiday Calendar"
+        title={staff ? "Staff Holidays" : "Holiday Calendar"}
         titleStyle="text-primaryBlue"
-        description="Weekly off days and holidays of the session. Attendance is not taken on these days."
+        description={
+          staff
+            ? "Weekly off days and holidays of the staff. Teachers cannot check in on these days."
+            : "Weekly off days and holidays of the session. Attendance is not taken on these days."
+        }
         descriptionStyle="text-gray-500"
       />
 
@@ -288,6 +297,7 @@ function HolidayCalendar() {
               </div>
             </div>
 
+            {!staff && (
             <div className="mt-4 flex flex-wrap gap-x-6 gap-y-3">
               <CircleCheckbox
                 id="holidayWholeSchool"
@@ -306,7 +316,8 @@ function HolidayCalendar() {
                 }
               />
             </div>
-            {!form.allClasses && (
+            )}
+            {!staff && !form.allClasses && (
               <div className="mt-3 rounded-md border border-gray-200 p-3">
                 <p className={labelClass}>Classes on holiday</p>
                 <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
@@ -371,8 +382,9 @@ function HolidayCalendar() {
                         {holiday.name}
                       </p>
                       <p className="text-sm text-gray-500">
-                        {rangeLabel(holiday)} ·{" "}
-                        {holiday.classes.length === 0
+                        {rangeLabel(holiday)}
+                        {staff ? "" : " · "}
+                        {staff ? "" : holiday.classes.length === 0
                           ? "Whole school"
                           : `Classes ${holiday.classes.map(toOrdinalLabel).join(", ")}`}
                       </p>

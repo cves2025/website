@@ -53,6 +53,10 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   "/welcome/fees/collection": P.FEE_MANAGE,
   "/welcome/fees/structure": P.FEE_MANAGE,
   "/welcome/fees/settings": P.FEE_MANAGE,
+
+  "/welcome/staff-attendance": P.STAFF_ATTENDANCE_MANAGE,
+  "/welcome/staff-attendance/holidays": P.STAFF_ATTENDANCE_MANAGE,
+  "/welcome/staff-attendance/settings": P.STAFF_ATTENDANCE_MANAGE,
 };
 
 const normalize = (path: string) =>

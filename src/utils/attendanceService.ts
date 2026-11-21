@@ -205,10 +205,12 @@ function toHoliday(value: unknown): Holiday | null {
   };
 }
 
+/** Students' calendar (holidayCalendar), or the staff calendar with COLLECTION.STAFF_HOLIDAYS. */
 export async function loadHolidayCalendar(
-  session: string
+  session: string,
+  collectionName: string = COLLECTION.HOLIDAY_CALENDAR
 ): Promise<HolidayCalendar> {
-  const snapshot = await getDoc(doc(db, COLLECTION.HOLIDAY_CALENDAR, session));
+  const snapshot = await getDoc(doc(db, collectionName, session));
   if (!snapshot.exists()) return emptyHolidayCalendar(session);
   const data = snapshot.data();
   const weeklyOff = Array.isArray(data.weeklyOff)
@@ -224,9 +226,10 @@ export async function loadHolidayCalendar(
 
 export async function saveHolidayCalendar(
   calendar: HolidayCalendar,
-  updatedBy: string
+  updatedBy: string,
+  collectionName: string = COLLECTION.HOLIDAY_CALENDAR
 ): Promise<void> {
-  await setDoc(doc(db, COLLECTION.HOLIDAY_CALENDAR, calendar.session), {
+  await setDoc(doc(db, collectionName, calendar.session), {
     session: calendar.session,
     weeklyOff: [...new Set(calendar.weeklyOff)].sort(),
     holidays: sortHolidays(calendar.holidays),

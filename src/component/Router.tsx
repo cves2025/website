@@ -53,6 +53,8 @@ import FeeReceipt from './panel/fees/FeeReceipt'
 import DuesReport from './panel/fees/DuesReport'
 import CollectionReport from './panel/fees/CollectionReport'
 import FeeSettings from './panel/fees/FeeSettings'
+import StaffAttendanceToday from './panel/staffAttendance/StaffAttendanceToday'
+import StaffAttendanceSettings from './panel/staffAttendance/StaffAttendanceSettings'
 import TcList from './panel/students/tc/TcList'
 import TcEditor from './panel/students/tc/TcEditor'
 import TcSettingsPage from './panel/students/tc/TcSettingsPage'
@@ -96,6 +98,9 @@ function Router() {
           <Route path="fees/collection" element={<CollectionReport />} />
           <Route path="fees/structure" element={<FeeStructure />} />
           <Route path="fees/settings" element={<FeeSettings />} />
+          <Route path="staff-attendance" element={<StaffAttendanceToday />} />
+          <Route path="staff-attendance/holidays" element={<HolidayCalendar staff />} />
+          <Route path="staff-attendance/settings" element={<StaffAttendanceSettings />} />
           <Route path="settings" element={<Settings />} />
           <Route path="settings/permissions" element={<Permissions />} />
           <Route path="settings/profile" element={<Profile />} />

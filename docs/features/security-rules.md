@@ -56,6 +56,11 @@ Class teacher is read from the `isClassTeacher` flag on the user document. Rules
 | `panelSettings/rolePermissions` | signed in | admin |
 | `panelSettings/*` (exam, suggestedRemarks, enrollmentCounter, lockSettings) | staff | admin |
 | `pinSecrets/{uid}` (unlock PIN hashes) | nobody | nobody (server only) |
+| `staffAttendanceSettings` | admin | admin |
+| `staffHolidays` | staff | admin |
+| `staffAttendance` | admin; a teacher their own days | nobody (server only, see staff-attendance.md) |
+| `staffDevices` | admin; a teacher their own | nobody (server only) |
+| `staffAttendanceLog`, `staffSelfies` | admin | nobody (server only) |
 | `feeStructures` | public | admin, never deleted |
 | `feeSettings`, `feeAccounts`, `feePayments`, `feeCounters` | admin | admin. Receipts are only cancelled; the counter only goes up by 1 |
 | anything else | no | no |

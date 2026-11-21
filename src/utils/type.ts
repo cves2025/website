@@ -1027,3 +1027,94 @@ export interface TcRecords {
   due: number | null;
   concession: boolean | null;
 }
+
+/* ------------------------------------------------------ staff attendance -- */
+
+export type StaffAttendanceStatus = "present" | "late" | "halfDay" | "absent" | "leave";
+
+/** Admin settings of staff attendance (staffAttendanceSettings/general). */
+export interface StaffAttendanceSettings {
+  /** The school point; null = not set (check-in is closed). */
+  location: { lat: number; lng: number } | null;
+  radiusM: number;
+  wifiCheck: boolean;
+  /** Router BSSIDs ("aa:bb:cc:dd:ee:ff", lower case) with a name for the admin. */
+  wifiNetworks: { bssid: string; name: string }[];
+  /** Future: QR on an office screen. Not used yet. */
+  qrCheck: boolean;
+  /** false = check-in only. */
+  checkOut: boolean;
+  /** "HH:mm": after this = Late. */
+  lateAfter: string;
+  /** "HH:mm" or "": after this = Half Day. */
+  halfDayAfter: string;
+  /** "HH:mm" or "": a check-out before this = Half Day. */
+  earlyLeaveBefore: string;
+  /** X lates = 1 half day (report); 0 = off. */
+  lateToHalfDay: number;
+  selfie: boolean;
+  /** Non-teaching staff are in the lists (marked by the admin; they have no login). */
+  includeStaff: boolean;
+}
+
+/** One check-in or check-out. */
+export interface StaffCheck {
+  /** ms */
+  at: number | null;
+  source: "app" | "admin";
+  distanceM: number | null;
+  model: string;
+  selfie: boolean;
+  byName: string;
+}
+
+/** One person's day (staffAttendance/{date}_{uid}). */
+export interface StaffAttendanceRecord {
+  id: string;
+  uid: string;
+  name: string;
+  personType: "teacher" | "staff";
+  date: string;
+  status: StaffAttendanceStatus;
+  checkIn: StaffCheck | null;
+  checkOut: StaffCheck | null;
+  earlyLeave: boolean;
+  manual: boolean;
+  manualReason: string;
+  manualByName: string;
+}
+
+/** A refused try, an admin change or a phone reset (staffAttendanceLog). */
+export interface StaffLogEntry {
+  id: string;
+  type: "refused" | "edit" | "deviceReset";
+  uid: string;
+  name: string;
+  date: string;
+  code: string;
+  message: string;
+  reason: string;
+  byName: string;
+  model: string;
+  distanceM: number | null;
+  /** ms */
+  at: number | null;
+}
+
+/** The phone a teacher's attendance is linked to. */
+export interface StaffDevice {
+  uid: string;
+  model: string;
+  /** ms */
+  boundAt: number | null;
+}
+
+/** Someone in the staff attendance list. */
+export interface StaffPerson {
+  uid: string;
+  name: string;
+  personType: "teacher" | "staff";
+  jobRole: string;
+  employeeId: string;
+  photo: string;
+}

@@ -38,6 +38,18 @@ export const COLLECTION = {
   DAILY_ATTENDANCE: "dailyAttendance",
   /** Holiday calendar of a session (weekly off + holidays), id = session. */
   HOLIDAY_CALENDAR: "holidayCalendar",
+  /** Staff attendance settings, one document: STAFF_ATTENDANCE_SETTINGS_DOC (admin). */
+  STAFF_ATTENDANCE_SETTINGS: "staffAttendanceSettings",
+  /** Staff holiday calendar of a session, same shape as HOLIDAY_CALENDAR. */
+  STAFF_HOLIDAYS: "staffHolidays",
+  /** One person's day, id = {date}_{uid}. Written only by the server. */
+  STAFF_ATTENDANCE: "staffAttendance",
+  /** Refused check-ins, admin edits, phone resets. Written only by the server. */
+  STAFF_ATTENDANCE_LOG: "staffAttendanceLog",
+  /** The phone a teacher's attendance is linked to, id = uid. Server only. */
+  STAFF_DEVICES: "staffDevices",
+  /** Check-in / out selfies, id = {date}_{uid}_{in|out}. Server only. */
+  STAFF_SELFIES: "staffSelfies",
   ROLL_NUMBER: "rollNumber",
   /** School news shown on the Home page, managed from Settings > News. */
   NEWS: "news",
@@ -912,3 +924,49 @@ export const STUDENT_EXPORT_STORAGE_KEY = "cves.studentExport.v1";
 
 /** Firestore `in` queries take at most 30 values. */
 export const FIRESTORE_IN_LIMIT = 30;
+
+/* ------------------------------------------------------ staff attendance -- */
+
+/** The one settings document of staff attendance. */
+export const STAFF_ATTENDANCE_SETTINGS_DOC = "general";
+
+/** Check-in radius choices (metres around the school point). */
+export const STAFF_RADIUS_OPTIONS = [50, 100, 150, 200, 300, 500].map((value) => ({
+  value: String(value),
+  label: `${value} m`,
+}));
+
+/** "X late = 1 half day" choices; 0 = off. */
+export const STAFF_LATE_TO_HALF_DAY_OPTIONS = [
+  { value: "0", label: "Off" },
+  ...[2, 3, 4, 5].map((value) => ({ value: String(value), label: `${value} lates = 1 half day` })),
+];
+
+/** Label and colours of a staff attendance status (and "not marked"). */
+export const STAFF_STATUS_META = {
+  present: { label: "Present", chip: "bg-green-50 text-green-700 border-green-200" },
+  late: { label: "Late", chip: "bg-amber-50 text-amber-800 border-amber-200" },
+  halfDay: { label: "Half Day", chip: "bg-orange-50 text-orange-700 border-orange-200" },
+  absent: { label: "Absent", chip: "bg-red-50 text-red-700 border-red-200" },
+  leave: { label: "Leave", chip: "bg-navy-soft text-navy border-navy/20" },
+  none: { label: "Not marked", chip: "bg-gray-50 text-gray-600 border-gray-200" },
+} as const;
+
+/** What the admin can mark by hand. */
+export const STAFF_MARK_STATUS_OPTIONS = [
+  { value: "present", label: "Present" },
+  { value: "late", label: "Late" },
+  { value: "halfDay", label: "Half Day" },
+  { value: "absent", label: "Absent" },
+  { value: "leave", label: "Leave" },
+];
+
+/** Why a check-in was refused (codes of server/router/staffAttendanceHandler.js). */
+export const STAFF_REFUSED_LABELS: Record<string, string> = {
+  MOCK_LOCATION: "Fake GPS",
+  OUTSIDE: "Outside school",
+  WIFI: "Not on school Wi-Fi",
+  DEVICE: "Another phone",
+  ROOTED: "Rooted phone",
+  EMULATOR: "Emulator",
+};

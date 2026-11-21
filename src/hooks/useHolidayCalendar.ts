@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { COLLECTION } from "../constants";
 import { loadHolidayCalendar } from "../utils/attendanceService";
 import { emptyHolidayCalendar } from "../utils/holidayCalendar";
 import type { HolidayCalendar } from "../utils/type";
 
-/** The holiday calendar of a session (Sunday off + no holidays when unsaved). */
-export function useHolidayCalendar(session: string) {
+/**
+ * The holiday calendar of a session (Sunday off + no holidays when unsaved):
+ * the students' one, or the staff one with COLLECTION.STAFF_HOLIDAYS.
+ */
+export function useHolidayCalendar(session: string, collectionName: string = COLLECTION.HOLIDAY_CALENDAR) {
   const [calendar, setCalendar] = useState<HolidayCalendar>(() =>
     emptyHolidayCalendar(session)
   );
@@ -20,7 +24,7 @@ export function useHolidayCalendar(session: string) {
     setError(null);
     setCalendar(emptyHolidayCalendar(session));
 
-    loadHolidayCalendar(session)
+    loadHolidayCalendar(session, collectionName)
       .then((data) => {
         if (!cancelled) setCalendar(data);
       })
@@ -35,7 +39,7 @@ export function useHolidayCalendar(session: string) {
     return () => {
       cancelled = true;
     };
-  }, [session, version]);
+  }, [session, collectionName, version]);
 
   const reload = useCallback(() => setVersion((value) => value + 1), []);
 

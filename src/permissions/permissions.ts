@@ -37,6 +37,8 @@ export const PERMISSIONS = {
   ATTENDANCE_VIEW: "attendance.view",
   HOLIDAY_MANAGE: "holiday.manage",
   FEE_MANAGE: "fee.manage",
+  /** Staff Attendance: day view, marks, phone resets, staff holidays, settings (admin only). */
+  STAFF_ATTENDANCE_MANAGE: "staffAttendance.manage",
   /** Transfer Certificate page: see saved TCs and print them. */
   TC_VIEW: "tc.view",
   /** Make, edit, issue and revise TCs (issuing marks the student Left). */

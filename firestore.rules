@@ -81,7 +81,7 @@ service cloud.firestore {
     function teacherBlocked() {
       return ['student.create', 'student.promote', 'teacher.create', 'exam.manage',
               'examSettings.access', 'settings.access', 'permissions.manage', 'fee.manage',
-              'tc.settings'];
+              'tc.settings', 'staffAttendance.manage'];
     }
 
     // LEGACY_CATALOG_PERMISSIONS: what the Permissions page offered before it
@@ -371,6 +371,46 @@ service cloud.firestore {
         || isStaff();
       allow write: if (docId in ['siteImages', 'galleryImport'] && can('gallery.manage'))
         || isAdmin();
+    }
+
+    // ---------- staff attendance ----------
+    // Check-in / out and admin marks are written only by the server
+    // (server/router/staffAttendanceHandler.js), which checks the place,
+    // phone, Wi-Fi and time. Clients never write the records.
+
+    // Settings (school location, Wi-Fi, times...): the admin only. Teachers
+    // get what they need from the server, not the school's Wi-Fi list.
+    match /staffAttendanceSettings/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Staff holiday calendar, one document per session (like holidayCalendar).
+    match /staffHolidays/{year} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // One person's day: the admin, and a teacher their own days.
+    match /staffAttendance/{docId} {
+      allow read: if isAdmin() || (isTeacher() && resource.data.uid == request.auth.uid);
+      allow write: if false;
+    }
+
+    // The phone a teacher's attendance is linked to.
+    match /staffDevices/{uid} {
+      allow read: if isAdmin() || (isTeacher() && uid == request.auth.uid);
+      allow write: if false;
+    }
+
+    // Refused tries, admin edits, phone resets; and the selfies.
+    match /staffAttendanceLog/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /staffSelfies/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     // ---------- fee module (admin only) ----------

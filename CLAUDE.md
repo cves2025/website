@@ -23,6 +23,7 @@ part of a file you change (use line ranges / grep), not the whole feature.
 | Permissions (all teachers / class teachers / one teacher) | [docs/features/permissions.md](docs/features/permissions.md) |
 | Environments: dev / prod Firebase projects, deploy, migration checklist | [docs/features/environments.md](docs/features/environments.md) |
 | Idle lock: admin panel locks after 5 minutes idle, password to unlock | [docs/features/idle-lock.md](docs/features/idle-lock.md) |
+| Staff attendance: app check-in / out (GPS, Wi-Fi, phone, selfie), day view, staff holidays, settings | [docs/features/staff-attendance.md](docs/features/staff-attendance.md) |
 | Fee module business rules (heads, dues, carry forward) | [docs/FEE_MANAGEMENT.md](docs/FEE_MANAGEMENT.md) |
 
 **Keep the maps true:** a commit that changes a mapped feature (new file, moved logic, new

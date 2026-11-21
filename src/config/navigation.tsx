@@ -7,6 +7,7 @@ import {
   FaClipboardList,
   FaCalendarCheck,
   FaRupeeSign,
+  FaUserClock,
 } from "react-icons/fa";
 
 export const BRAND = {
@@ -66,6 +67,16 @@ export const MENU: MenuItem[] = [
     accent: BRAND.blue,
     subLinks: [
       { label: "Add Teacher", path: "/welcome/teacher/add" },
+    ],
+  },
+  {
+    label: "Staff Attendance",
+    icon: <FaUserClock />,
+    accent: BRAND.pink,
+    subLinks: [
+      { label: "Staff Attendance", path: "/welcome/staff-attendance", end: true },
+      { label: "Staff Holidays", path: "/welcome/staff-attendance/holidays" },
+      { label: "Attendance Settings", path: "/welcome/staff-attendance/settings" },
     ],
   },
   {
