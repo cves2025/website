@@ -26,6 +26,15 @@ Sums with a filter need composite indexes: `firestore.indexes.dev.json` / `.prod
 (feePayments status+date+amount, dailyAttendance date + each count, feeAccounts session +
 transport.amount). Missing index -> `failed-precondition` -> fallback to reading documents.
 
+## Motion
+
+- Cards rise in one after another (2 s each, 1 s apart) and lift on hover with a cves line on top: `.dash-grid > section`
+  in `src/index.css` (the floating fee card is not a grid `<section>`, so it is left alone).
+- Numbers count up (`CountUp`); rings and bars fill with `useCountUp(ready ? 1 : 0)` (`COUNT_UP_MS`, 2 s).
+- Greeting banner: drifting blobs (`.dash-blob`), time-of-day icon (Sun / CloudSun / Moon,
+  `.dash-float`) (greeting checked every `DASHBOARD_CLOCK_MS`).
+- `prefers-reduced-motion`: no rise, lift, drift or count-up.
+
 ## Change X -> look here
 
 - Card layout / greeting: `Dashboard.tsx`; header on the dashboard: `Welcome.tsx`.

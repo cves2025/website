@@ -56,6 +56,7 @@ All in `src/custom-components`. Forms use react-hook-form; a screen without a fo
 | Tooltip on hover / focus (instead of the `title` attribute) | `Tooltip` (`content`, optional `side`, `delay`); navy bubble with an arrow, drawn in a portal |
 | Rich text | `RichText` (show), `RichTextEditor` (edit) |
 | Admission form look | `custom-components/admission/*` |
+| Dashboard number that counts up | `CountUp` (`format`, `suffix`); rings / bars fill with `useCountUp(ready ? 1 : 0)` (`hooks/useCountUp.ts`, `COUNT_UP_MS`, at once with reduced motion) |
 
 If a screen truly needs something not listed, extend the closest component with an optional prop
 (as `CustomToggle` got `disabled` / `ariaLabel`) instead of building a new one, and add it here.

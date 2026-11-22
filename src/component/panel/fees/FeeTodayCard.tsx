@@ -25,7 +25,9 @@ import {
 } from "../../../hooks/useDashboardStats";
 import useFeeStructure from "../../../hooks/useFeeStructure";
 import { useAllClassesLengthOfStudents } from "../../../hooks/useAllClassesLengthOfStudents";
+import CountUp from "../../../custom-components/CountUp";
 import { Spinner } from "../../../custom-components/Loader";
+import { useCountUp } from "../../../hooks/useCountUp";
 
 const session = generateAcademicYears()[0]?.value ?? "";
 
@@ -39,10 +41,12 @@ function ProgressRing({
 }) {
   const radius = 40;
   const circumference = 2 * Math.PI * radius;
+  // Fills from empty (and the % counts up) together with the numbers.
+  const progress = useCountUp(percent === null || loading ? 0 : 1);
   const filled =
     percent === null || loading
       ? 0
-      : (Math.min(percent, 100) / 100) * circumference;
+      : (Math.min(percent, 100) / 100) * circumference * progress;
   if (loading) {
     // The empty ring with a spinner in the middle while the numbers load.
     return (
@@ -99,7 +103,7 @@ function ProgressRing({
         fontWeight="600"
         fill="#1f2937"
       >
-        {percent === null ? "—" : `${percent}%`}
+        {percent === null ? "—" : `${Math.round(percent * progress)}%`}
       </text>
     </svg>
   );
@@ -213,7 +217,7 @@ function FeeSummary({
                   {collected.error}
                 </span>
               ) : (
-                formatRupees(collected.total)
+                <CountUp value={collected.total} format={(n) => formatRupees(Math.round(n))} />
               )}
             </div>
             <p className="flex min-h-5 items-center justify-center gap-2 text-sm text-gray-600 sm:justify-start">
@@ -237,7 +241,7 @@ function FeeSummary({
               {collected.loading ? (
                 <Spinner size="sm" label="" />
               ) : (
-                collected.receipts
+                <CountUp value={collected.receipts} />
               )}
             </div>
             <p className="text-sm text-gray-600">

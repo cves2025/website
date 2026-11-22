@@ -601,6 +601,11 @@ export type FeePeriod = (typeof FEE_PERIOD_OPTIONS)[number]["value"];
 export const FEE_PANEL_MS = 350;
 
 /** Background of the dashboard banner and of the top bar on the dashboard. */
+/** Dashboard numbers count up, rings / bars fill, in this long (ms). */
+export const COUNT_UP_MS = 2000;
+/** Dashboard greeting (morning / afternoon / evening): checked this often (ms). */
+export const DASHBOARD_CLOCK_MS = 60_000;
+
 export const DASHBOARD_GRADIENT =
   "bg-[linear-gradient(100deg,#a8196f_0%,#b52a3f_50%,#c2410c_100%)]";
 

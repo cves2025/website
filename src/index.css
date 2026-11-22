@@ -325,3 +325,68 @@ body {
   background: #db2777 !important;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.35);
 }
+/* Dashboard (admin/Dashboard.tsx): the cards rise in one after another; on
+   hover a card lifts a little and shows the cves line on its top edge. The
+   fee card is not a <section> of the grid (it floats), so it is left alone.
+   Fill mode "backwards": the start state holds during the delay, and after the
+   animation the card is free again ("both" kept transform: none on top of the
+   hover lift). Reduced motion: no rise, no lift. */
+@keyframes dashRise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+.dash-grid > section {
+  position: relative;
+  animation: dashRise 2s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+/* 1 s between the cards. */
+.dash-grid > section:nth-of-type(2) { animation-delay: 1s; }
+.dash-grid > section:nth-of-type(3) { animation-delay: 2s; }
+.dash-grid > section:nth-of-type(4) { animation-delay: 3s; }
+.dash-grid > section:nth-of-type(5) { animation-delay: 4s; }
+.dash-grid > section:nth-of-type(n + 6) { animation-delay: 5s; }
+.dash-grid > section::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 1.5rem;
+  right: 1.5rem;
+  height: 3px;
+  border-radius: 0 0 9999px 9999px;
+  background: linear-gradient(to right, #009746, #393186, #e7087e, #e31e25);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.dash-grid > section:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 28px 60px -24px rgba(17, 24, 39, 0.32);
+}
+.dash-grid > section:hover::before { opacity: 1; }
+
+/* Greeting banner: two soft light blobs drift slowly. */
+@keyframes dashDrift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-6%, 8%) scale(1.12); }
+}
+.dash-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(48px);
+  pointer-events: none;
+  animation: dashDrift 14s ease-in-out infinite;
+}
+@keyframes dashFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+.dash-float { animation: dashFloat 4s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-grid > section,
+  .dash-blob,
+  .dash-float { animation: none; }
+  .dash-grid > section,
+  .dash-grid > section::before { transition: none; }
+  .dash-grid > section:hover { transform: none; }
+}

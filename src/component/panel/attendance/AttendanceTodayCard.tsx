@@ -14,6 +14,7 @@ import { dayOffReason, sessionOfDate, todayKey } from "../../../utils/holidayCal
 import { attendanceSections, sectionValue, type SectionOption } from "./attendanceShared";
 import { toOrdinalLabel } from "../../../utils/toOrdinalLabel";
 import { Spinner } from "../../../custom-components/Loader";
+import CountUp from "../../../custom-components/CountUp";
 import CustomSelect from "../../../custom-components/CustomSelect";
 
 const MARK_PATH = "/welcome/attendance/mark";
@@ -137,7 +138,7 @@ function AttendanceView({
 }: AttendanceViewProps) {
   const total = present + absent + leave;
   const percent = total ? Math.round((present / total) * 1000) / 10 : 0;
-  const value = (number: number) => (loading ? <Spinner size="sm" label="" className="my-1" /> : number);
+  const value = (number: number) => (loading ? <Spinner size="sm" label="" className="my-1" /> : <CountUp value={number} />);
 
   const tiles = [
     { value: present, label: "Present", className: "bg-[#e4f4ea]" },
@@ -150,7 +151,13 @@ function AttendanceView({
     <>
       <CardTitle action={action} />
       <div className="mt-3 flex h-12 items-center text-5xl font-extrabold leading-none tracking-tight text-gray-900 tabular-nums">
-        {loading ? <Spinner size="md" label="Loading attendance" /> : total ? `${percent}%` : "—"}
+        {loading ? (
+          <Spinner size="md" label="Loading attendance" />
+        ) : total ? (
+          <CountUp value={percent} format={(n) => String(Math.round(n * 10) / 10)} suffix="%" />
+        ) : (
+          "—"
+        )}
       </div>
       <p className="mt-2 min-h-5 text-sm text-gray-600">
         {error ? (

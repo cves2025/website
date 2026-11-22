@@ -14,6 +14,7 @@ import { CheckCircle2 } from "lucide-react";
 import { ADMISSION_SECTIONS, MARKS_PATH } from "../../../constants";
 import CustomSelect from "../../../custom-components/CustomSelect";
 import { Spinner } from "../../../custom-components/Loader";
+import CountUp from "../../../custom-components/CountUp";
 import { useExamList } from "../../../hooks/useExamList";
 import useMarksProgress from "../../../hooks/useMarksProgress";
 import { NO_SCOPE, PERMISSIONS, scopedSections, subjectAccess } from "../../../permissions";
@@ -136,7 +137,7 @@ function MarksSummary({ exams }: { exams: ExamDoc[] }) {
   const count = (status: MarksPendingRow["status"]) => rows.filter((row) => row.status === status).length;
   const pendingCount = rows.length - count("complete");
   const missingMarks = rows.reduce((total, row) => total + row.missingMarks, 0);
-  const value = (number: number) => (loading ? <Spinner size="sm" label="" className="my-1" /> : number);
+  const value = (number: number) => (loading ? <Spinner size="sm" label="" className="my-1" /> : <CountUp value={number} />);
 
   const tiles = [
     { value: count("complete"), label: "Complete", className: "bg-[#e4f4ea]" },
@@ -161,7 +162,7 @@ function MarksSummary({ exams }: { exams: ExamDoc[] }) {
       </div>
 
       <div className="mt-3 flex h-12 items-center text-5xl font-extrabold leading-none tracking-tight text-gray-900 tabular-nums">
-        {loading ? <Spinner size="md" label="Loading marks progress" /> : pendingCount}
+        {loading ? <Spinner size="md" label="Loading marks progress" /> : <CountUp value={pendingCount} />}
       </div>
       <p className="mt-2 min-h-5 text-sm text-gray-600">
         {error ? (

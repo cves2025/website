@@ -14,7 +14,9 @@ import {
   ADMISSION_DASHBOARD_SESSIONS,
   STUDENT_LIST_PATH,
 } from "../../../constants";
+import CountUp from "../../../custom-components/CountUp";
 import { Spinner } from "../../../custom-components/Loader";
+import { useCountUp } from "../../../hooks/useCountUp";
 import Tooltip from "../../../custom-components/Tooltip";
 import { useAdmissionStats } from "../../../hooks/useDashboardStats";
 import { PERMISSIONS } from "../../../permissions";
@@ -32,6 +34,8 @@ function GenderRing({ counts, loading }: { counts: StudentCounts; loading: boole
   const radius = 40;
   const circumference = 2 * Math.PI * radius;
   const total = counts.students;
+  // Fills from empty together with the numbers.
+  const filled = useCountUp(loading ? 0 : 1);
   let offset = 0;
 
   return (
@@ -44,7 +48,7 @@ function GenderRing({ counts, loading }: { counts: StudentCounts; loading: boole
             { value: counts.male, color: MALE },
             { value: counts.female, color: FEMALE },
           ].map((part) => {
-            const length = (part.value / total) * circumference;
+            const length = (part.value / total) * circumference * filled;
             const arc = (
               <circle
                 key={part.color}
@@ -67,7 +71,7 @@ function GenderRing({ counts, loading }: { counts: StudentCounts; loading: boole
         <Spinner size="sm" label="Loading student counts" />
       ) : (
         <span className="relative text-center text-[17px] font-semibold leading-tight text-gray-800 tabular-nums">
-          {total}
+          <CountUp value={total} />
           <span className="block text-[11px] font-normal text-gray-500">in all</span>
         </span>
       )}
@@ -84,7 +88,7 @@ function AdmissionCard({ className }: { className: string }) {
   const { stats, loading, error } = useAdmissionStats(sessions);
   const { current, classSections, newAdmissions } = stats;
   const most = Math.max(1, ...sessions.map((item) => newAdmissions[item] ?? 0));
-  const small = (value: number) => (loading ? <Spinner size="xs" label="" /> : value);
+  const small = (value: number) => (loading ? <Spinner size="xs" label="" /> : <CountUp value={value} />);
 
   return (
     <section
@@ -101,7 +105,7 @@ function AdmissionCard({ className }: { className: string }) {
             ) : error ? (
               <span className="text-base font-semibold text-red-600">{error}</span>
             ) : (
-              current.students
+              <CountUp value={current.students} />
             )}
           </div>
           <p className="flex min-h-5 flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-gray-600 sm:justify-start">

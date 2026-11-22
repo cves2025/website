@@ -9,7 +9,9 @@ import { NavLink } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 
 import { STAFF_ATTENDANCE_PATH, TEACHERS_PATH } from "../../../constants";
+import CountUp from "../../../custom-components/CountUp";
 import { Spinner } from "../../../custom-components/Loader";
+import { useCountUp } from "../../../hooks/useCountUp";
 import Tooltip from "../../../custom-components/Tooltip";
 import { usePeopleStats } from "../../../hooks/useDashboardStats";
 import type { PeopleCounts } from "../../../utils/dashboardStats";
@@ -22,14 +24,16 @@ const FEMALE = "#e7087e";
 
 function GenderBar({ counts, loading }: { counts: PeopleCounts; loading: boolean }) {
   const total = Math.max(1, counts.male + counts.female);
+  // Fills from empty together with the numbers.
+  const filled = useCountUp(loading ? 0 : 1);
   return (
     <Tooltip content={`${counts.male} male, ${counts.female} female`} side="top" className="w-full">
       <span className="mt-2 flex h-2 w-full gap-0.5 overflow-hidden rounded-full bg-[#f2dfe8]" role="img" aria-label={`${counts.male} male, ${counts.female} female`}>
         {!loading && counts.male > 0 && (
-          <span className="block h-full rounded-full transition-[width] duration-500" style={{ width: `${(counts.male / total) * 100}%`, background: MALE }} />
+          <span className="block h-full rounded-full" style={{ width: `${(counts.male / total) * 100 * filled}%`, background: MALE }} />
         )}
         {!loading && counts.female > 0 && (
-          <span className="block h-full rounded-full transition-[width] duration-500" style={{ width: `${(counts.female / total) * 100}%`, background: FEMALE }} />
+          <span className="block h-full rounded-full" style={{ width: `${(counts.female / total) * 100 * filled}%`, background: FEMALE }} />
         )}
       </span>
     </Tooltip>
@@ -38,12 +42,12 @@ function GenderBar({ counts, loading }: { counts: PeopleCounts; loading: boolean
 
 /** One group (Teachers or Staff): total, active, male / female. */
 function Group({ label, counts, loading }: { label: string; counts: PeopleCounts; loading: boolean }) {
-  const small = (value: number) => (loading ? <Spinner size="xs" label="" /> : value);
+  const small = (value: number) => (loading ? <Spinner size="xs" label="" /> : <CountUp value={value} />);
   return (
     <div className="min-w-0">
       <p className="text-sm text-gray-600">{label}</p>
       <div className="flex h-11 items-center text-4xl font-extrabold leading-tight tracking-tight text-gray-900 tabular-nums">
-        {loading ? <Spinner size="md" label={`Loading ${label.toLowerCase()}`} /> : counts.total}
+        {loading ? <Spinner size="md" label={`Loading ${label.toLowerCase()}`} /> : <CountUp value={counts.total} />}
       </div>
       <p className="text-sm text-gray-600">
         <span className="font-semibold text-gray-900 tabular-nums">{small(counts.active)}</span> active
@@ -95,7 +99,7 @@ function PeopleCard({ className }: { className: string }) {
               <div key={label} className="flex items-center justify-between gap-2 py-0.5 text-xs text-gray-700">
                 <span>{label}</span>
                 <span className="font-bold tabular-nums text-[#ad1a6f]">
-                  {loading ? "" : counts.onLeave}
+                  {loading ? "" : <CountUp value={counts.onLeave} />}
                   {!loading && counts.halfDayLeave > 0 && (
                     <span className="ml-1 font-normal text-gray-500">+ {counts.halfDayLeave} half day</span>
                   )}

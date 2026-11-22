@@ -12,7 +12,9 @@ import { ArrowRight } from "lucide-react";
 
 import { TC_DASHBOARD_SESSIONS, TC_PATH, TC_REGISTER_CLASS } from "../../../../constants";
 import CustomSelect from "../../../../custom-components/CustomSelect";
+import CountUp from "../../../../custom-components/CountUp";
 import { Spinner } from "../../../../custom-components/Loader";
+import { useCountUp } from "../../../../hooks/useCountUp";
 import { useTcCounts } from "../../../../hooks/useDashboardStats";
 import { PERMISSIONS } from "../../../../permissions";
 import { generateAcademicYears } from "../../../../utils/generateAcademicYears";
@@ -35,6 +37,8 @@ function StatusRing({ counts, loading }: { counts: TcCounts; loading: boolean })
     { value: counts.cancelled, color: CANCELLED },
     { value: counts.draft, color: DRAFT },
   ];
+  // Fills from empty together with the numbers.
+  const filled = useCountUp(loading ? 0 : 1);
   let offset = 0;
 
   return (
@@ -44,7 +48,7 @@ function StatusRing({ counts, loading }: { counts: TcCounts; loading: boolean })
         {!loading &&
           total > 0 &&
           parts.map((part) => {
-            const length = (part.value / total) * circumference;
+            const length = (part.value / total) * circumference * filled;
             const arc = (
               <circle
                 key={part.color}
@@ -67,7 +71,7 @@ function StatusRing({ counts, loading }: { counts: TcCounts; loading: boolean })
         <Spinner size="sm" label="Loading TC counts" />
       ) : (
         <span className="relative text-center text-[17px] font-semibold leading-tight text-gray-800">
-          {total}
+          <CountUp value={total} />
           <span className="block text-[11px] font-normal text-gray-500">in all</span>
         </span>
       )}
@@ -87,7 +91,7 @@ function TcCard({ className }: { className: string }) {
 
   const current = counts[session] ?? { issued: 0, cancelled: 0, draft: 0 };
   const most = Math.max(1, ...sessions.map((item) => counts[item]?.issued ?? 0));
-  const small = (value: number) => (loading ? <Spinner size="xs" label="" /> : value);
+  const small = (value: number) => (loading ? <Spinner size="xs" label="" /> : <CountUp value={value} />);
 
   return (
     <section
@@ -116,7 +120,7 @@ function TcCard({ className }: { className: string }) {
             ) : error ? (
               <span className="text-base font-semibold text-red-600">{error}</span>
             ) : (
-              current.issued
+              <CountUp value={current.issued} />
             )}
           </div>
           <p className="flex min-h-5 flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-gray-600 sm:justify-start">
