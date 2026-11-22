@@ -603,6 +603,32 @@ export const FEE_PANEL_MS = 350;
 /** Background of the dashboard banner and of the top bar on the dashboard. */
 /** Dashboard numbers count up, rings / bars fill, in this long (ms). */
 export const COUNT_UP_MS = 2000;
+
+/**
+ * Bell notifications (NotificationBell.tsx): the colour of each row's icon by
+ * tone. The tone comes from the notification's `kind` (server
+ * services/notify.js callers), and good / bad words in its title win
+ * ("Leave approved" is good, "Leave rejected" bad).
+ */
+export type NotificationTone = "good" | "bad" | "alert" | "leave" | "info" | "holiday";
+export const NOTIFICATION_TONE_CLASS: Record<NotificationTone, string> = {
+  good: "bg-[#e4f4ea] text-[#047857]",
+  bad: "bg-[#fce7e7] text-[#b91c1c]",
+  alert: "bg-[#fff0dc] text-[#b45309]",
+  leave: "bg-[#f7e8ee] text-[#ad1a6f]",
+  holiday: "bg-[#e4f4ea] text-[#047857]",
+  info: "bg-navy-soft text-navy",
+};
+export const NOTIFICATION_KIND_TONE: Record<string, NotificationTone> = {
+  cheat: "alert",
+  leave: "leave",
+  attendance: "info",
+  device: "info",
+  holiday: "holiday",
+};
+/** Title words that make a row good / bad, whatever its kind. */
+export const NOTIFICATION_GOOD_WORDS = /\b(approved|added|set)\b/i;
+export const NOTIFICATION_BAD_WORDS = /\b(rejected|declined|cancelled)\b/i;
 /** Dashboard greeting (morning / afternoon / evening): checked this often (ms). */
 export const DASHBOARD_CLOCK_MS = 60_000;
 
