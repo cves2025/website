@@ -13,9 +13,9 @@ locked; going back to the panel from it uses the normal lock.
 | File | What it does |
 |---|---|
 | `src/hooks/useIdleLock.ts` | Tracks activity, counts down (`remainingMs`), `lock()` / `unlock()`. Last activity (`IDLE_ACTIVITY_KEY`) and the lock (`IDLE_LOCKED_KEY` = uid) are in localStorage: shared by every open tab, and a reload stays locked |
-| `src/component/IdleLockScreen.tsx` | Lock screen: password checked by Firebase (`reauthenticateWithCredential`), `IDLE_LOCK_MAX_ATTEMPTS` (5) wrong tries -> logged out; "Log out" button |
+| `src/component/IdleLockScreen.tsx` | Lock screen: password checked by Firebase (`reauthenticateWithCredential`), `IDLE_LOCK_MAX_ATTEMPTS` (5) wrong tries -> logged out; "Log out" button. Right password / PIN: cves tick "Verified" (`UNLOCK_VERIFIED_MS`), then the lock fades away (`UNLOCK_FADE_MS`) before `onUnlock`; at once with prefers-reduced-motion (same on the app) |
 | `src/component/Welcome.tsx` | Uses the hook for admins; header timer chip (lock icon + m:ss, amber in the last minute, click = lock now); renders the lock screen |
-| `src/constants.ts` | `IDLE_LOCK_MS`, `IDLE_LOCK_MAX_ATTEMPTS`, `IDLE_ACTIVITY_KEY`, `IDLE_LOCKED_KEY` |
+| `src/constants.ts` | `IDLE_LOCK_MS`, `IDLE_LOCK_MAX_ATTEMPTS`, `IDLE_ACTIVITY_KEY`, `IDLE_LOCKED_KEY`, `UNLOCK_VERIFIED_MS`, `UNLOCK_FADE_MS` |
 
 ## Password or PIN (Settings > Lock & PIN)
 
@@ -34,6 +34,8 @@ is always shown under the PIN.
 - The PIN is only checked on the server: `pinSecrets/{uid}` holds a scrypt hash (random salt +
   `PIN_PEPPER` env of the server). Rules deny every client access to `pinSecrets`.
 - 4 digits; easy PINs (`WEAK_PINS`, same list on the server) are refused.
+- The PIN is checked as soon as the 4th digit is typed (lock screen and the confirm dialog), as on
+  the app; Unlock / Confirm are still there for the password.
 - 5 wrong PINs in a row lock the PIN for 15 minutes on the server (the password still works);
   the server also limits PIN checks to 30 per 15 minutes per IP. On the lock screen PIN and
   password tries count together towards `IDLE_LOCK_MAX_ATTEMPTS` (logout); a server that cannot be

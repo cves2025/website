@@ -13,8 +13,8 @@
  *   if (!(await confirmPassword({ title: "Save Fee Structure" }))) return;
  *   ...and render {passwordDialog} once in the page.
  */
-import { useContext, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useContext, useEffect, useRef, useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
 
 import { myContext } from "../component/context/MyContextProvider";
 import { CVES_BUTTON, PIN_LENGTH, PIN_PATTERN, type UnlockMethod } from "../constants";
@@ -111,6 +111,14 @@ export function usePasswordConfirm() {
     }
     finish(true);
   });
+
+  // PIN: checked as soon as the 4th digit is typed, as on the app and the lock screen.
+  // A wrong PIN clears the field, so the same PIN is not sent twice.
+  const pin = useWatch({ control, name: "pin" });
+  useEffect(() => {
+    if (request && method === "pin" && !checking && PIN_PATTERN.test(pin)) void submit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the PIN changes
+  }, [pin]);
 
   const passwordDialog = (
     <Modal

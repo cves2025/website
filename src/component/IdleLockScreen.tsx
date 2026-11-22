@@ -8,12 +8,19 @@
  * Wrong tries (PIN and password together) reaching IDLE_LOCK_MAX_ATTEMPTS,
  * or "Log out", sign the user out.
  */
-import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useEffect, useRef, useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
-import { Lock } from "lucide-react";
+import { Check, Lock } from "lucide-react";
 
-import { IDLE_LOCK_MAX_ATTEMPTS, PIN_LENGTH, PIN_PATTERN, type UnlockMethod } from "../constants";
+import {
+  IDLE_LOCK_MAX_ATTEMPTS,
+  PIN_LENGTH,
+  PIN_PATTERN,
+  UNLOCK_FADE_MS,
+  UNLOCK_VERIFIED_MS,
+  type UnlockMethod,
+} from "../constants";
 import CustomButton from "../custom-components/CustomButton";
 import CustomInput from "../custom-components/CustomInput";
 import { Spinner } from "../custom-components/Loader";
@@ -38,6 +45,24 @@ function IdleLockScreen({ email, name, onUnlock, onLogout }: IdleLockScreenProps
   const [error, setError] = useState("");
   const [checking, setChecking] = useState(false);
   const [attempts, setAttempts] = useState(0);
+  // After the right password / PIN: "verified" (tick), then "leaving" (fade out), then onUnlock.
+  const [step, setStep] = useState<"form" | "verified" | "leaving">("form");
+  const timers = useRef<number[]>([]);
+  useEffect(() => () => timers.current.forEach((timer) => window.clearTimeout(timer)), []);
+
+  /** Shows the tick, fades the lock, then opens the panel (at once with reduced motion). */
+  const unlocked = () => {
+    reset({ password: "", pin: "" });
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      onUnlock();
+      return;
+    }
+    setStep("verified");
+    timers.current.push(
+      window.setTimeout(() => setStep("leaving"), UNLOCK_VERIFIED_MS),
+      window.setTimeout(onUnlock, UNLOCK_VERIFIED_MS + UNLOCK_FADE_MS)
+    );
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -80,8 +105,7 @@ function IdleLockScreen({ email, name, onUnlock, onLogout }: IdleLockScreenProps
       const result = await verifyPin(pin);
       setChecking(false);
       if (result.ok) {
-        reset({ password: "", pin: "" });
-        onUnlock();
+        unlocked();
         return;
       }
       if (result.code === "PIN_LOCKED" || result.code === "PIN_NOT_SET") {
@@ -101,8 +125,7 @@ function IdleLockScreen({ email, name, onUnlock, onLogout }: IdleLockScreenProps
 
     try {
       await reauthenticateWithCredential(current, EmailAuthProvider.credential(email, password));
-      reset({ password: "", pin: "" });
-      onUnlock();
+      unlocked();
     } catch (cause) {
       const code = (cause as { code?: string })?.code ?? "";
       const { loggedOut, left } = wrongTry();
@@ -119,13 +142,39 @@ function IdleLockScreen({ email, name, onUnlock, onLogout }: IdleLockScreenProps
     }
   });
 
+  // PIN: checked as soon as the 4th digit is typed, as on the app (no Unlock click).
+  // A wrong PIN clears the field, so the same PIN is not sent twice.
+  const pin = useWatch({ control, name: "pin" });
+  useEffect(() => {
+    if (method === "pin" && step === "form" && !checking && PIN_PATTERN.test(pin)) void unlock();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the PIN changes
+  }, [pin]);
+
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-gray-900/60 p-4 backdrop-blur-md"
+      className={`fixed inset-0 z-[70] flex items-center justify-center bg-gray-900/60 p-4 backdrop-blur-md transition-opacity ease-out ${
+        step === "leaving" ? "opacity-0" : "opacity-100"
+      }`}
+      style={{ transitionDuration: `${UNLOCK_FADE_MS}ms` }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="idle-lock-title"
     >
+      {step !== "form" ? (
+        // Right password / PIN: a cves tick, then the whole lock fades away.
+        <div
+          className="flex w-full max-w-sm flex-col items-center rounded-2xl bg-white p-8 text-center shadow-2xl"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="grid h-16 w-16 animate-[zoomIn_0.35s_ease-out] place-items-center rounded-full bg-cves text-white shadow-md">
+            <Check className="h-8 w-8" strokeWidth={3} aria-hidden="true" />
+          </span>
+          <h2 id="idle-lock-title" className="mt-3 text-lg font-bold text-gray-900">
+            Verified
+          </h2>
+        </div>
+      ) : (
       <form onSubmit={(event) => void unlock(event)} className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl" noValidate>
         <div className="mb-4 flex flex-col items-center text-center">
           <span className="mb-3 grid h-14 w-14 place-items-center rounded-full bg-cves text-white shadow-md">
@@ -195,6 +244,7 @@ function IdleLockScreen({ email, name, onUnlock, onLogout }: IdleLockScreenProps
           </div>
         )}
       </form>
+      )}
     </div>
   );
 }
