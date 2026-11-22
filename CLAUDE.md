@@ -19,6 +19,7 @@ part of a file you change (use line ranges / grep), not the whole feature.
 | Add Teacher: teachers, staff, Job Role | [docs/features/teacher-staff.md](docs/features/teacher-staff.md) |
 | Add / edit student (admission form, Enrollment No. rules) | [docs/features/add-student.md](docs/features/add-student.md) |
 | Student List (filters, teacher scope, delete: left / wrong entry, recycle bin) | [docs/features/student-list.md](docs/features/student-list.md) |
+| Student documents: upload (photos / PDF), versions kept, Verified, Settings types, list badge | [docs/features/student-documents.md](docs/features/student-documents.md) |
 | Transfer Certificate: TC list / register, editor, A4 print, TC Settings, Sr. No. | [docs/features/transfer-certificate.md](docs/features/transfer-certificate.md) |
 | Permissions (all teachers / class teachers / one teacher) | [docs/features/permissions.md](docs/features/permissions.md) |
 | Environments: dev / prod Firebase projects, deploy, migration checklist | [docs/features/environments.md](docs/features/environments.md) |

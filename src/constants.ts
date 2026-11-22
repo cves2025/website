@@ -23,6 +23,8 @@ import type {
 
 export const COLLECTION = {
   STUDENTS: "students",
+  /** studentDocuments/{studentId} (summary) + /versions/{id}: see docs/features/student-documents.md. */
+  STUDENT_DOCUMENTS: "studentDocuments",
   ENROLLMENTS: "enrollments",
   SUBJECTS: "subjects",
   EXAMS: "exams",
@@ -97,7 +99,24 @@ export const PRE_DEFINED_DOC_ID = {
   SITE_IMAGES: "siteImages",
   /** Highest Enrollment No. in use; the Add Student page suggests the next. */
   ENROLLMENT_COUNTER: "enrollmentCounter",
+  /** Student document types: `{ types: StudentDocumentType[] }` (Settings, admin). */
+  STUDENT_DOCUMENTS: "studentDocuments",
 }
+
+/** Types offered before Settings > Student documents is saved (ids never change). */
+export const DEFAULT_STUDENT_DOCUMENT_TYPES = [
+  { id: "studentAadhaar", name: "Student Aadhaar", required: true, order: 1, active: true },
+  { id: "birthCertificate", name: "Birth Certificate", required: true, order: 2, active: true },
+  { id: "fatherAadhaar", name: "Father Aadhaar", required: true, order: 3, active: true },
+  { id: "motherAadhaar", name: "Mother Aadhaar", required: true, order: 4, active: true },
+];
+/** One file of a document at most (also in storage.rules). */
+export const STUDENT_DOCUMENT_MAX_BYTES = 2 * 1024 * 1024;
+/** Photos of a document are made this size (longest side, px) and quality before upload. */
+export const STUDENT_DOCUMENT_IMAGE = { maxDimension: 1800, quality: 0.82 };
+/** Files a document takes: photos (front + back) or one PDF. Nothing else (video, Excel ...). */
+export const STUDENT_DOCUMENT_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+export const STUDENT_DOCUMENT_PDF_TYPE = "application/pdf";
 
 /** Document id inside COLLECTION.STAMP_SIGN that stores the Principal's
     signature and the school stamp image URLs. */

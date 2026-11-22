@@ -2,6 +2,7 @@ import PageHeader from "../../../custom-components/PageHeader";
 import AllClassLists from "./AllClassLists";
 import ExamRulesSection from "./ExamRulesSection";
 import LockPinSection from "./LockPinSection";
+import StudentDocumentTypesSection from "./StudentDocumentTypesSection";
 
 function Settings() {
   return (
@@ -18,6 +19,8 @@ function Settings() {
       <ExamRulesSection />
 
       <LockPinSection />
+
+      <StudentDocumentTypesSection />
     </div>
   );
 }

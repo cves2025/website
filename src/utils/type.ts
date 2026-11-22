@@ -1219,3 +1219,47 @@ export interface AppNotification {
   /** ms */
   createdAt: number | null;
 }
+
+/* ---------------- Student documents (docs/features/student-documents.md) ---------------- */
+
+/** One kind of document the school takes (Settings > Student documents). */
+export interface StudentDocumentType {
+  /** Never changes once saved (versions point to it). */
+  id: string;
+  name: string;
+  /** Counted in the Student List badge "N/M docs" and the "Documents missing" filter. */
+  required: boolean;
+  order: number;
+  /** Off = no new uploads, old versions still shown. */
+  active: boolean;
+}
+
+/** A file of a version: the front / back photo, or the PDF. */
+export interface StudentDocumentFile {
+  /** Storage path: studentDocuments/{studentId}/{typeId}/{versionId}/{side}.{jpg|pdf} */
+  path: string;
+  /** The name the file had on the uploader's device. */
+  name: string;
+  contentType: string;
+  size: number;
+  side: "front" | "back" | "file";
+}
+
+/** One upload of a document; never changed or deleted. */
+export interface StudentDocumentVersion {
+  id: string;
+  typeId: string;
+  files: StudentDocumentFile[];
+  uploadedBy: string;
+  uploadedByName: string;
+  /** ms */
+  uploadedAt: number | null;
+  note: string;
+}
+
+/** studentDocuments/{studentId}: what the Student List badge needs, per type id. */
+export interface StudentDocumentSummary {
+  uploaded: Record<string, { versions: number; lastVersionId: string; lastAt: number | null }>;
+  /** Verified is for one version: a newer upload is not verified. */
+  verified: Record<string, { versionId: string; by: string; byName: string; at: number | null }>;
+}

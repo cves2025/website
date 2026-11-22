@@ -80,6 +80,12 @@ export const TEACHER_PERMISSION_GROUPS: PermissionCatalogGroup[] = [
           "Change the student, father and mother photos of their own classes (mobile app).",
       },
       {
+        permission: P.STUDENT_DOCUMENTS,
+        label: "Upload Student Documents",
+        description:
+          "Upload a new version of the documents (Aadhaar, birth certificate ...) of students of their own classes. Every teacher can view them; nobody can delete them.",
+      },
+      {
         permission: P.SUBJECT_MANAGE,
         label: "Subjects",
         description: "Add, edit and delete subjects of a class.",
@@ -213,5 +219,6 @@ export const LEGACY_CATALOG_PERMISSIONS: Permission[] =
       p !== P.STUDENT_PHOTO &&
       p !== P.TC_VIEW &&
       p !== P.TC_ISSUE &&
-      p !== P.STUDENT_EXPORT
+      p !== P.STUDENT_EXPORT &&
+      p !== P.STUDENT_DOCUMENTS
   );

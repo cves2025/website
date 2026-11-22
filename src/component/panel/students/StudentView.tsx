@@ -10,6 +10,7 @@ import { allowedClassSections, pairKey } from "../../../utils/studentScope";
 import { ADD_STUDENT_PATH, COLLECTION, CVES_ON_HOVER } from "../../../constants";
 import { db } from "../../../firebase/config";
 import type { PhotoKind } from "../../../firebase/studentPhotos";
+import StudentDocumentsPanel from "./documents/StudentDocumentsPanel";
 import { NO_SCOPE, PERMISSIONS } from "../../../permissions";
 import { myContext } from "../../context/MyContextProvider";
 import CustomButton from "../../../custom-components/CustomButton";
@@ -26,7 +27,7 @@ const STUDENT_LIST_PATH = "/welcome/student/list";
 type LoadState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; studentName: string };
+  | { status: "ready"; studentName: string; studentId: string };
 
 /**
  * View Student (Student List > View): the admission form of one enrollment,
@@ -98,7 +99,7 @@ function StudentView() {
           sessionStart: sessionStart ? sessionStart.slice(-2) : values.sessionStart,
           sessionEnd: sessionEnd ? sessionEnd.slice(-2) : values.sessionEnd,
         });
-        setState({ status: "ready", studentName: values.fullName });
+        setState({ status: "ready", studentName: values.fullName, studentId: studentSnapshot.id });
       } catch (error) {
         if (cancelled) return;
         console.error("Failed to load the student:", error);
@@ -224,6 +225,14 @@ function StudentView() {
             </A4Sheet>
           </div>
         </div>
+      )}
+
+      {/* Documents: on screen only, never printed with the admission form. */}
+      {state.status === "ready" && (
+        <section className="mx-auto mt-2 w-full max-w-4xl rounded-xl border border-gray-200 bg-white p-4 shadow-sm print:hidden">
+          <h2 className="mb-3 text-base font-bold text-gray-800">Documents</h2>
+          <StudentDocumentsPanel studentId={state.studentId} />
+        </section>
       )}
     </div>
   );

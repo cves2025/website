@@ -38,6 +38,26 @@ service firebase.storage {
       return hasRole(['admin']);
     }
 
+    // The 'student.documents' permission, as firestore.rules works it out
+    // (teacherCan): it is not a built-in default, so a teacher has it when
+    // granted to them, or saved for all teachers / class teachers on the
+    // Permissions page, and not revoked for them.
+    function canUploadDocuments() {
+      return isAdmin() || (hasRole(['teacher']) && teacherHasDocuments());
+    }
+
+    function teacherHasDocuments() {
+      let p = 'student.documents';
+      let overrides = profile().get('permissionOverrides', {});
+      let defaults = /databases/(default)/documents/panelSettings/rolePermissions;
+      return !(p in overrides.get('revoke', []))
+        && (p in overrides.get('grant', [])
+          || (firestore.exists(defaults)
+            && (p in firestore.get(defaults).data.get('teacher', [])
+              || (profile().get('isClassTeacher', false) == true
+                && p in firestore.get(defaults).data.get('classTeacher', [])))));
+    }
+
     function isImage() {
       return request.resource.contentType.matches('image/.*')
         && request.resource.size < 10 * 1024 * 1024;
@@ -91,6 +111,22 @@ service firebase.storage {
     // change is checked in firestore.rules).
     match /students/{studentId}/{fileName} {
       allow create, update: if isStaff() && isImage();
+      allow delete: if isAdmin();
+    }
+
+    // Student documents (Aadhaar ...; docs/features/student-documents.md):
+    // read by staff (above), opened with getBlob, never through a saved URL.
+    // Admin or a teacher with student.documents adds a version's files: a
+    // photo (the app always sends JPEG) or a PDF, up to 2 MB
+    // (STUDENT_DOCUMENT_MAX_BYTES); no video, Excel or other file. A file is
+    // never replaced; only the admin deletes one (a wrong upload, after the
+    // password on the page).
+    match /studentDocuments/{studentId}/{typeId}/{versionId}/{fileName} {
+      allow create: if canUploadDocuments()
+        && request.resource.size <= 2 * 1024 * 1024
+        && request.resource.contentType in ['image/jpeg', 'application/pdf']
+        && fileName.matches('(front|back)[.]jpg|file[.]pdf');
+      allow update: if false;
       allow delete: if isAdmin();
     }
 

@@ -7,6 +7,8 @@ export const PERMISSIONS = {
   STUDENT_FORM_VIEW: "student.formView",
   /** Change the student, father and mother photos (mobile app Students page). */
   STUDENT_PHOTO: "student.photo",
+  /** Upload a new version of a student's documents (Aadhaar ...). Every teacher may view them. */
+  STUDENT_DOCUMENTS: "student.documents",
   STUDENT_PROMOTE: "student.promote",
   /** Download Excel of the students (a teacher: only their own classes). */
   STUDENT_EXPORT: "student.export",

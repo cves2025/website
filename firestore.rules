@@ -191,6 +191,34 @@ service cloud.firestore {
           .hasOnly(['studentPhoto', 'fatherPhoto', 'motherPhoto', 'updatedAt']);
     }
 
+    // Student documents (docs/features/student-documents.md): every staff
+    // member reads; admin or student.documents adds a version (never
+    // changed) and moves the summary's `uploaded`; only the admin sets
+    // `verified` and deletes a version (after the password on the page).
+    match /studentDocuments/{studentId} {
+      allow read: if isStaff();
+      allow create: if isAdmin()
+        || (can('student.documents')
+          && request.resource.data.keys().hasOnly(['uploaded', 'updatedAt']));
+      allow update: if isAdmin()
+        || (can('student.documents')
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uploaded', 'updatedAt']));
+      allow delete: if false;
+
+      match /versions/{versionId} {
+        allow read: if isStaff();
+        allow create: if can('student.documents')
+          && request.resource.data.uploadedBy == request.auth.uid
+          && request.resource.data.files is list
+          && request.resource.data.files.size() >= 1
+          && request.resource.data.files.size() <= 2
+          && request.resource.data.typeId is string;
+        allow update: if false;
+        // Admin only, after the password on the page (a wrong upload).
+        allow delete: if isAdmin();
+      }
+    }
+
     match /enrollments/{enrollmentId} {
       allow read: if isStaff();
       allow write: if isAdmin();

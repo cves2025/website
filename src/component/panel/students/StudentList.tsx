@@ -22,7 +22,7 @@ import {
 } from "firebase/firestore";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
-import { Eye, FileSpreadsheet, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { Eye, FileSpreadsheet, FileText, Pencil, RotateCcw, Trash2 } from "lucide-react";
 
 import {
   ADD_STUDENT_PATH,
@@ -54,6 +54,10 @@ import {
 } from "../../../permissions";
 import { removeWrongEntry } from "../../../utils/studentRemoval";
 import StudentExportModal from "./StudentExportModal";
+import StudentDocumentsModal from "./documents/StudentDocumentsModal";
+import CircleCheckbox from "../../../custom-components/CircleCheckbox";
+import { useDocumentSummaries, useDocumentTypes } from "../../../hooks/useStudentDocuments";
+import { requiredDone } from "../../../utils/studentDocumentsService";
 import Modal from "../../../custom-components/Modal";
 import { Button as UIButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -231,7 +235,8 @@ export default function StudentList() {
   const canManage = can(PERMISSIONS.STUDENT_CREATE);
   // View / print the admission form; ON for teachers by default.
   const canViewForm = can(PERMISSIONS.STUDENT_FORM_VIEW);
-  const showActions = canManage || canViewForm;
+  // Every staff member may open a student's documents, so the column is always there.
+  const showActions = true;
   // Download Excel (admin; a teacher with student.export gets their own classes).
   const canExport = can(PERMISSIONS.STUDENT_EXPORT);
   const [exportOpen, setExportOpen] = useState(false);
@@ -375,12 +380,21 @@ export default function StudentList() {
     void loadStudents();
   }, [loadStudents]);
 
+  // Documents: types (for the "N/M docs" badge) and the "missing only" filter.
+  const { types: documentTypes } = useDocumentTypes();
+  const [docsMissingOnly, setDocsMissingOnly] = useState(false);
+  const [documentsOf, setDocumentsOf] = useState<StudentListRow | null>(null);
+  const requiredDocTypes = useMemo(
+    () => documentTypes.filter((type) => type.required && type.active),
+    [documentTypes],
+  );
+
   /* Back to the first page whenever the list content changes. */
   useEffect(() => {
     setPage(1);
-  }, [search, selectedClass, selectedSection, selectedYear, showBin]);
+  }, [search, selectedClass, selectedSection, selectedYear, showBin, docsMissingOnly]);
 
-  const students = useMemo(() => {
+  const listedStudents = useMemo(() => {
     const searchValue = search.trim().toLowerCase();
 
     // The list or the recycle bin.
@@ -429,6 +443,41 @@ export default function StudentList() {
     sortDirection,
     sortActive,
   ]);
+
+  /*
+   * Document summaries: only of the students on this page, or of every
+   * listed student while "Documents missing" is ticked (the filter needs them).
+   */
+  const docsFilterOn = docsMissingOnly && requiredDocTypes.length > 0;
+  const summaryIds = useMemo(() => {
+    const ids = (list: StudentListRow[]) =>
+      list.map((row) => row.studentId).filter((id) => id !== "");
+    if (docsFilterOn) return ids(listedStudents);
+    const pages = Math.max(1, Math.ceil(listedStudents.length / pageSize));
+    const current = Math.max(1, Math.min(page, pages));
+    return ids(listedStudents.slice((current - 1) * pageSize, current * pageSize));
+  }, [docsFilterOn, listedStudents, page, pageSize]);
+  const { summaries: docSummaries, reload: reloadDocSummaries } =
+    useDocumentSummaries(summaryIds, documentTypes.length > 0 && !loading);
+
+  /** "N/M" required documents of a student; null while not known. */
+  const docsOf = (row: StudentListRow) => {
+    const summary = docSummaries[row.studentId];
+    return summary ? requiredDone(summary, documentTypes) : null;
+  };
+
+  const students = useMemo(
+    () =>
+      docsFilterOn
+        ? listedStudents.filter((row) => {
+            const summary = docSummaries[row.studentId];
+            if (!summary) return true;
+            const { done, of } = requiredDone(summary, documentTypes);
+            return done < of;
+          })
+        : listedStudents,
+    [docsFilterOn, listedStudents, docSummaries, documentTypes],
+  );
 
   /** Removed students in the loaded classes (the recycle bin button's count). */
   const binCount = rows.filter((row) => row.isDeleted).length;
@@ -786,6 +835,15 @@ export default function StudentList() {
         />
       )}
 
+      <StudentDocumentsModal
+        student={documentsOf}
+        onClose={() => {
+          setDocumentsOf(null);
+          // The badge follows what was uploaded.
+          reloadDocSummaries();
+        }}
+      />
+
       {canManage && showBin && (
         <p className="rounded-lg border border-pink-200 bg-pink-50 px-4 py-2 text-sm text-gray-700">
           <b>Recycle bin:</b> removed students of the chosen year and class. Restore brings one back; Wrong entry
@@ -878,6 +936,19 @@ export default function StudentList() {
         </div>
       </div>
 
+      {/* Students still missing a required document (reads their summaries). */}
+      {requiredDocTypes.length > 0 && !showBin && (
+        <div className="flex justify-end">
+          <CircleCheckbox
+            id="student-docs-missing"
+            label={`Documents missing only (${requiredDocTypes.map((type) => type.name).join(", ")})`}
+            checked={docsMissingOnly}
+            onCheckedChange={setDocsMissingOnly}
+            className="font-semibold"
+          />
+        </div>
+      )}
+
       {/* Table */}
 
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
@@ -952,6 +1023,23 @@ export default function StudentList() {
 
                   <TableCell className="font-medium text-gray-800">
                     {student.studentName}
+                    {/* Required documents uploaded: a pink bar and "1/4". */}
+                    {requiredDocTypes.length > 0 && docsOf(student) && (
+                      <span
+                        className="-mt-0.5 flex items-center gap-2 leading-none"
+                        aria-label={`${docsOf(student)!.done} of ${docsOf(student)!.of} documents uploaded`}
+                      >
+                        <span className="h-1.5 w-20 overflow-hidden rounded-full bg-[#f2dfe8]" aria-hidden="true">
+                          <span
+                            className="block h-full rounded-full bg-[#ad1a6f] transition-[width] duration-500"
+                            style={{ width: `${(docsOf(student)!.done / Math.max(1, docsOf(student)!.of)) * 100}%` }}
+                          />
+                        </span>
+                        <span className="text-[11px] font-semibold tabular-nums text-[#ad1a6f]" aria-hidden="true">
+                          {docsOf(student)!.done}/{docsOf(student)!.of}
+                        </span>
+                      </span>
+                    )}
                   </TableCell>
 
                   <TableCell>{student.className}</TableCell>
@@ -977,6 +1065,19 @@ export default function StudentList() {
                             className="h-8 w-8 bg-green-600 text-white hover:bg-green-700"
                           >
                             <Eye className="h-4 w-4" />
+                          </UIButton>
+                        )}
+
+                        {!showBin && student.studentId && (
+                          <UIButton
+                            type="button"
+                            size="icon"
+                            title="Documents"
+                            aria-label={`Documents of ${student.studentName}`}
+                            onClick={() => setDocumentsOf(student)}
+                            className="h-8 w-8 bg-navy text-white hover:bg-navy-light"
+                          >
+                            <FileText className="h-4 w-4" />
                           </UIButton>
                         )}
 
