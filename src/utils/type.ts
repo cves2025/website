@@ -50,6 +50,8 @@ export interface PhysicalStatus {
  */
 export interface AdmissionStudentFormValues extends StudentFormValues {
   fullName: string;
+  /** Admitted in this session (counted on the dashboard), saved on the enrollment. */
+  isNewAdmission: boolean;
   fatherOccupation: string;
   gender: string;
   category: string;

@@ -1,5 +1,8 @@
 import {
   collectionTotal,
+  newAdmissionsOf,
+  studentCountsOf,
+  type StudentCounts,
   schoolAttendanceOn,
   sectionsAttendanceOn,
   tcCountsOf,
@@ -67,6 +70,39 @@ export function useMarkedSectionsOn(date: string, enabled: boolean) {
     { initial: null, enabled: enabled && Boolean(date), errorMessage: "Marked sections could not be loaded." }
   );
   return { markedKeys: data, loading, error };
+}
+
+export interface AdmissionStats {
+  /** Students of `sessions[0]` (the current session). */
+  current: StudentCounts;
+  /** New admissions of each of `sessions`. */
+  newAdmissions: Record<string, number>;
+}
+
+/**
+ * Students (male / female) of the first of `sessions` and the new admissions
+ * of each: 6 + 1 per session counts.
+ */
+export function useAdmissionStats(sessions: string[], enabled = true) {
+  const { data, loading, error } = useAsyncData<AdmissionStats>(
+    async () => {
+      const [current, ...counts] = await Promise.all([
+        studentCountsOf(sessions[0]),
+        ...sessions.map((session) => newAdmissionsOf(session)),
+      ]);
+      return {
+        current: current as StudentCounts,
+        newAdmissions: Object.fromEntries(sessions.map((session, index) => [session, counts[index] as number])),
+      };
+    },
+    [sessions.join(",")],
+    {
+      initial: { current: { students: 0, male: 0, female: 0 }, newAdmissions: {} },
+      enabled: enabled && sessions.length > 0,
+      errorMessage: "Student counts could not be loaded.",
+    }
+  );
+  return { stats: data, loading, error };
 }
 
 /** TC counts (issued / cancelled / draft) of each of `sessions`, by session. */

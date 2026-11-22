@@ -21,7 +21,11 @@ The form looks like the printed admission form, in two pages (Student Info, then
 - `students/{id}`: master record (name parts, `enrollment`, parents, contacts, addresses,
   photos, `isDeleted` = recycle bin).
 - `enrollments/{id}`: one per student per session (`academicYear`, `className`, `section`,
-  `enrollment`, `studentName`, `fatherName`, `phone`, `studentId`).
+  `enrollment`, `studentName`, `fatherName`, `phone`, `studentId`, `isNewAdmission`, `gender`).
+  `isNewAdmission`: the "Is this new admission?" CircleCheckbox on page 1 (ticked by default for a
+  new student; edit loads it from the enrollment). Counted per session by the dashboard Students
+  card. Promotion does not carry it (`studentPromotion.ts`); Bulk Import does not set it.
+  `gender` is copied onto the enrollment (Add Student, Bulk Import) for the male / female counts.
 - `panelSettings/enrollmentCounter` (`PRE_DEFINED_DOC_ID.ENROLLMENT_COUNTER`):
   `{ lastEnrollment }` = highest numeric Enrollment No. in use.
 

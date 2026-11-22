@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { useForm, SubmitHandler, FieldPath, get } from "react-hook-form";
+import { Controller, useForm, SubmitHandler, FieldPath, get } from "react-hook-form";
 import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { AdmissionStudentFormValues } from "../../../utils/type";
 import BulkStudentImport from "../BulkStudentImport";
 import CustomButton from "../../../custom-components/CustomButton";
+import CircleCheckbox from "../../../custom-components/CircleCheckbox";
 import Modal from "../../../custom-components/Modal";
 import { generateAcademicYears } from "../../../utils/generateAcademicYears";
 import {
@@ -59,6 +60,7 @@ const defaultValues: AdmissionStudentFormValues = {
   address: "",
   academicYear: "",
   fullName: "",
+  isNewAdmission: true,
   fatherOccupation: "",
   gender: "",
   category: "",
@@ -202,6 +204,10 @@ function buildEnrollmentFields(
     className: data.className,
     section: data.section,
     enrollment: data.enrollment.trim(),
+    // Counted as a new admission of this session on the dashboard.
+    isNewAdmission: data.isNewAdmission === true,
+    // Male / female counts of a session on the dashboard.
+    gender: data.gender,
     studentName: fullName,
     firstName,
     lastName,
@@ -499,7 +505,10 @@ function AddStudent() {
           throw new Error("Student record not found.");
         }
         if (cancelled) return;
-        reset(studentDocToFormValues(studentSnapshot.data()));
+        reset({
+          ...studentDocToFormValues(studentSnapshot.data()),
+          isNewAdmission: enrollmentSnapshot.data().isNewAdmission === true,
+        });
         setPendingStudentPhoto(null);
         setPendingFatherPhoto(null);
         setPendingMotherPhoto(null);
@@ -1002,6 +1011,20 @@ function AddStudent() {
           />
 
           <div className="mt-8 flex flex-wrap items-center justify-end gap-3">
+            {/* Ticked = counted as a new admission of this session (dashboard). */}
+            <Controller
+              control={control}
+              name="isNewAdmission"
+              render={({ field }) => (
+                <CircleCheckbox
+                  id="isNewAdmission"
+                  label="Is this new admission?"
+                  checked={field.value === true}
+                  onCheckedChange={field.onChange}
+                  className="mr-auto font-sans font-semibold"
+                />
+              )}
+            />
             <CustomButton type="button" variant="cves" onClick={handleNext}>
               Next
             </CustomButton>

@@ -494,6 +494,7 @@ export const PHONE_PATTERN: RegExp = /^[0-9+\-\s()]*$/;
 
 // Routes
 export const ADD_STUDENT_PATH = "/welcome/student/add";
+export const STUDENT_LIST_PATH = "/welcome/student/list";
 /** View / print one student's admission form: `?id=<enrollmentId>`. */
 export const VIEW_STUDENT_PATH = "/welcome/student/view";
 
@@ -648,6 +649,13 @@ export const TC_SETTINGS_PATH = "/welcome/student/tc/settings";
 
 /** Sessions shown year-wise on the dashboard TC card (newest first). */
 export const TC_DASHBOARD_SESSIONS = 5;
+
+/**
+ * Dashboard Students card: the current session's students (male / female) and
+ * the new admissions (enrollments with `isNewAdmission`) of the last
+ * ADMISSION_DASHBOARD_SESSIONS sessions (generateAcademicYears, from 2026-27).
+ */
+export const ADMISSION_DASHBOARD_SESSIONS = 3;
 
 /** Public page the TC's QR code opens: `/verify-tc/<tcId>` (no login). */
 export const TC_VERIFY_PATH = "/verify-tc";

@@ -19,6 +19,8 @@ export function studentDocToFormValues(doc: DocumentData): AdmissionStudentFormV
     firstName: doc.firstName ?? "",
     lastName: doc.lastName ?? "",
     fullName: doc.fullName ?? "",
+    // Kept on the enrollment, not the student doc: the edit loader sets it.
+    isNewAdmission: false,
     enrollment: doc.enrollment ?? "",
     className: doc.className ?? "",
     section: doc.section ?? "A",

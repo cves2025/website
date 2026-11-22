@@ -41,6 +41,7 @@ Done:
 4. Email/Password sign-in and Storage (asia-south1) enabled in `childrensvalley`.
 5. Cloud Run service account `913523658602-compute@developer.gserviceaccount.com` got
    `roles/firebaseauth.admin`, `roles/datastore.user`, `roles/serviceusage.serviceUsageConsumer`
+   and `roles/firebasecloudmessaging.admin` (app push; without it the bell works but no push)
    in `childrensvalley`.
 6. Rules, indexes and storage rules deployed to `childrensvalley`; CORS set on its bucket.
 7. Pictures: 386 files copied into `childrensvalley.firebasestorage.app` (60 from

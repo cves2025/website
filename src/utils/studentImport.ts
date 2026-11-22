@@ -1417,6 +1417,8 @@ export function toFirestoreEnrollment(row: StudentRow, studentId: string) {
     className: row.className,
     section: row.section,
     enrollment: row.enrollment,
+    // Male / female counts of a session on the dashboard.
+    gender: row.gender,
     studentName: row.fullName,
     firstName: row.firstName,
     lastName: row.lastName,

@@ -155,6 +155,46 @@ export interface TcCounts {
   draft: number;
 }
 
+export interface StudentCounts {
+  /** Enrollments of the session not in the recycle bin. */
+  students: number;
+  male: number;
+  female: number;
+}
+
+/** Count of the enrollments of a session with more equality filters. */
+const enrollmentCount = async (session: string, ...filters: ReturnType<typeof where>[]) =>
+  (
+    await getCountFromServer(
+      query(collection(db, COLLECTION.ENROLLMENTS), where("academicYear", "==", session), ...filters)
+    )
+  ).data().count;
+
+/**
+ * Students of a session, male and female: six counts. Older enrollments have
+ * no `isDeleted`, so each = all - deleted (as the class counts do). Gender is
+ * on the enrollment (`gender`, "Male" / "Female"). Equality filters only: no
+ * composite index.
+ */
+export async function studentCountsOf(session: string): Promise<StudentCounts> {
+  const deleted = where("isDeleted", "==", true);
+  const male = where("gender", "==", "Male");
+  const female = where("gender", "==", "Female");
+  const [all, allDeleted, males, malesDeleted, females, femalesDeleted] = await Promise.all([
+    enrollmentCount(session),
+    enrollmentCount(session, deleted),
+    enrollmentCount(session, male),
+    enrollmentCount(session, male, deleted),
+    enrollmentCount(session, female),
+    enrollmentCount(session, female, deleted),
+  ]);
+  return { students: all - allDeleted, male: males - malesDeleted, female: females - femalesDeleted };
+}
+
+/** Enrollments of a session saved with "Is this new admission?" (left ones too: they were admitted). */
+export const newAdmissionsOf = (session: string) =>
+  enrollmentCount(session, where("isNewAdmission", "==", true));
+
 /** TCs of a session by status (three counts; equality filters need no composite index). */
 export async function tcCountsOf(session: string): Promise<TcCounts> {
   const countOf = async (status: keyof TcCounts) =>

@@ -7,6 +7,7 @@ import AttendanceTodayCard from "../panel/attendance/AttendanceTodayCard";
 import MarksPendingCard from "../panel/marks/MarksPendingCard";
 import FeeTodayCard from "../panel/fees/FeeTodayCard";
 import TcDashboardCard from "../panel/students/tc/TcDashboardCard";
+import AdmissionDashboardCard from "../panel/students/AdmissionDashboardCard";
 
 const greeting = (hour: number) =>
   hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -35,10 +36,11 @@ function Dashboard() {
         </div>
 
         {/* Cards over the banner, all the same height */}
-        <div className="-mt-20 grid grid-cols-1 items-stretch gap-6 px-6 md:px-12 xl:grid-cols-2">
+        <div className="-mt-20 grid grid-cols-1 items-stretch gap-6 px-6 md:px-12 lg:grid-cols-2 xl:grid-cols-3">
           <AttendanceTodayCard />
           <MarksPendingCard />
           <TcDashboardCard />
+          <AdmissionDashboardCard />
           <FeeTodayCard />
         </div>
       </div>

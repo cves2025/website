@@ -524,6 +524,8 @@ export async function promoteStudents(params: {
       const {
         promotion: _promotion,
         promotedFrom: _promotedFrom,
+        // A promoted student is not a new admission of the next session.
+        isNewAdmission: _isNewAdmission,
         createdAt: _createdAt,
         updatedAt: _updatedAt,
         ...carried
