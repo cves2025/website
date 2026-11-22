@@ -527,8 +527,8 @@ export const FEE_COLLECT_PATH = "/welcome/fees/collect";
 export const IDLE_LOCK_MS = 5 * 60 * 1000;
 /** Wrong passwords on the lock screen before the user is logged out. */
 export const IDLE_LOCK_MAX_ATTEMPTS = 5;
-/** After a right password / PIN: the "Verified" tick shows, then the lock fades away (ms). */
-export const UNLOCK_VERIFIED_MS = 550;
+/** After a right password / PIN: the "Verified" tick draws itself (this long), then the lock fades away (ms). */
+export const UNLOCK_VERIFIED_MS = 2000;
 export const UNLOCK_FADE_MS = 300;
 /** Browser keys (shared by the tabs): last activity time, and the locked user. */
 export const IDLE_ACTIVITY_KEY = "cves:lastActivity";

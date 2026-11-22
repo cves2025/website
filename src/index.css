@@ -390,3 +390,18 @@ body {
   .dash-grid > section::before { transition: none; }
   .dash-grid > section:hover { transform: none; }
 }
+
+/* Lock screen "Verified" (IdleLockScreen.tsx): the tick draws itself
+   (pathLength 1, duration set inline = UNLOCK_VERIFIED_MS). */
+@keyframes unlockTick {
+  0%, 12% { stroke-dashoffset: 1; }
+  100% { stroke-dashoffset: 0; }
+}
+.unlock-tick {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: unlockTick 2s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .unlock-tick { animation: none; stroke-dashoffset: 0; }
+}

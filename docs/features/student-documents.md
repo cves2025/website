@@ -1,6 +1,6 @@
 # Student documents (Aadhaar, birth certificate ...): upload, versions, verified
 
-Website: built. Mobile app: still to build (see the end).
+Website and mobile app: built.
 
 ## Rules agreed with the school
 
@@ -60,8 +60,10 @@ for a permission that is not a built-in default: granted to the teacher, or in
 Modal / View: types (1) + summary (1) + the student's versions. List badge: the page's
 summaries (30 per query); the "missing" tick reads every listed student's summary once.
 
-## Mobile (to build)
+## Mobile app
 
-`features/students`: a Documents screen per student like the photo update (types, upload from
-camera / gallery / PDF picker, versions, open); `services/studentDocumentsService.ts` mirrors
-the website service; same rules.
+On the Students page (`features/students`), for the admin and `student.documents` only (they
+see and upload there): a pink "1/4" bar under each name opens `StudentDocumentsDialog` (state
+per type, upload a version: Front + Back photos or a PDF; admin: download via the share sheet).
+Verify, delete and the types stay on the website. `services/studentDocumentsService.ts` mirrors
+the website service (same documents, fields, paths). Map: mobile docs/APP_MAP.md.

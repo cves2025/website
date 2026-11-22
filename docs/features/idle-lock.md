@@ -13,7 +13,7 @@ locked; going back to the panel from it uses the normal lock.
 | File | What it does |
 |---|---|
 | `src/hooks/useIdleLock.ts` | Tracks activity, counts down (`remainingMs`), `lock()` / `unlock()`. Last activity (`IDLE_ACTIVITY_KEY`) and the lock (`IDLE_LOCKED_KEY` = uid) are in localStorage: shared by every open tab, and a reload stays locked |
-| `src/component/IdleLockScreen.tsx` | Lock screen: password checked by Firebase (`reauthenticateWithCredential`), `IDLE_LOCK_MAX_ATTEMPTS` (5) wrong tries -> logged out; "Log out" button. Right password / PIN: cves tick "Verified" (`UNLOCK_VERIFIED_MS`), then the lock fades away (`UNLOCK_FADE_MS`) before `onUnlock`; at once with prefers-reduced-motion (same on the app) |
+| `src/component/IdleLockScreen.tsx` | Lock screen: password checked by Firebase (`reauthenticateWithCredential`), `IDLE_LOCK_MAX_ATTEMPTS` (5) wrong tries -> logged out; "Log out" button. Right password / PIN: cves tick "Verified" that draws itself in 2 s (`UNLOCK_VERIFIED_MS`, `.unlock-tick` in index.css), then the lock fades away (`UNLOCK_FADE_MS`) before `onUnlock`; at once with prefers-reduced-motion (same on the app) |
 | `src/component/Welcome.tsx` | Uses the hook for admins; header timer chip (lock icon + m:ss, amber in the last minute, click = lock now); renders the lock screen |
 | `src/constants.ts` | `IDLE_LOCK_MS`, `IDLE_LOCK_MAX_ATTEMPTS`, `IDLE_ACTIVITY_KEY`, `IDLE_LOCKED_KEY`, `UNLOCK_VERIFIED_MS`, `UNLOCK_FADE_MS` |
 

@@ -11,7 +11,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
-import { Check, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 
 import {
   IDLE_LOCK_MAX_ATTEMPTS,
@@ -168,7 +168,10 @@ function IdleLockScreen({ email, name, onUnlock, onLogout }: IdleLockScreenProps
           aria-live="polite"
         >
           <span className="grid h-16 w-16 animate-[zoomIn_0.35s_ease-out] place-items-center rounded-full bg-cves text-white shadow-md">
-            <Check className="h-8 w-8" strokeWidth={3} aria-hidden="true" />
+            {/* The tick draws itself in UNLOCK_VERIFIED_MS (.unlock-tick in index.css). */}
+            <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 12l5 5L20 6" pathLength={1} className="unlock-tick" style={{ animationDuration: `${UNLOCK_VERIFIED_MS}ms` }} />
+            </svg>
           </span>
           <h2 id="idle-lock-title" className="mt-3 text-lg font-bold text-gray-900">
             Verified
