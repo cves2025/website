@@ -17,7 +17,7 @@ import {
   where,
 } from "firebase/firestore";
 
-import { COLLECTION } from "../constants";
+import { CLASSES, COLLECTION, SECTIONS } from "../constants";
 import { db } from "../firebase/config";
 import { loadAttendanceOnDate, loadDailyAttendance } from "./attendanceService";
 import { loadPaymentsBetween } from "./feeService";
@@ -190,6 +190,29 @@ export async function studentCountsOf(session: string): Promise<StudentCounts> {
     enrollmentCount(session, female, deleted),
   ]);
   return { students: all - allDeleted, male: males - malesDeleted, female: females - femalesDeleted };
+}
+
+export interface ClassSectionCounts {
+  /** Classes (CLASSES) with at least one student in the session. */
+  classes: number;
+  /** Section names (SECTIONS: A, B ...) with at least one student, in any class. */
+  sections: number;
+}
+
+/**
+ * Classes and sections in use in a session: one count per class and one per
+ * section name (CLASSES + SECTIONS counts). Active = `isDeleted == false`
+ * (Add Student, Bulk Import and promotion all save it). Equality filters
+ * only: no composite index.
+ */
+export async function classSectionCountsOf(session: string): Promise<ClassSectionCounts> {
+  const active = where("isDeleted", "==", false);
+  const used = async (field: string, values: string[]) =>
+    (
+      await Promise.all(values.map((value) => enrollmentCount(session, active, where(field, "==", value))))
+    ).filter((count) => count > 0).length;
+  const [classes, sections] = await Promise.all([used("className", CLASSES), used("section", SECTIONS)]);
+  return { classes, sections };
 }
 
 /** Enrollments of a session saved with "Is this new admission?" (left ones too: they were admitted). */

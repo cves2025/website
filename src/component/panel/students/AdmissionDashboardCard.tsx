@@ -82,7 +82,7 @@ function AdmissionCard({ className }: { className: string }) {
     []
   );
   const { stats, loading, error } = useAdmissionStats(sessions);
-  const { current, newAdmissions } = stats;
+  const { current, classSections, newAdmissions } = stats;
   const most = Math.max(1, ...sessions.map((item) => newAdmissions[item] ?? 0));
   const small = (value: number) => (loading ? <Spinner size="xs" label="" /> : value);
 
@@ -112,6 +112,20 @@ function AdmissionCard({ className }: { className: string }) {
             <span className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full" style={{ background: FEMALE }} />
               {small(current.female)} Female
+            </span>
+          </p>
+          {/* Classes and sections that have students this session. */}
+          <p className="mt-1 flex min-h-5 flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-gray-600 sm:justify-start">
+            <span>
+              <span className="font-semibold text-gray-900 tabular-nums">{small(classSections.classes)}</span>{" "}
+              {classSections.classes === 1 ? "Class" : "Classes"}
+            </span>
+            <span className="text-gray-300" aria-hidden="true">
+              |
+            </span>
+            <span>
+              <span className="font-semibold text-gray-900 tabular-nums">{small(classSections.sections)}</span>{" "}
+              {classSections.sections === 1 ? "Section" : "Sections"}
             </span>
           </p>
         </div>
