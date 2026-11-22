@@ -2,8 +2,17 @@
 
 Dashboard card for admins (whole school) and teachers with `MARKS_ENTER` / `MARKS_VIEW` (only the
 classes / subjects they teach, plus their class-teacher classes). For one exam of the current
-session (active, started; the latest by default) it shows per class + section: complete, in
-progress (which subjects miss how many marks) or not started.
+session it shows per class + section: complete, in progress (which subjects miss how many marks)
+or not started.
+
+- **Current exam (default):** the active exam of the session with the latest start date on or
+  before today; it stays current (going on, then over while marks are entered) until the next one
+  starts. The dropdown also offers the earlier started exams; it is hidden when there is only one.
+  An exam without dates is not listed (the card names it: add its dates).
+- Under the title a chip: "Going on · ends <date>" or "Over on <date> · marks entry".
+- Big number = classes complete of all (`N / M`) and
+  tiles Classes complete / In progress / Not started / Marks left.
+- Session = `generateAcademicYears()[0]` (newest first).
 
 ## Files
 

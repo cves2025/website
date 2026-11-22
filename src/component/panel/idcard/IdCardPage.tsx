@@ -45,8 +45,8 @@ const KIND_PERMISSION: Record<IdCardKind, Permission> = {
 };
 
 const sessions = generateAcademicYears();
-/** The latest session (the list runs oldest first). */
-const currentSession = sessions[sessions.length - 1]?.value ?? "";
+/** The current session (generateAcademicYears lists the newest first). */
+const currentSession = sessions[0]?.value ?? "";
 const classOptions = CLASS_OPTIONS.map((option) => ({ ...option, label: toOrdinalLabel(option.value) }));
 const sectionOptions = ADMISSION_SECTIONS.map((section) => ({ value: section, label: `Section ${section}` }));
 
