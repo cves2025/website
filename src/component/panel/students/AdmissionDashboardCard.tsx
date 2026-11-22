@@ -140,10 +140,10 @@ function AdmissionCard({ className }: { className: string }) {
               const value = newAdmissions[item] ?? 0;
               const latest = item === sessions[0];
               return (
-                <Tooltip key={item} content={`${item}: ${value} new admissions`} className="block">
+                <Tooltip key={item} content={`${item}: ${value} new admissions`} className="w-full">
                   <div
                     role="listitem"
-                    className={`grid grid-cols-[3.75rem_minmax(0,1fr)_2rem] items-center gap-2 py-0.5 text-xs ${
+                    className={`grid w-full grid-cols-[3.75rem_minmax(0,1fr)_2rem] items-center gap-2 py-0.5 text-xs ${
                       latest ? "font-bold text-navy" : "text-gray-700"
                     }`}
                   >

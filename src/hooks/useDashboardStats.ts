@@ -2,7 +2,9 @@ import {
   classSectionCountsOf,
   collectionTotal,
   newAdmissionsOf,
+  peopleCountsOf,
   type ClassSectionCounts,
+  type PeopleCounts,
   studentCountsOf,
   type StudentCounts,
   schoolAttendanceOn,
@@ -110,6 +112,30 @@ export function useAdmissionStats(sessions: string[], enabled = true) {
       },
       enabled: enabled && sessions.length > 0,
       errorMessage: "Student counts could not be loaded.",
+    }
+  );
+  return { stats: data, loading, error };
+}
+
+export interface PeopleStats {
+  teachers: PeopleCounts;
+  staff: PeopleCounts;
+}
+
+const NO_PEOPLE: PeopleCounts = { total: 0, active: 0, male: 0, female: 0, onLeave: 0, halfDayLeave: 0 };
+
+/** Teachers and staff (gender, active) and who is on leave on `date`: 12 counts. Admin only. */
+export function usePeopleStats(date: string, enabled = true) {
+  const { data, loading, error } = useAsyncData<PeopleStats>(
+    async () => {
+      const [teachers, staff] = await Promise.all([peopleCountsOf("teacher", date), peopleCountsOf("staff", date)]);
+      return { teachers, staff };
+    },
+    [date],
+    {
+      initial: { teachers: NO_PEOPLE, staff: NO_PEOPLE },
+      enabled: enabled && Boolean(date),
+      errorMessage: "Teacher and staff counts could not be loaded.",
     }
   );
   return { stats: data, loading, error };

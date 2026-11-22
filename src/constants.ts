@@ -657,6 +657,10 @@ export const TC_DASHBOARD_SESSIONS = 5;
  */
 export const ADMISSION_DASHBOARD_SESSIONS = 3;
 
+/** Dashboard Teachers & Staff card links. */
+export const TEACHERS_PATH = "/welcome/teacher/add";
+export const STAFF_ATTENDANCE_PATH = "/welcome/staff-attendance";
+
 /** Public page the TC's QR code opens: `/verify-tc/<tcId>` (no login). */
 export const TC_VERIFY_PATH = "/verify-tc";
 

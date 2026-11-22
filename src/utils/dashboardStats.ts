@@ -215,6 +215,55 @@ export async function classSectionCountsOf(session: string): Promise<ClassSectio
   return { classes, sections };
 }
 
+export interface PeopleCounts {
+  /** Not deleted (`isDeleted == false`). */
+  total: number;
+  /** Status "Active" of those. */
+  active: number;
+  male: number;
+  female: number;
+  /** On leave today (staffAttendance `status == "leave"`). */
+  onLeave: number;
+  /** On a half-day leave today (`halfDayLeave == true`). */
+  halfDayLeave: number;
+}
+
+const usersCount = async (role: string, ...filters: ReturnType<typeof where>[]) =>
+  (
+    await getCountFromServer(
+      query(collection(db, COLLECTION.USERS), where("role", "==", role), where("isDeleted", "==", false), ...filters)
+    )
+  ).data().count;
+
+const leaveCount = async (date: string, personType: string, filter: ReturnType<typeof where>) =>
+  (
+    await getCountFromServer(
+      query(
+        collection(db, COLLECTION.STAFF_ATTENDANCE),
+        where("date", "==", date),
+        where("personType", "==", personType),
+        filter
+      )
+    )
+  ).data().count;
+
+/**
+ * Teachers or staff (`role`, users) and who is on leave on `date`: six counts.
+ * Gender is saved "Male" / "Female" (GENDER_OPTIONS). The leave counts read
+ * staffAttendance (admin only, rules). Equality filters only: no composite index.
+ */
+export async function peopleCountsOf(role: string, date: string): Promise<PeopleCounts> {
+  const [total, active, male, female, onLeave, halfDayLeave] = await Promise.all([
+    usersCount(role),
+    usersCount(role, where("status", "==", "Active")),
+    usersCount(role, where("gender", "==", "Male")),
+    usersCount(role, where("gender", "==", "Female")),
+    leaveCount(date, role, where("status", "==", "leave")),
+    leaveCount(date, role, where("halfDayLeave", "==", true)),
+  ]);
+  return { total, active, male, female, onLeave, halfDayLeave };
+}
+
 /** Enrollments of a session saved with "Is this new admission?" (left ones too: they were admitted). */
 export const newAdmissionsOf = (session: string) =>
   enrollmentCount(session, where("isNewAdmission", "==", true));

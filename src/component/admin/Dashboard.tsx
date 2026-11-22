@@ -8,6 +8,7 @@ import MarksPendingCard from "../panel/marks/MarksPendingCard";
 import FeeTodayCard from "../panel/fees/FeeTodayCard";
 import TcDashboardCard from "../panel/students/tc/TcDashboardCard";
 import AdmissionDashboardCard from "../panel/students/AdmissionDashboardCard";
+import PeopleDashboardCard from "../panel/teacher/PeopleDashboardCard";
 
 const greeting = (hour: number) =>
   hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -41,6 +42,7 @@ function Dashboard() {
           <MarksPendingCard />
           <TcDashboardCard />
           <AdmissionDashboardCard />
+          <PeopleDashboardCard />
           <FeeTodayCard />
         </div>
       </div>
