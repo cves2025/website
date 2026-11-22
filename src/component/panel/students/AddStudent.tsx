@@ -1018,10 +1018,11 @@ function AddStudent() {
               render={({ field }) => (
                 <CircleCheckbox
                   id="isNewAdmission"
-                  label="Is this new admission?"
+                  label="IS THIS NEW ADMISSION?"
                   checked={field.value === true}
                   onCheckedChange={field.onChange}
-                  className="mr-auto font-sans font-semibold"
+                  // Same as "MANDATORY E-MAIL ADDRESS" on the sheet: Times, green, semibold.
+                  className="mr-auto text-sm font-semibold text-green-800 sm:text-base"
                 />
               )}
             />

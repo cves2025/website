@@ -173,13 +173,14 @@ const enrollmentCount = async (session: string, ...filters: ReturnType<typeof wh
 /**
  * Students of a session, male and female: six counts. Older enrollments have
  * no `isDeleted`, so each = all - deleted (as the class counts do). Gender is
- * on the enrollment (`gender`, "Male" / "Female"). Equality filters only: no
+ * on the enrollment (`gender`, "MALE" / "FEMALE"). Equality filters only: no
  * composite index.
  */
 export async function studentCountsOf(session: string): Promise<StudentCounts> {
   const deleted = where("isDeleted", "==", true);
-  const male = where("gender", "==", "Male");
-  const female = where("gender", "==", "Female");
+  // The admission form and Bulk Import save gender in capitals.
+  const male = where("gender", "==", "MALE");
+  const female = where("gender", "==", "FEMALE");
   const [all, allDeleted, males, malesDeleted, females, femalesDeleted] = await Promise.all([
     enrollmentCount(session),
     enrollmentCount(session, deleted),
