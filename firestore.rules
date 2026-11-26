@@ -81,7 +81,7 @@ service cloud.firestore {
     function teacherBlocked() {
       return ['student.create', 'student.promote', 'teacher.create', 'exam.manage',
               'examSettings.access', 'settings.access', 'permissions.manage', 'fee.manage',
-              'tc.settings', 'staffAttendance.manage'];
+              'tc.settings', 'staffAttendance.manage', 'udise.manage'];
     }
 
     // LEGACY_CATALOG_PERMISSIONS: what the Permissions page offered before it
@@ -327,6 +327,14 @@ service cloud.firestore {
       allow read: if docId == 'homeBanner' || isStaff();
       allow write: if (docId == 'homeBanner' && can('banner.manage'))
         || (docId != 'homeBanner' && isAdmin());
+    }
+
+    // ---------- UDISE+ (testing) ----------
+
+    // The UDISE-only answers of a student (docs/features/udise.md). Admin only;
+    // the module reads students / enrollments, it never writes them.
+    match /udiseStudents/{studentId} {
+      allow read, write: if isAdmin();
     }
 
     // ---------- transfer certificates ----------

@@ -19,6 +19,9 @@ import type {
   TcRow,
   TcSettings,
   TcStatus,
+  UdiseFieldDef,
+  UdiseSettings,
+  UdiseStep,
 } from "./utils/type";
 
 export const COLLECTION = {
@@ -1099,3 +1102,236 @@ export const TABLE_HEAD_ROW_CLASS = "bg-navy hover:bg-navy";
 
 /** A <TableHead> cell of the shadcn Table. */
 export const TABLE_HEAD_CELL_CLASS = "text-xs font-semibold uppercase tracking-wide text-white";
+
+/* ------------------------------------------------------- UDISE+ (testing) -- */
+// A separate module (docs/features/udise.md): it only READS students / enrollments;
+// its own fields live in COLLECTION.UDISE_STUDENTS and its settings in
+// settings/{UDISE_SETTINGS_DOC}. The codes are the UDISE+ SDMS portal's own.
+
+/** UDISE+ page; `?tab=settings` opens its settings. */
+export const UDISE_PATH = "/welcome/udise";
+/** udiseStudents/{studentId}: the UDISE-only answers of one student (admin only). */
+export const UDISE_STUDENTS_COLLECTION = "udiseStudents";
+/** Document id inside COLLECTION.SETTINGS: school-wide UDISE defaults + class codes. */
+export const UDISE_SETTINGS_DOC = "udise";
+
+export const UDISE_STEP_LABEL: Record<UdiseStep, string> = {
+  GP: "General Profile",
+  EP: "Enrolment Profile",
+  FP: "Facility Profile",
+};
+
+/** Portal class codes of our classes (UDISE+ "Grade/Class": PP-3 = -3 ... XII = 12). */
+export const DEFAULT_UDISE_CLASS_CODES: Record<string, string> = {
+  PG: "",
+  Nursery: "-3",
+  LKG: "-2",
+  UKG: "-1",
+  "1": "1",
+  "2": "2",
+  "3": "3",
+  "4": "4",
+  "5": "5",
+  "6": "6",
+  "7": "7",
+  "8": "8",
+};
+
+export const UDISE_CLASS_OPTIONS = [
+  { value: "-3", label: "PP-3 (Nursery / KG)" },
+  { value: "-2", label: "PP-2 (LKG)" },
+  { value: "-1", label: "PP-1 (UKG)" },
+  ...["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"].map((label, index) => ({
+    value: String(index + 1),
+    label,
+  })),
+];
+
+/** Our category -> portal Social Category code. */
+export const UDISE_CATEGORY_CODES: Record<string, string> = { GENERAL: "1", SC: "2", ST: "3", OBC: "4" };
+
+/** Our blood group text -> portal code (9 = Under Investigation). */
+export const UDISE_BLOOD_GROUP_CODES: Record<string, string> = {
+  "A+": "1",
+  "A-": "2",
+  "B+": "3",
+  "B-": "4",
+  "O+": "5",
+  "O-": "6",
+  "AB+": "7",
+  "AB-": "8",
+};
+
+/**
+ * Every UDISE+ field the module knows, in portal order. `key` = the portal's
+ * `formcontrolname`. `derived`: filled from our student data (still changeable
+ * per student); `defaultable`: a school-wide default can be set on the
+ * Settings tab. `radio`: ids of the portal's Yes / No radio buttons.
+ */
+export const UDISE_FIELDS: UdiseFieldDef[] = [
+  // ----- GP: General Profile
+  { key: "address", step: "GP", no: "4.1.9 (a)", label: "Address", kind: "text", required: true, derived: true, maxLength: 150 },
+  { key: "pincode", step: "GP", no: "4.1.9 (b)", label: "Pincode", kind: "number", required: true, derived: true, maxLength: 6 },
+  { key: "primaryMobile", step: "GP", no: "4.1.10 (a)", label: "Mobile Number", kind: "number", required: true, derived: true, maxLength: 10 },
+  { key: "secondaryMobile", step: "GP", no: "4.1.10 (b)", label: "Alternate Mobile Number", kind: "number", derived: true, maxLength: 10 },
+  { key: "email", step: "GP", no: "4.1.11", label: "Contact e-mail", kind: "text", derived: true },
+  {
+    key: "motherTongue", step: "GP", no: "4.1.12", label: "Mother Tongue (search text on the portal, e.g. 42-HINDI)",
+    kind: "text", required: true, defaultable: true,
+  },
+  {
+    key: "socCatId", step: "GP", no: "4.1.13", label: "Social Category", kind: "select", required: true, derived: true,
+    options: [
+      { value: "1", label: "1 - GENERAL" },
+      { value: "2", label: "2 - SC" },
+      { value: "3", label: "3 - ST" },
+      { value: "4", label: "4 - OBC" },
+    ],
+  },
+  {
+    key: "minorityId", step: "GP", no: "4.1.14", label: "Minority Group", kind: "select", required: true, defaultable: true,
+    options: ["Muslim", "Christian", "Sikh", "Buddhist", "Parsi", "Jain", "NA"].map((label, index) => ({
+      value: String(index + 1),
+      label: `${index + 1}-${label}`,
+    })),
+  },
+  { key: "isBplYN", step: "GP", no: "4.1.15", label: "BPL beneficiary?", kind: "yesno", required: true, defaultable: true, radio: { Y: "isBPLY", N: "isBPLN" } },
+  { key: "aayBplYN", step: "GP", no: "4.1.15 (a)", label: "Antyodaya Anna Yojana (AAY)? (only when BPL)", kind: "yesno", defaultable: true, radio: { Y: "aayBplY", N: "aayBplN" } },
+  { key: "ewsYN", step: "GP", no: "4.1.16", label: "EWS / Disadvantaged Group?", kind: "yesno", required: true, defaultable: true, radio: { Y: "ewsY", N: "ewsN" } },
+  { key: "cwsnYN", step: "GP", no: "4.1.17", label: "CWSN?", kind: "yesno", required: true, defaultable: true, radio: { Y: "cwsnY", N: "cwsnN" } },
+  {
+    key: "impairmentType", step: "GP", no: "4.1.17 (a)", label: "Type of impairment (only when CWSN, max 3)", kind: "multi",
+    options: [
+      "Blindness", "Low-Vision", "Hearing impairment", "Speech and Language", "Locomotor Disability",
+      "Mental illness", "Specific Learning Disabilities", "Cerebral palsy", "Autism Spectrum Disorder",
+      "Multiple Disability incl. deaf blindness", "Leprosy Cured students", "Dwarfism", "Intellectual Disability",
+      "Muscular Dystrophy", "Chronic Neurological conditions", "Multiple Sclerosis", "Thalassemia",
+      "Haemophilia", "Sickle Cell disease", "Acid Attack victim", "Parkinso-n’s disease",
+    ].map((label) => ({ value: label, label })),
+  },
+  { key: "disabilityCerti", step: "GP", no: "4.1.17 (b)", label: "Disability Certificate? (only when CWSN)", kind: "yesno", radio: { Y: "disabilityCertiY", N: "disabilityCertiN" } },
+  { key: "impairmentPercent", step: "GP", no: "4.1.17", label: "Disability Percentage (only when CWSN)", kind: "number", maxLength: 3 },
+  { key: "natIndYN", step: "GP", no: "4.1.18", label: "Indian National?", kind: "yesno", required: true, derived: true, radio: { Y: "natIndY", N: "natIndN" } },
+  { key: "natOtherCountry", step: "GP", no: "4.1.18 (a)", label: "Nationality of a foreign student", kind: "text" },
+  { key: "ooscYN", step: "GP", no: "4.1.19", label: "Out-of-School-Child (now or before)?", kind: "yesno", required: true, defaultable: true, radio: { Y: "ooscY", N: "ooscN" } },
+  {
+    key: "ooscMainstreamedYN", step: "GP", no: "4.1.19 (a)", label: "When mainstreamed? (only when OOSC)", kind: "select",
+    options: [
+      { value: "1", label: "1-In current academic year" },
+      { value: "2", label: "2-In earlier academic year" },
+    ],
+  },
+  {
+    key: "bloodGroup", step: "GP", no: "4.1.20", label: "Blood Group", kind: "select", required: true, derived: true, defaultable: true,
+    options: [
+      ...Object.entries({ "1": "A+", "2": "A-", "3": "B+", "4": "B-", "5": "O+", "6": "O-", "7": "AB+", "8": "AB-" }).map(
+        ([value, label]) => ({ value, label })
+      ),
+      { value: "9", label: "Under Investigation" },
+    ],
+  },
+
+  // ----- EP: Enrolment Profile
+  { key: "admnNumber", step: "EP", no: "4.2.1", label: "Admission Number", kind: "text", required: true, derived: true, maxLength: 25 },
+  { key: "admnStartDate", step: "EP", no: "4.2.2", label: "Admission Date (DD/MM/YYYY)", kind: "date", required: true, derived: true },
+  { key: "rollNumber", step: "EP", no: "", label: "Class / Section Roll Number", kind: "number", derived: true, maxLength: 5 },
+  {
+    key: "mediumOfInstruction", step: "EP", no: "4.2.3 (a)", label: "Medium of Instruction", kind: "select", required: true, defaultable: true,
+    options: [{ value: "19", label: "19-English" }],
+  },
+  {
+    key: "languageGroup", step: "EP", no: "4.2.3 (b)(i)", label: "Languages Group", kind: "select", required: true, defaultable: true,
+    options: [
+      { value: "1002", label: "English_Hindi" },
+      { value: "1005", label: "English_Hindi_Sanskrit" },
+    ],
+  },
+  {
+    key: "manadatorySubject", step: "EP", no: "4.2.3 (c)(i)", label: "Mandatory / General Subjects", kind: "multi", required: true, defaultable: true,
+    options: ["MATHEMATICS", "ENVIRONMENTAL STUDIES (EVS)", "SOCIAL SCIENCE"].map((label) => ({ value: label, label })),
+  },
+  {
+    key: "enrStatusPY", step: "EP", no: "4.2.5 (a)", label: "Status in previous academic year", kind: "select", required: true, derived: true, defaultable: true,
+    options: [
+      { value: "1", label: "1-Studied at Current/Same School" },
+      { value: "2", label: "2-Studied at Other School" },
+      { value: "3", label: "3-Anganwadi/ECCE Center" },
+      { value: "4", label: "4-None/Not Studying" },
+      { value: "5", label: "5-Studying in Unrecognized/Open School" },
+    ],
+  },
+  { key: "classPY", step: "EP", no: "4.2.5 (b)", label: "Class studied in the previous year", kind: "select", required: true, derived: true, options: UDISE_CLASS_OPTIONS },
+  { key: "isRte", step: "EP", no: "4.2.6 (a)", label: "Admitted under Section 12C of RTE?", kind: "yesno", required: true, defaultable: true, radio: { Y: "isRteY", N: "isRteN" } },
+  { key: "isRteAmount", step: "EP", no: "4.2.6 (b)", label: "RTE amount claimed (only when RTE)", kind: "number", maxLength: 5 },
+  {
+    key: "examResultPy", step: "EP", no: "4.2.7 (a)", label: "Previous class: result", kind: "select", required: true, defaultable: true,
+    options: [
+      { value: "1", label: "Promoted/Passed" },
+      { value: "3", label: "Not Promoted/Not Passed/Repeater" },
+      { value: "4", label: "Promoted/Passed without Examination" },
+    ],
+  },
+  { key: "examMarksPy", step: "EP", no: "4.2.7 (b)", label: "Previous class: marks %", kind: "number", maxLength: 3 },
+  { key: "attendancePy", step: "EP", no: "4.2.8", label: "Days attended in the previous year", kind: "number", required: true, maxLength: 3 },
+
+  // ----- FP: Facility Profile (value 1 = Yes, 2 = No on the portal)
+  { key: "olympdsNlc", step: "FP", no: "4.3.3", label: "State / National competitions or Olympiads?", kind: "yesno", required: true, defaultable: true, radio: { Y: "olympdsNlcY", N: "olympdsNlcN" } },
+  { key: "nccYn", step: "FP", no: "4.3.4 (a)", label: "NCC", kind: "yesno", required: true, defaultable: true, radio: { Y: "nccY", N: "nccN" } },
+  { key: "nssYn", step: "FP", no: "4.3.4 (b)", label: "NSS", kind: "yesno", required: true, defaultable: true, radio: { Y: "nssY", N: "nssN" } },
+  { key: "scoutsYn", step: "FP", no: "4.3.4 (c)", label: "Scouts and Guides", kind: "yesno", required: true, defaultable: true, radio: { Y: "scoutsY", N: "scoutsN" } },
+  { key: "heightInCm", step: "FP", no: "4.3.5 (a)", label: "Height (cm)", kind: "number", required: true, derived: true, maxLength: 3 },
+  { key: "weightInKg", step: "FP", no: "4.3.5 (b)", label: "Weight (kg)", kind: "number", required: true, derived: true, maxLength: 3 },
+  {
+    key: "distanceFrmSchool", step: "FP", no: "4.3.6", label: "Distance from home to school", kind: "select", required: true, defaultable: true,
+    options: [
+      { value: "1", label: "1 - Less than 1 km" },
+      { value: "2", label: "2 - Between 1-3 Kms" },
+      { value: "3", label: "3 - Between 3-5 Kms" },
+      { value: "4", label: "4 - More than 5 Kms" },
+    ],
+  },
+  {
+    key: "parentEducation", step: "FP", no: "4.3.7", label: "Highest education of mother / father / guardian", kind: "select", required: true, defaultable: true,
+    options: [
+      { value: "1", label: "1 - Primary" },
+      { value: "2", label: "2 - Upper Primary" },
+      { value: "3", label: "3 - Secondary or Equivalent" },
+      { value: "4", label: "4 - Higher Secondary or Equivalent" },
+      { value: "5", label: "5 - More than Higher Secondary" },
+      { value: "6", label: "6 - No Schooling Experience" },
+    ],
+  },
+];
+
+/** Starting school-wide answers (Settings tab changes them). */
+export const DEFAULT_UDISE_SETTINGS: UdiseSettings = {
+  defaults: {
+    motherTongue: "42-HINDI",
+    minorityId: "7",
+    isBplYN: "N",
+    aayBplYN: "",
+    ewsYN: "N",
+    cwsnYN: "N",
+    ooscYN: "N",
+    bloodGroup: "9",
+    mediumOfInstruction: "19",
+    languageGroup: "1002",
+    manadatorySubject: "",
+    enrStatusPY: "",
+    isRte: "N",
+    examResultPy: "1",
+    olympdsNlc: "N",
+    nccYn: "N",
+    nssYn: "N",
+    scoutsYn: "N",
+    distanceFrmSchool: "",
+    parentEducation: "",
+  },
+  classCodes: DEFAULT_UDISE_CLASS_CODES,
+};
+
+/** Multi-select answers are saved as one text, joined with this. */
+export const UDISE_MULTI_SEPARATOR = "|";
+
+/** "Not set" choice of a UDISE dropdown (a dropdown value cannot be empty). */
+export const UDISE_NONE = "none";

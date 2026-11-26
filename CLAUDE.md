@@ -21,6 +21,7 @@ part of a file you change (use line ranges / grep), not the whole feature.
 | Student List (filters, teacher scope, delete: left / wrong entry, recycle bin) | [docs/features/student-list.md](docs/features/student-list.md) |
 | Student documents: upload (photos / PDF), versions kept, Verified, Settings types, list badge | [docs/features/student-documents.md](docs/features/student-documents.md) |
 | Transfer Certificate: TC list / register, editor, A4 print, TC Settings, Sr. No. | [docs/features/transfer-certificate.md](docs/features/transfer-certificate.md) |
+| UDISE+ (testing): portal answers GP / EP / FP, own fields + settings, reads students only | [docs/features/udise.md](docs/features/udise.md) |
 | Permissions (all teachers / class teachers / one teacher) | [docs/features/permissions.md](docs/features/permissions.md) |
 | Environments: dev / prod Firebase projects, deploy, migration checklist | [docs/features/environments.md](docs/features/environments.md) |
 | Idle lock: admin panel locks after 5 minutes idle, password to unlock | [docs/features/idle-lock.md](docs/features/idle-lock.md) |

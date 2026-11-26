@@ -47,6 +47,8 @@ export const PERMISSIONS = {
   TC_ISSUE: "tc.issue",
   /** TC Settings (letterhead, book no., Sr. No.); admin only. */
   TC_SETTINGS: "tc.settings",
+  /** UDISE+ page (testing): portal answers of students + UDISE settings; admin only. */
+  UDISE_MANAGE: "udise.manage",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

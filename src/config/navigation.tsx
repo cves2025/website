@@ -37,6 +37,7 @@ export const MENU: MenuItem[] = [
       { label: "Promote Student", path: "/welcome/student/promote" },
       { label: "Subject", path: "/welcome/student/subject" },
       { label: "Transfer Certificate", path: "/welcome/student/tc" },
+      { label: "UDISE+ (Testing)", path: "/welcome/udise" },
     ],
   },
   {

@@ -41,6 +41,7 @@ Class teacher is read from the `isClassTeacher` flag on the user document. Rules
 | `users` | own doc, staff | admin; own doc: only `lastSeenReleaseId`, `updatedAt` |
 | `students` | staff | admin; with `student.photo` only `studentPhoto`, `fatherPhoto`, `motherPhoto` (+ `updatedAt`) |
 | `studentDocuments/{id}` (+ `/versions`) | staff | admin; `student.documents`: summary only `uploaded` + `updatedAt`, versions create (self, 1-2 files), never update, delete: admin (student-documents.md) |
+| `udiseStudents/{id}` | admin | admin (UDISE+ testing module, udise.md) |
 | `enrollments`, `rollNumber`, `exams`, `stampSign` | staff | admin; `enrollments` also `tc.issue`, only to mark Left (`isDeleted: true`, `leftReason`, `tcNo`, `leftAt`) |
 | `tcVerify` (public TC verify copy) | anyone, `get` one only (no list) | `tc.issue`, only matching the TC after the write (status, TC No., name), fixed keys; never deleted |
 | `transferCertificates` | `tc.view` / `tc.issue` | `tc.issue`: draft, issue, revise (number kept), delete a draft; `tc.view`: only `printCount`; admin: cancel. Issued TCs are never deleted |

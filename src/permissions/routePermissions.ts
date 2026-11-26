@@ -20,6 +20,7 @@ export const ROUTE_PERMISSIONS: Record<string, RouteRule> = {
   "/welcome/student/tc": [P.TC_VIEW, P.TC_ISSUE],
   "/welcome/student/tc/edit": [P.TC_VIEW, P.TC_ISSUE],
   "/welcome/student/tc/settings": P.TC_SETTINGS,
+  "/welcome/udise": P.UDISE_MANAGE,
 
   "/welcome/teacher/add": P.TEACHER_CREATE,
 

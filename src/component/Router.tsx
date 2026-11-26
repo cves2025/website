@@ -61,6 +61,7 @@ import OfficeQr from './panel/staffAttendance/OfficeQr'
 import TcList from './panel/students/tc/TcList'
 import TcEditor from './panel/students/tc/TcEditor'
 import TcSettingsPage from './panel/students/tc/TcSettingsPage'
+import UdisePage from './panel/udise/UdisePage'
 
 function Router() {
   return (
@@ -92,6 +93,7 @@ function Router() {
           <Route path="student/tc" element={<TcList />} />
           <Route path="student/tc/edit" element={<TcEditor />} />
           <Route path="student/tc/settings" element={<TcSettingsPage />} />
+          <Route path="udise" element={<UdisePage />} />
           <Route path="attendance/mark" element={<MarkAttendance />} />
           <Route path="attendance/report" element={<AttendanceReport />} />
           <Route path="attendance/holidays" element={<HolidayCalendar />} />

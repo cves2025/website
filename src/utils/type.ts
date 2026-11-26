@@ -1263,3 +1263,74 @@ export interface StudentDocumentSummary {
   /** Verified is for one version: a newer upload is not verified. */
   verified: Record<string, { versionId: string; by: string; byName: string; at: number | null }>;
 }
+
+/* ------------------------------------------------------- UDISE+ (testing) -- */
+
+/** The three UDISE+ SDMS forms of a student. */
+export type UdiseStep = "GP" | "EP" | "FP";
+
+export type UdiseFieldKind = "text" | "number" | "date" | "select" | "yesno" | "multi";
+
+/** One UDISE+ field; `key` is the portal's `formcontrolname`. */
+export interface UdiseFieldDef {
+  key: string;
+  step: UdiseStep;
+  /** Question number on the portal (e.g. "4.1.13"). */
+  no: string;
+  label: string;
+  kind: UdiseFieldKind;
+  options?: { value: string; label: string }[];
+  required?: boolean;
+  /** Filled from our student / enrollment data. */
+  derived?: boolean;
+  /** A school-wide default can be set on the UDISE Settings tab. */
+  defaultable?: boolean;
+  maxLength?: number;
+  /** Ids of the portal's Yes / No radio buttons. */
+  radio?: { Y: string; N: string };
+}
+
+/** Answers by field key ("" = none). Multi answers are joined with UDISE_MULTI_SEPARATOR. */
+export type UdiseValues = Record<string, string>;
+
+/** settings/udise: school-wide defaults and our class -> portal class code. */
+export interface UdiseSettings {
+  defaults: UdiseValues;
+  classCodes: Record<string, string>;
+}
+
+/** udiseStudents/{studentId}: answers typed for one student (they win over all else). */
+export interface UdiseStudentDoc {
+  values: UdiseValues;
+  updatedAt: number | null;
+  updatedByName: string;
+}
+
+/** Where a final UDISE answer came from. */
+export type UdiseSource = "student" | "records" | "default" | "none";
+
+export interface UdiseAnswer {
+  value: string;
+  source: UdiseSource;
+}
+
+/** One student of a section on the UDISE page. */
+export interface UdiseStudentRow {
+  studentId: string;
+  enrollmentId: string;
+  studentName: string;
+  fatherName: string;
+  admissionNo: string;
+  pen: string;
+  rollNumber: number;
+  /** Answers worked out from our records (read only). */
+  records: UdiseValues;
+  /** Answers saved for this student in udiseStudents. */
+  saved: UdiseValues;
+}
+
+/** Form of UDISE answers: `values.<key>` (select "none" = not set) and `multi.<key>` for multi-choice. */
+export interface UdiseForm {
+  values: Record<string, string>;
+  multi: Record<string, string[]>;
+}
